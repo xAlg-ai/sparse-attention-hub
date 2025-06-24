@@ -96,7 +96,6 @@ MYPY_FLAGS=(
 PYTHON_DIRS=(
     'sparse_attention_hub'
     'tests'
-    'examples'
     'scripts'
 )
 

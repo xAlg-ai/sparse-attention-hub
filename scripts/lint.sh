@@ -43,7 +43,7 @@ run_flake8() {
             --max-line-length=88 \
             --extend-ignore=E203,W503,E501 \
             --exclude=build,dist,.git,__pycache__,.pytest_cache,.venv \
-            sparse_attention_hub tests examples scripts
+            sparse_attention_hub tests scripts
         echo -e "${GREEN}✅ flake8 passed${NC}"
     else
         return 1
@@ -93,7 +93,7 @@ run_bandit() {
 run_black_check() {
     echo -e "${BLUE}Running black (format check)...${NC}"
     if check_tool "black"; then
-        black --check --line-length=88 sparse_attention_hub tests examples scripts
+        black --check --line-length=88 sparse_attention_hub tests scripts
         echo -e "${GREEN}✅ black format check passed${NC}"
     else
         return 1
@@ -109,8 +109,8 @@ run_isort_check() {
             --profile=black \
             --line-length=88 \
             --multi-line=3 \
-            --known-first-party=sparse_attention_hub \
-            sparse_attention_hub tests examples scripts
+            -p sparse_attention_hub \
+            sparse_attention_hub tests scripts
         echo -e "${GREEN}✅ isort check passed${NC}"
     else
         return 1

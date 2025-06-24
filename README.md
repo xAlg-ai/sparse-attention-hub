@@ -228,7 +228,6 @@ sparse-attention-hub/
 ├── tests/                          # Test suite
 │   ├── unit/                       # Unit tests
 │   └── integration/                # Integration tests
-├── examples/                       # Usage examples
 ├── scripts/                        # Utility scripts
 └── docs/                          # Documentation
 ```

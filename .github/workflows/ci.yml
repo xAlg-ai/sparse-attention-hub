@@ -36,15 +36,15 @@ jobs:
     
     - name: Check code formatting with black
       run: |
-        black --check --line-length=88 sparse_attention_hub tests examples scripts
+        black --check --line-length=88 sparse_attention_hub tests scripts
     
     - name: Check import sorting with isort
       run: |
-        isort --check-only --profile=black --line-length=88 --multi-line=3 --known-first-party=sparse_attention_hub sparse_attention_hub tests examples scripts
+        isort --check-only --profile=black --line-length=88 --multi-line=3 -p sparse_attention_hub sparse_attention_hub tests scripts
     
     - name: Lint with flake8
       run: |
-        flake8 --max-line-length=88 --extend-ignore=E203,W503,E501 --exclude=build,dist,.git,__pycache__,.pytest_cache,.venv sparse_attention_hub tests examples scripts
+        flake8 --max-line-length=88 --extend-ignore=E203,W503,E501 --exclude=build,dist,.git,__pycache__,.pytest_cache,.venv sparse_attention_hub tests scripts
     
     - name: Type check with mypy
       run: |
