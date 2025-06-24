@@ -1,11 +1,9 @@
 """Unit tests for metrics module."""
 
-import json
 import os
 import tempfile
 
 import numpy as np
-import pytest
 
 from sparse_attention_hub.metrics.base import MicroMetric
 from sparse_attention_hub.metrics.implementations import SampleVariance

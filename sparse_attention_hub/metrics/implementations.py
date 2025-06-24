@@ -1,6 +1,6 @@
 """Concrete metric implementations."""
 
-from typing import Any, List, Union
+from typing import List, Union
 
 import numpy as np
 import torch

@@ -2,8 +2,6 @@
 
 from unittest.mock import Mock
 
-import pytest
-
 from sparse_attention_hub.sparse_attention.base import (
     EfficientAttention,
     ResearchAttention,

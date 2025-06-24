@@ -34,13 +34,13 @@ def main():
         print("Discovering tests...")
         discovered = tester.discover_tests()
 
-        print(f"\nUnit tests ({len(discovered['unit'])}):")
+        print(f"\nUnit tests ({len(discovered['unit'])}): ")
         for test in discovered["unit"]:
-            print(f"  - {test}")
+            print(f" - {test}")
 
-        print(f"\nIntegration tests ({len(discovered['integration'])}):")
+        print(f"\nIntegration tests ({len(discovered['integration'])}): ")
         for test in discovered["integration"]:
-            print(f"  - {test}")
+            print(f" - {test}")
 
         return 0
 

@@ -1,7 +1,7 @@
 """Research maskers for attention mechanisms."""
 
 from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import List
 
 from torch import Tensor
 

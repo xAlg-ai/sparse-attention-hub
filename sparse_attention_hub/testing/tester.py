@@ -2,7 +2,7 @@
 
 import subprocess
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class Tester:
