@@ -11,7 +11,7 @@ class MicroMetric(ABC):
         self.name = name
 
     @abstractmethod
-    def compute(self, *args, **kwargs) -> Any:
+    def compute(self, *args: Any, **kwargs: Any) -> Any:
         """Compute the metric value.
 
         Args:

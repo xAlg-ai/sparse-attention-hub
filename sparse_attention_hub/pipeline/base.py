@@ -12,7 +12,7 @@ class Pipeline(ABC):
         self.tokenizer = tokenizer
 
     @abstractmethod
-    def __call__(self, inputs: Any, **kwargs) -> Any:
+    def __call__(self, inputs: Any, **kwargs: Any) -> Any:
         """Execute the pipeline on inputs.
 
         Args:

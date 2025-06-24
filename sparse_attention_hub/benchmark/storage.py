@@ -54,7 +54,7 @@ class ResultStorage:
             return None
 
         with open(file_path, "r") as f:
-            result = json.load(f)
+            result: Optional[Dict[str, Any]] = json.load(f)
             return result
 
     def list_results(self) -> List[Dict[str, str]]:

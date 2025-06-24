@@ -22,7 +22,11 @@ class BenchmarkExecutor:
         self._registered_benchmarks[benchmark.name] = benchmark
 
     def evaluate(
-        self, benchmark: Benchmark, model: Any, subset: Optional[str] = None, **kwargs
+        self,
+        benchmark: Benchmark,
+        model: Any,
+        subset: Optional[str] = None,
+        **kwargs: Any
     ) -> Dict[str, Any]:
         """Evaluate a model on a benchmark.
 
@@ -57,7 +61,7 @@ class BenchmarkExecutor:
         return results
 
     def evaluate_multiple(
-        self, benchmark_names: List[str], model: Any, **kwargs
+        self, benchmark_names: List[str], model: Any, **kwargs: Any
     ) -> Dict[str, Dict[str, Any]]:
         """Evaluate a model on multiple benchmarks.
 

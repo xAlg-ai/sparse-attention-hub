@@ -1,6 +1,6 @@
 """Concrete metric implementations."""
 
-from typing import List, Union
+from typing import Any, List, Union
 
 import numpy as np
 import torch
@@ -19,7 +19,7 @@ class TopkRecall(MicroMetric):
         self,
         predictions: Union[List, torch.Tensor, np.ndarray],
         ground_truth: Union[List, torch.Tensor, np.ndarray],
-        **kwargs,
+        **kwargs: Any,
     ) -> float:
         """Compute top-k recall.
 
@@ -52,7 +52,7 @@ class LocalError(MicroMetric):
         self,
         predicted_attention: Union[torch.Tensor, np.ndarray],
         true_attention: Union[torch.Tensor, np.ndarray],
-        **kwargs,
+        **kwargs: Any,
     ) -> float:
         """Compute local error between attention patterns.
 
@@ -82,7 +82,7 @@ class SampleVariance(MicroMetric):
         super().__init__("sample_variance")
 
     def compute(
-        self, samples: Union[List, torch.Tensor, np.ndarray], **kwargs
+        self, samples: Union[List, torch.Tensor, np.ndarray], **kwargs: Any
     ) -> float:
         """Compute sample variance.
 

@@ -21,7 +21,7 @@ class Benchmark(ABC):
         pass
 
     @abstractmethod
-    def run_benchmark(self, model: Any, **kwargs) -> Dict[str, Any]:
+    def run_benchmark(self, model: Any, **kwargs: Any) -> Dict[str, Any]:
         """Run the benchmark on a model.
 
         Args:

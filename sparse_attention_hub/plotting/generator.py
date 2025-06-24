@@ -29,7 +29,7 @@ class PlotGenerator:
         granularity: Granularity,
         data: Optional[Dict[str, Any]] = None,
         plot_type: str = "default",
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Generate a plot with specified granularity.
 
@@ -52,7 +52,10 @@ class PlotGenerator:
             raise ValueError(f"Unsupported granularity: {granularity}")
 
     def _generate_plot_1(
-        self, granularity: Granularity, data: Optional[Dict[str, Any]] = None, **kwargs
+        self,
+        granularity: Granularity,
+        data: Optional[Dict[str, Any]] = None,
+        **kwargs: Any
     ) -> str:
         """Generate plot type 1 (line plots, attention patterns).
 
@@ -96,7 +99,10 @@ class PlotGenerator:
         return filepath
 
     def _generate_plot_2(
-        self, granularity: Granularity, data: Optional[Dict[str, Any]] = None, **kwargs
+        self,
+        granularity: Granularity,
+        data: Optional[Dict[str, Any]] = None,
+        **kwargs: Any
     ) -> str:
         """Generate plot type 2 (heatmaps, attention matrices).
 

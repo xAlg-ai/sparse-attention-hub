@@ -14,7 +14,7 @@ class PipelineHF(Pipeline):
         super().__init__(model, tokenizer)
         self.device = device
 
-    def __call__(self, inputs: Any, **kwargs) -> Any:
+    def __call__(self, inputs: Any, **kwargs: Any) -> Any:
         """Execute the HuggingFace pipeline on inputs.
 
         Args:

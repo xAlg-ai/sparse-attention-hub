@@ -43,7 +43,7 @@ class LongBench(Benchmark):
         # TODO: Implement LongBench dataset loading
         raise NotImplementedError("LongBench dataset loading not yet implemented")
 
-    def run_benchmark(self, model: Any, **kwargs) -> Dict[str, Any]:
+    def run_benchmark(self, model: Any, **kwargs: Any) -> Dict[str, Any]:
         """Run LongBench on a model.
 
         Args:
@@ -88,7 +88,7 @@ class Loogle(Benchmark):
         # TODO: Implement Loogle dataset loading
         raise NotImplementedError("Loogle dataset loading not yet implemented")
 
-    def run_benchmark(self, model: Any, **kwargs) -> Dict[str, Any]:
+    def run_benchmark(self, model: Any, **kwargs: Any) -> Dict[str, Any]:
         """Run Loogle on a model.
 
         Args:
@@ -133,7 +133,7 @@ class InfBench(Benchmark):
         # TODO: Implement InfBench dataset loading
         raise NotImplementedError("InfBench dataset loading not yet implemented")
 
-    def run_benchmark(self, model: Any, **kwargs) -> Dict[str, Any]:
+    def run_benchmark(self, model: Any, **kwargs: Any) -> Dict[str, Any]:
         """Run InfBench on a model.
 
         Args:
