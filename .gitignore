@@ -147,3 +147,4 @@ wandb/
 # OS
 .DS_Store
 Thumbs.db
+bandit-report.json
