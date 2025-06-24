@@ -11,7 +11,7 @@ from .metadata import SparseAttentionMetadata
 class SparseAttention(ABC):
     """Abstract base class for sparse attention mechanisms."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.metadata = SparseAttentionMetadata()
 
     @abstractmethod
@@ -44,7 +44,7 @@ class EfficientAttention(SparseAttention):
 class ResearchAttention(SparseAttention):
     """Abstract base class for research attention mechanisms with maskers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.masks: Sequence = []
 

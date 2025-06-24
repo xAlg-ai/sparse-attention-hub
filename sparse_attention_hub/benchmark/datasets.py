@@ -8,7 +8,7 @@ from .base import Benchmark
 class LongBench(Benchmark):
     """LongBench benchmark implementation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         subsets = [
             "narrativeqa",
             "qasper",
@@ -75,7 +75,7 @@ class LongBench(Benchmark):
 class Loogle(Benchmark):
     """Loogle benchmark implementation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         subsets = ["short_dependency", "long_dependency"]
         super().__init__("Loogle", subsets)
 
@@ -120,7 +120,7 @@ class Loogle(Benchmark):
 class InfBench(Benchmark):
     """InfBench benchmark implementation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         subsets = ["en_qa", "en_mc", "en_summ", "zh_qa", "zh_mc", "zh_summ"]
         super().__init__("InfBench", subsets)
 

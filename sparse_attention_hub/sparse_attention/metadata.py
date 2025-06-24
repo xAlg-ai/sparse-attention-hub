@@ -6,7 +6,7 @@ from typing import Any, Dict
 class SparseAttentionMetadata:
     """Manages metadata for sparse attention mechanisms."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.layer_wise_state: Dict[str, Any] = {}
         self.global_state_: Dict[str, Any] = {}
 

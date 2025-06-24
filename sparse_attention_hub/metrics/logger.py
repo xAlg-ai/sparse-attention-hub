@@ -19,7 +19,7 @@ class MicroMetricLogger:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not self._initialized:
             self.available_metrics: List[MicroMetric] = []
             self.metrics_to_log: List[MicroMetric] = []

@@ -45,7 +45,7 @@ class TopkRecall(MicroMetric):
 class LocalError(MicroMetric):
     """Local error metric implementation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("local_error")
 
     def compute(
@@ -78,7 +78,7 @@ class LocalError(MicroMetric):
 class SampleVariance(MicroMetric):
     """Sample variance metric implementation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("sample_variance")
 
     def compute(

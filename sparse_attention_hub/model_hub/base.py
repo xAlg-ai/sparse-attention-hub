@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional
 class ModelHub(ABC):
     """Abstract base class for model hubs."""
 
-    def __init__(self, api_token: Optional[str] = None):
+    def __init__(self, api_token: Optional[str] = None) -> None:
         self.api_token = api_token
 
     @abstractmethod

@@ -8,7 +8,7 @@ from .base import ModelHub
 class ModelHubHF(ModelHub):
     """HuggingFace-specific model hub implementation."""
 
-    def __init__(self, api_token: Optional[str] = None):
+    def __init__(self, api_token: Optional[str] = None) -> None:
         super().__init__(api_token)
         self._original_attention_interfaces: Dict[str, Any] = {}
         self._registered_hooks: Dict[str, Any] = {}

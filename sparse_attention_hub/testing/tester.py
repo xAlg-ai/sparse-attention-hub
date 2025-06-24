@@ -207,7 +207,7 @@ class Tester:
         """
         import os
 
-        discovered = {"unit": [], "integration": []}
+        discovered: Dict[str, List[str]] = {"unit": [], "integration": []}
 
         # Discover unit tests
         if os.path.exists(self.unit_test_dir):
