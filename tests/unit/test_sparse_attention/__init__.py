@@ -1,1 +1,1 @@
-"""Unit tests for sparse attention module.""" 
+"""Unit tests for sparse attention module."""

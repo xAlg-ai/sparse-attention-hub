@@ -1,8 +1,9 @@
 """Unit tests for sparse attention base module."""
 
+import numpy as np
 import pytest
 import torch
-import numpy as np
+
 from sparse_attention_hub.sparse_attention.base import SparseAttention
 
 
@@ -20,4 +21,4 @@ class TestSparseAttention:
         pass
 
     def test_attention_computation(self, sample_attention_scores, sample_sparse_mask):
-        pass 
+        pass

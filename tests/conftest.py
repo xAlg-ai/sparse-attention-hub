@@ -1,8 +1,9 @@
 """Pytest configuration and shared fixtures for sparse attention hub tests."""
 
-import pytest
-import numpy as np
 from typing import Generator
+
+import numpy as np
+import pytest
 
 
 @pytest.fixture
@@ -45,4 +46,4 @@ def num_heads() -> int:
 @pytest.fixture
 def batch_size() -> int:
     """Batch size for testing."""
-    return 4 
+    return 4

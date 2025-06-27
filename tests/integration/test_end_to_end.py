@@ -2,6 +2,7 @@
 
 import pytest
 import torch
+
 from tests.fixtures.sample_data import create_sample_attention_data, create_sparse_mask
 
 
@@ -19,4 +20,4 @@ class TestEndToEndSparseAttention:
         pass
 
     def test_metrics_integration(self):
-        pass 
+        pass

@@ -1,8 +1,10 @@
 """Performance tests for sparse attention benchmarks."""
 
-import pytest
 import time
+
+import pytest
 import torch
+
 from tests.fixtures.sample_data import create_sample_attention_data, create_sparse_mask
 
 
@@ -19,4 +21,4 @@ class TestPerformanceBenchmarks:
         pass
 
     def test_scalability(self):
-        pass 
+        pass
