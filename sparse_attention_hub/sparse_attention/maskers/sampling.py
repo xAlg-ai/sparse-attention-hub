@@ -2,7 +2,7 @@
 
 from typing import Any, List
 
-from .base import SamplingMasker, ResearchMasker
+from .base import ResearchMasker, SamplingMasker
 
 
 class RRandomSampling(SamplingMasker):
@@ -66,4 +66,4 @@ class RMagicPig(SamplingMasker):
     ) -> Any:
         """Get attention denominator."""
         # Bare metal implementation - no functionality
-        pass 
+        pass

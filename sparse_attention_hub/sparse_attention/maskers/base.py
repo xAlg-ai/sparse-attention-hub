@@ -57,4 +57,4 @@ class topKMasker(FixedMasker):
 class topPMasker(FixedMasker):
     """Abstract base class for top-P maskers."""
 
-    pass 
+    pass

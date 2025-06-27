@@ -98,4 +98,4 @@ class RSinkMasker(FixedMasker):
     ) -> Any:
         """Get attention denominator."""
         # Bare metal implementation - no functionality
-        pass 
+        pass

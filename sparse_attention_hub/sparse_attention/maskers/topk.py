@@ -2,7 +2,7 @@
 
 from typing import Any, List
 
-from .base import topKMasker, ResearchMasker
+from .base import ResearchMasker, topKMasker
 
 
 class RPQCache(topKMasker):
@@ -130,4 +130,4 @@ class RDoubleSparsity(topKMasker):
     ) -> Any:
         """Get attention denominator."""
         # Bare metal implementation - no functionality
-        pass 
+        pass

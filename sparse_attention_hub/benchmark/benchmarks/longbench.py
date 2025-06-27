@@ -69,4 +69,4 @@ class LongBench(Benchmark):
             Dictionary of metrics
         """
         # TODO: Implement LongBench metrics
-        raise NotImplementedError("LongBench metrics not yet implemented") 
+        raise NotImplementedError("LongBench metrics not yet implemented")

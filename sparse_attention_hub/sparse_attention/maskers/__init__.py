@@ -1,26 +1,20 @@
 """Research maskers for attention mechanisms (bare metal)."""
 
-from .base import (
-    ResearchMasker,
-    SamplingMasker,
-    FixedMasker,
-    topKMasker,
-    topPMasker,
-)
-from .fixed import RLocalMasker, RCausalMasker, RSinkMasker
-from .topk import RPQCache, ROracletopK, RHashAttention, RDoubleSparsity
-from .sampling import RRandomSampling, RMagicPig
+from .base import FixedMasker, ResearchMasker, SamplingMasker, topKMasker, topPMasker
+from .fixed import RCausalMasker, RLocalMasker, RSinkMasker
+from .sampling import RMagicPig, RRandomSampling
+from .topk import RDoubleSparsity, RHashAttention, ROracletopK, RPQCache
 
 __all__ = [
     # Base classes
     "ResearchMasker",
-    "SamplingMasker", 
+    "SamplingMasker",
     "FixedMasker",
     "topKMasker",
     "topPMasker",
     # Fixed maskers
     "RLocalMasker",
-    "RCausalMasker", 
+    "RCausalMasker",
     "RSinkMasker",
     # Top-K maskers
     "RPQCache",
@@ -30,4 +24,4 @@ __all__ = [
     # Sampling maskers
     "RRandomSampling",
     "RMagicPig",
-] 
+]

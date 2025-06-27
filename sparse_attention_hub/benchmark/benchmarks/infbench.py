@@ -47,4 +47,4 @@ class InfBench(Benchmark):
             Dictionary of metrics
         """
         # TODO: Implement InfBench metrics
-        raise NotImplementedError("InfBench metrics not yet implemented") 
+        raise NotImplementedError("InfBench metrics not yet implemented")

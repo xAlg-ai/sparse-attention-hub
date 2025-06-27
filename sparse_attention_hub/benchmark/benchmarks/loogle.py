@@ -47,4 +47,4 @@ class Loogle(Benchmark):
             Dictionary of metrics
         """
         # TODO: Implement Loogle metrics
-        raise NotImplementedError("Loogle metrics not yet implemented") 
+        raise NotImplementedError("Loogle metrics not yet implemented")
