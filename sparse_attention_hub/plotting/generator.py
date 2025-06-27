@@ -55,7 +55,7 @@ class PlotGenerator:
         self,
         granularity: Granularity,
         data: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> str:
         """Generate plot type 1 (line plots, attention patterns).
 
@@ -102,7 +102,7 @@ class PlotGenerator:
         self,
         granularity: Granularity,
         data: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> str:
         """Generate plot type 2 (heatmaps, attention matrices).
 

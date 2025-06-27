@@ -1,4 +1,4 @@
-"""Metadata management for sparse attention mechanisms."""
+"""Metadata management for sparse attention mechanisms (bare metal)."""
 
 from typing import Any, Dict
 
@@ -7,6 +7,7 @@ class SparseAttentionMetadata:
     """Manages metadata for sparse attention mechanisms."""
 
     def __init__(self) -> None:
+        """Initialize metadata."""
         self.layer_wise_state: Dict[str, Any] = {}
         self.global_state_: Dict[str, Any] = {}
 

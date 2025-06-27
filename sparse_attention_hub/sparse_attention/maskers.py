@@ -1,9 +1,7 @@
-"""Research maskers for attention mechanisms."""
+"""Research maskers for attention mechanisms (bare metal)."""
 
 from abc import ABC, abstractmethod
-from typing import List
-
-from torch import Tensor
+from typing import Any, List
 
 
 class ResearchMasker(ABC):
@@ -12,12 +10,12 @@ class ResearchMasker(ABC):
     @abstractmethod
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List["ResearchMasker"],
     ) -> None:
         """Add mask to attention computation."""
@@ -25,15 +23,15 @@ class ResearchMasker(ABC):
 
     @abstractmethod
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
         """Get attention numerator with mask applied."""
         pass
 
     @abstractmethod
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
         """Get attention denominator with mask applied."""
         pass
 
@@ -68,28 +66,31 @@ class RLocalMasker(FixedMasker):
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement local masking
-        raise NotImplementedError("RLocalMasker not yet implemented")
+        """Add local mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RLocalMasker numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RLocalMasker denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 class RCausalMasker(FixedMasker):
@@ -97,28 +98,31 @@ class RCausalMasker(FixedMasker):
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement causal masking
-        raise NotImplementedError("RCausalMasker not yet implemented")
+        """Add causal mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RCausalMasker numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RCausalMasker denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 class RSinkMasker(FixedMasker):
@@ -126,28 +130,31 @@ class RSinkMasker(FixedMasker):
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement sink masking
-        raise NotImplementedError("RSinkMasker not yet implemented")
+        """Add sink mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RSinkMasker numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RSinkMasker denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 # Top-K masker implementations
@@ -156,28 +163,31 @@ class RPQCache(topKMasker):
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement PQ cache masking
-        raise NotImplementedError("RPQCache not yet implemented")
+        """Add PQ cache mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RPQCache numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RPQCache denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 class ROracletopK(topKMasker):
@@ -185,142 +195,156 @@ class ROracletopK(topKMasker):
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement oracle top-K masking
-        raise NotImplementedError("ROracletopK not yet implemented")
+        """Add oracle top-K mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("ROracletopK numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("ROracletopK denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 class RHashAttention(topKMasker):
-    """Hash attention-based top-K masker."""
+    """Hash attention masker."""
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement hash attention masking
-        raise NotImplementedError("RHashAttention not yet implemented")
+        """Add hash attention mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RHashAttention numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RHashAttention denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 class RDoubleSparsity(topKMasker):
-    """Double sparsity-based top-K masker."""
+    """Double sparsity masker."""
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement double sparsity masking
-        raise NotImplementedError("RDoubleSparsity not yet implemented")
+        """Add double sparsity mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RDoubleSparsity numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RDoubleSparsity denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
-# Sampling masker implementations
 class RRandomSampling(SamplingMasker):
     """Random sampling masker."""
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement random sampling masking
-        raise NotImplementedError("RRandomSampling not yet implemented")
+        """Add random sampling mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RRandomSampling numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RRandomSampling denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass
 
 
 class RMagicPig(SamplingMasker):
-    """Magic Pig sampling masker."""
+    """Magic Pig masker."""
 
     def add_mask(
         self,
-        keys: Tensor,
-        queries: Tensor,
-        values: Tensor,
-        previous_attention_mask: Tensor,
-        prev_num: Tensor,
-        prev_den: Tensor,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        # TODO: Implement Magic Pig masking
-        raise NotImplementedError("RMagicPig not yet implemented")
+        """Add Magic Pig mask."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_numerator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement numerator computation
-        raise NotImplementedError("RMagicPig numerator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
 
     def get_attention_denominator(
-        self, keys: Tensor, queries: Tensor, values: Tensor, mask: Tensor
-    ) -> Tensor:
-        # TODO: Implement denominator computation
-        raise NotImplementedError("RMagicPig denominator not yet implemented")
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass

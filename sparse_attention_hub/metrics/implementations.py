@@ -102,5 +102,5 @@ class SampleVariance(MicroMetric):
         # Compute sample variance
         if len(samples) == 0:
             return 0.0
-
         return float(np.var(samples, ddof=1) if len(samples) > 1 else 0.0)
+

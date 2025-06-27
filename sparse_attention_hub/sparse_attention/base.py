@@ -1,25 +1,22 @@
-"""Base classes for sparse attention mechanisms."""
+"""Base classes for sparse attention mechanisms (bare metal)."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Tuple
-
-from torch import Tensor
-
-from .metadata import SparseAttentionMetadata
+from typing import Any, Optional, Tuple
 
 
 class SparseAttention(ABC):
     """Abstract base class for sparse attention mechanisms."""
 
     def __init__(self) -> None:
-        self.metadata = SparseAttentionMetadata()
+        """Initialize sparse attention mechanism."""
+        pass
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Tensor, Optional[Tensor]]:
+    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
         """Compute custom attention mechanism.
 
         Returns:
-            Tuple of attention output tensor and optional attention weights.
+            Tuple of attention output and optional attention weights.
         """
         pass
 
@@ -32,11 +29,11 @@ class EfficientAttention(SparseAttention):
     """Abstract base class for efficient attention mechanisms."""
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Tensor, Optional[Tensor]]:
+    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
         """Compute efficient attention mechanism.
 
         Returns:
-            Tuple of attention output tensor and optional attention weights.
+            Tuple of attention output and optional attention weights.
         """
         pass
 
@@ -45,14 +42,15 @@ class ResearchAttention(SparseAttention):
     """Abstract base class for research attention mechanisms with maskers."""
 
     def __init__(self) -> None:
+        """Initialize research attention mechanism."""
         super().__init__()
-        self.masks: Sequence = []
+        self.masks: list = []
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Tensor, Optional[Tensor]]:
+    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
         """Compute research attention mechanism with masking.
 
         Returns:
-            Tuple of attention output tensor and optional attention weights.
+            Tuple of attention output and optional attention weights.
         """
         pass

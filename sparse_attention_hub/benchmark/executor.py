@@ -26,7 +26,7 @@ class BenchmarkExecutor:
         benchmark: Benchmark,
         model: Any,
         subset: Optional[str] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Evaluate a model on a benchmark.
 

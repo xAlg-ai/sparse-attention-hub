@@ -1,8 +1,6 @@
-"""Efficient attention implementations."""
+"""Efficient attention implementations (bare metal)."""
 
-from typing import Optional, Tuple
-
-from torch import Tensor
+from typing import Any, Optional, Tuple
 
 from .base import EfficientAttention
 
@@ -10,24 +8,24 @@ from .base import EfficientAttention
 class DoubleSparsity(EfficientAttention):
     """Double sparsity attention mechanism."""
 
-    def custom_attention(self) -> Tuple[Tensor, Optional[Tensor]]:
+    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
         """Compute double sparsity attention.
 
         Returns:
-            Tuple of attention output tensor and optional attention weights.
+            Tuple of attention output and optional attention weights.
         """
-        # TODO: Implement double sparsity attention algorithm
-        raise NotImplementedError("DoubleSparsity attention not yet implemented")
+        # Bare metal implementation - no functionality
+        pass
 
 
 class HashAttention(EfficientAttention):
     """Hash-based attention mechanism."""
 
-    def custom_attention(self) -> Tuple[Tensor, Optional[Tensor]]:
+    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
         """Compute hash-based attention.
 
         Returns:
-            Tuple of attention output tensor and optional attention weights.
+            Tuple of attention output and optional attention weights.
         """
-        # TODO: Implement hash attention algorithm
-        raise NotImplementedError("HashAttention not yet implemented")
+        # Bare metal implementation - no functionality
+        pass
