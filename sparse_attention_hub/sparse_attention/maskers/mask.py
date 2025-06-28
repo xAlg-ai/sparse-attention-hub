@@ -141,14 +141,12 @@ class Mask:
             
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             ptr_size = np.prod(self.shape[:-1]) + 1
-            ptr = torch.zeros(ptr_size, dtype=torch.long)
-            
-            # For multi-dimensional tensors, we need to count non-zero elements for each position
-            # in the flattened tensor (excluding the last dimension)
-            flat_mask = self.mask.view(-1, self.shape[-1])  # Reshape to (prod(shape[:-1]), shape[-1])
-            
-            for i in range(flat_mask.shape[0]):
-                ptr[i + 1] = ptr[i] + torch.count_nonzero(flat_mask[i])
+            # Vectorized version: count nonzero per row and cumsum
+            counts = torch.count_nonzero(self.mask.view(-1, self.shape[-1]), dim=1)
+            ptr = torch.cat([
+                torch.zeros(1, dtype=torch.long),
+                torch.cumsum(counts, dim=0)
+            ])
             
             return non_zero_indices, ptr, data
         else:
@@ -166,21 +164,11 @@ class Mask:
         elif self.from_index:
             # Convert sparse representation to dense mask
             dense_mask = torch.zeros(self.shape, dtype=self.dtype)
-            
-            # For each position in the mask
-            for i in range(len(self.ptr) - 1):
-                start_idx = self.ptr[i]
-                end_idx = self.ptr[i + 1]
-                
-                if start_idx < end_idx:
-                    # Get the indices for this position
-                    pos_indices = self.indices[start_idx:end_idx]
-                    # Set the corresponding positions to the data values or 1.0 if data is None
-                    if self.data is not None:
-                        dense_mask.view(-1)[pos_indices] = self.data[start_idx:end_idx]
-                    else:
-                        dense_mask.view(-1)[pos_indices] = 1.0
-            
+            if self.indices is not None and len(self.indices) > 0:
+                if self.data is not None:
+                    dense_mask.view(-1)[self.indices] = self.data
+                else:
+                    dense_mask.view(-1)[self.indices] = 1.0
             return dense_mask
         else:
             raise RuntimeError("Mask object is in an invalid state")
