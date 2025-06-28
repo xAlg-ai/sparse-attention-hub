@@ -1,12 +1,12 @@
-"""Sampling-based masker implementations."""
+"""Base fixed pattern masker implementations."""
 
 from typing import Any, List
 
-from .base import ResearchMasker, SamplingMasker
+from ..base import FixedMasker, ResearchMasker
 
 
-class RRandomSampling(SamplingMasker):
-    """Random sampling masker."""
+class LocalMasker(FixedMasker):
+    """Local attention masker."""
 
     def add_mask(
         self,
@@ -18,7 +18,7 @@ class RRandomSampling(SamplingMasker):
         prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        """Add random sampling mask."""
+        """Add local mask."""
         # Bare metal implementation - no functionality
         pass
 
@@ -37,8 +37,8 @@ class RRandomSampling(SamplingMasker):
         pass
 
 
-class RMagicPig(SamplingMasker):
-    """Magic Pig masker."""
+class CausalMasker(FixedMasker):
+    """Causal attention masker."""
 
     def add_mask(
         self,
@@ -50,7 +50,7 @@ class RMagicPig(SamplingMasker):
         prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        """Add Magic Pig mask."""
+        """Add causal mask."""
         # Bare metal implementation - no functionality
         pass
 
@@ -67,3 +67,35 @@ class RMagicPig(SamplingMasker):
         """Get attention denominator."""
         # Bare metal implementation - no functionality
         pass
+
+
+class SinkMasker(FixedMasker):
+    """Sink attention masker."""
+
+    def add_mask(
+        self,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
+        maskers: List[ResearchMasker],
+    ) -> None:
+        """Add sink mask."""
+        # Bare metal implementation - no functionality
+        pass
+
+    def get_attention_numerator(
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator."""
+        # Bare metal implementation - no functionality
+        pass
+
+    def get_attention_denominator(
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator."""
+        # Bare metal implementation - no functionality
+        pass 

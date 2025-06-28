@@ -4,8 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Any, List
 
 
-
-
 class ResearchMasker(ABC):
     """Abstract base class for research maskers."""
 
@@ -50,13 +48,13 @@ class FixedMasker(ResearchMasker):
     pass
 
 
-class topKMasker(FixedMasker):
+class TopKMasker(FixedMasker):
     """Abstract base class for top-K maskers."""
 
     pass
 
 
-class topPMasker(FixedMasker):
+class TopPMasker(FixedMasker):
     """Abstract base class for top-P maskers."""
 
-    pass
+    pass 

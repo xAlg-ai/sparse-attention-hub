@@ -1,5 +1,5 @@
 import torch
-from sparse_attention_hub.sparse_attention.maskers.mask import Mask
+from sparse_attention_hub.sparse_attention.utils.mask import Mask
 import numpy as np  
 
 def test_create_mask_from_dense_mask():

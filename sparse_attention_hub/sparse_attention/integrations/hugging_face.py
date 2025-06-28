@@ -1,23 +1,9 @@
-"""Sparse attention generators and interfaces (bare metal)."""
+"""HuggingFace integration for sparse attention."""
 
-from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from .base import SparseAttention
-
-
-class SparseAttentionGen(ABC):
-    """Abstract base class for sparse attention generators."""
-
-    @abstractmethod
-    def get_custom_attention_function(self) -> Callable:
-        """Get the custom attention function."""
-        pass
-
-    @abstractmethod
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Make the generator callable."""
-        pass
+from ..base import SparseAttention
+from ..generator import SparseAttentionGen
 
 
 class SparseAttentionHF(SparseAttentionGen):
@@ -45,4 +31,4 @@ class SparseAttentionHF(SparseAttentionGen):
         Returns:
             Output from the sparse attention mechanism
         """
-        pass
+        pass 
