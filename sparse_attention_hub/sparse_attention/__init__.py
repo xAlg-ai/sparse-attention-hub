@@ -7,22 +7,20 @@ from .generator import SparseAttentionGen
 from .integrations import SparseAttentionHF
 from .metadata import SparseAttentionMetadata
 from .research_attention import ResearchAttention
-from .research_attention.maskers import (
+from .research_attention.maskers import ResearchMasker
+from .research_attention.maskers.fixed import (
+    CausalMasker,
+    RDoubleSparsity,
     FixedMasker,
-    ResearchMasker,
-    SamplingMasker,
+    RHashAttention,
+    LocalMasker,
+    OracleTopK,
+    PQCache,
+    SinkMasker,
     TopKMasker,
     TopPMasker,
 )
-from .research_attention.maskers.fixed import CausalMasker, LocalMasker, SinkMasker
-from .research_attention.maskers.fixed.implementations import (
-    DoubleSparsity as RDoubleSparsity,
-    HashAttention as RHashAttention,
-    OracleTopK,
-    PQCache,
-)
-from .research_attention.maskers.sampling import RandomSamplingMasker
-from .research_attention.maskers.sampling.implementations import MagicPig
+from .research_attention.maskers.sampling import MagicPig, RandomSamplingMasker, SamplingMasker
 from .utils import Mask
 
 __all__ = [

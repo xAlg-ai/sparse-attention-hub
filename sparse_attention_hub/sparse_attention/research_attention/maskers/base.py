@@ -33,28 +33,4 @@ class ResearchMasker(ABC):
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator with mask applied."""
-        pass
-
-
-class SamplingMasker(ResearchMasker):
-    """Abstract base class for sampling-based maskers."""
-
-    pass
-
-
-class FixedMasker(ResearchMasker):
-    """Abstract base class for fixed pattern maskers."""
-
-    pass
-
-
-class TopKMasker(FixedMasker):
-    """Abstract base class for top-K maskers."""
-
-    pass
-
-
-class TopPMasker(FixedMasker):
-    """Abstract base class for top-P maskers."""
-
-    pass 
+        pass 

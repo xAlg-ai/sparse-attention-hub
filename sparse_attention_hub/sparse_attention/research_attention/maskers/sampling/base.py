@@ -1,37 +1,9 @@
 """Base sampling masker implementations."""
 
-from typing import Any, List
-
-from ..base import ResearchMasker, SamplingMasker
+from ..base import ResearchMasker
 
 
-class RandomSamplingMasker(SamplingMasker):
-    """Random sampling masker."""
+class SamplingMasker(ResearchMasker):
+    """Abstract base class for sampling-based maskers."""
 
-    def add_mask(
-        self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        previous_attention_mask: Any,
-        prev_num: Any,
-        prev_den: Any,
-        maskers: List[ResearchMasker],
-    ) -> None:
-        """Add random sampling mask."""
-        # Bare metal implementation - no functionality
-        pass
-
-    def get_attention_numerator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
-
-    def get_attention_denominator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass 
+    pass 

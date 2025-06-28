@@ -1,13 +1,13 @@
-"""Oracle top-K masker implementation."""
+"""Random sampling masker implementation."""
 
 from typing import Any, List
 
 from ...base import ResearchMasker
-from ..base import TopKMasker
+from ..base import SamplingMasker
 
 
-class OracleTopK(TopKMasker):
-    """Oracle top-K masker."""
+class RandomSamplingMasker(SamplingMasker):
+    """Random sampling masker."""
 
     def add_mask(
         self,
@@ -19,7 +19,7 @@ class OracleTopK(TopKMasker):
         prev_den: Any,
         maskers: List[ResearchMasker],
     ) -> None:
-        """Add oracle top-K mask."""
+        """Add random sampling mask."""
         # Bare metal implementation - no functionality
         pass
 

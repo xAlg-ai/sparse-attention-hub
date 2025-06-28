@@ -2,7 +2,8 @@
 
 from typing import Any, List
 
-from ...base import ResearchMasker, TopKMasker
+from ...base import ResearchMasker
+from ..base import TopKMasker
 
 
 class DoubleSparsity(TopKMasker):

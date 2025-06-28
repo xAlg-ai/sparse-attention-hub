@@ -1,5 +1,6 @@
 """Sampling-based maskers."""
 
-from .base import RandomSamplingMasker
+from .base import SamplingMasker
+from .implementations import RandomSamplingMasker, MagicPig
 
-__all__ = ["RandomSamplingMasker"] 
+__all__ = ["SamplingMasker", "RandomSamplingMasker", "MagicPig"] 
