@@ -1,7 +1,5 @@
 """Pytest configuration and shared fixtures for sparse attention hub tests."""
 
-from typing import Generator
-
 import numpy as np
 import pytest
 

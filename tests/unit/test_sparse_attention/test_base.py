@@ -1,10 +1,6 @@
 """Unit tests for sparse attention base module."""
 
-import numpy as np
 import pytest
-import torch
-
-from sparse_attention_hub.sparse_attention.base import SparseAttention
 
 
 @pytest.mark.unit

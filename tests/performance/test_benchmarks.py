@@ -1,11 +1,6 @@
 """Performance tests for sparse attention benchmarks."""
 
-import time
-
 import pytest
-import torch
-
-from tests.fixtures.sample_data import create_sample_attention_data, create_sparse_mask
 
 
 @pytest.mark.performance

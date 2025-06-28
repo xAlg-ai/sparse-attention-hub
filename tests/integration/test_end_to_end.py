@@ -1,9 +1,6 @@
 """Integration tests for end-to-end sparse attention functionality."""
 
 import pytest
-import torch
-
-from tests.fixtures.sample_data import create_sample_attention_data, create_sparse_mask
 
 
 @pytest.mark.integration
