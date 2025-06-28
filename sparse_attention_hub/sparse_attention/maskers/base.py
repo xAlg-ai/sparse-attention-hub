@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from typing import Any, List
 
 
+
+
 class ResearchMasker(ABC):
     """Abstract base class for research maskers."""
 

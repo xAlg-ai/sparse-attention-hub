@@ -2,6 +2,7 @@
 
 from .base import FixedMasker, ResearchMasker, SamplingMasker, topKMasker, topPMasker
 from .fixed import RCausalMasker, RLocalMasker, RSinkMasker
+from .mask import Mask
 from .sampling import RMagicPig, RRandomSampling
 from .topk import RDoubleSparsity, RHashAttention, ROracletopK, RPQCache
 
@@ -12,6 +13,8 @@ __all__ = [
     "FixedMasker",
     "topKMasker",
     "topPMasker",
+    # Mask class
+    "Mask",
     # Fixed maskers
     "RLocalMasker",
     "RCausalMasker",
