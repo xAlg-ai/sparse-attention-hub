@@ -67,6 +67,7 @@ class ResearchMasker(ABC):
         Raises:
             ValueError: If no masker class is found for the config type.
         """
+
         if cls._MASKER_REGISTRY is None:
             from .fixed import (
                 LocalMasker, LocalMaskerConfig,
