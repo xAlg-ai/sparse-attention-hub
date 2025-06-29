@@ -1,13 +1,25 @@
 """Random sampling masker implementation."""
 
-from typing import Any, List
+from dataclasses import dataclass
+from typing import Any, List, Union
 
 from ...base import ResearchMasker
-from ..base import SamplingMasker
+from ..base import SamplingMasker, SamplingMaskerConfig
+
+
+@dataclass
+class RandomSamplingMaskerConfig(SamplingMaskerConfig):
+    """Configuration for RandomSamplingMasker."""
+    pass
 
 
 class RandomSamplingMasker(SamplingMasker):
     """Random sampling masker."""
+
+    def __init__(self, config: RandomSamplingMaskerConfig):
+        """Initialize random sampling masker with configuration."""
+        super().__init__(config)
+        self.sampling_rate = config.sampling_rate
 
     def add_mask(
         self,
@@ -35,4 +47,9 @@ class RandomSamplingMasker(SamplingMasker):
     ) -> Any:
         """Get attention denominator."""
         # Bare metal implementation - no functionality
-        pass 
+        pass
+
+    @classmethod
+    def create_from_config(cls, config: RandomSamplingMaskerConfig) -> "RandomSamplingMasker":
+        """Create RandomSamplingMasker instance from configuration."""
+        return cls(config) 

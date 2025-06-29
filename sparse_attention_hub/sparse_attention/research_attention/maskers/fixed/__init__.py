@@ -1,6 +1,13 @@
 """Fixed pattern maskers."""
 
-from .base import FixedMasker, TopKMasker, TopPMasker
+from .base import (
+    FixedMasker, 
+    TopKMasker, 
+    TopPMasker,
+    FixedMaskerConfig,
+    TopKMaskerConfig,
+    TopPMaskerConfig
+)
 from .implementations import (
     CausalMasker,
     LocalMasker,
@@ -9,17 +16,32 @@ from .implementations import (
     PQCache,
     HashAttention as RHashAttention,
     DoubleSparsity as RDoubleSparsity,
+    LocalMaskerConfig,
+    SinkMaskerConfig,
+    OracleTopKConfig,
+    PQCacheConfig,
+    HashAttentionConfig,
+    DoubleSparsityConfig,
 )
 
 __all__ = [
     "FixedMasker",
     "TopKMasker", 
     "TopPMasker",
+    "FixedMaskerConfig",
+    "TopKMaskerConfig",
+    "TopPMaskerConfig",
     "LocalMasker", 
     "CausalMasker", 
     "SinkMasker",
     "OracleTopK", 
     "PQCache", 
     "RHashAttention", 
-    "RDoubleSparsity"
+    "RDoubleSparsity",
+    "LocalMaskerConfig",
+    "SinkMaskerConfig",
+    "OracleTopKConfig",
+    "PQCacheConfig",
+    "HashAttentionConfig",
+    "DoubleSparsityConfig",
 ] 

@@ -1,13 +1,25 @@
 """Oracle top-K masker implementation."""
 
-from typing import Any, List
+from dataclasses import dataclass
+from typing import Any, List, Union
 
 from ...base import ResearchMasker
-from ..base import TopKMasker
+from ..base import TopKMasker, TopKMaskerConfig
+
+
+@dataclass
+class OracleTopKConfig(TopKMaskerConfig):
+    """Configuration for OracleTopK masker."""
+    pass
 
 
 class OracleTopK(TopKMasker):
     """Oracle top-K masker."""
+
+    def __init__(self, config: OracleTopKConfig):
+        """Initialize oracle top-K masker with configuration."""
+        super().__init__(config)
+        self.heavy_size = config.heavy_size
 
     def add_mask(
         self,
@@ -35,4 +47,9 @@ class OracleTopK(TopKMasker):
     ) -> Any:
         """Get attention denominator."""
         # Bare metal implementation - no functionality
-        pass 
+        pass
+
+    @classmethod
+    def create_from_config(cls, config: OracleTopKConfig) -> "OracleTopK":
+        """Create OracleTopK instance from configuration."""
+        return cls(config) 

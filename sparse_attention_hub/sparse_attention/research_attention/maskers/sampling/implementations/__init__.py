@@ -1,6 +1,11 @@
 """Sampling masker implementations."""
 
-from .magic_pig import MagicPig
-from .random_sampling import RandomSamplingMasker
+from .magic_pig import MagicPig, MagicPigConfig
+from .random_sampling import RandomSamplingMasker, RandomSamplingMaskerConfig
 
-__all__ = ["MagicPig", "RandomSamplingMasker"] 
+__all__ = [
+    "MagicPig", 
+    "RandomSamplingMasker",
+    "MagicPigConfig",
+    "RandomSamplingMaskerConfig"
+] 

@@ -1,13 +1,28 @@
 """PQ cache-based top-K masker implementation."""
 
-from typing import Any, List
+from dataclasses import dataclass
+from typing import Any, List, Union
 
 from ...base import ResearchMasker
-from ..base import TopKMasker
+from ..base import TopKMasker, TopKMaskerConfig
+
+
+@dataclass
+class PQCacheConfig(TopKMaskerConfig):
+    """Configuration for PQCache masker."""
+    pq_sub_dim: int
+    pq_bits: int
 
 
 class PQCache(TopKMasker):
     """PQ cache-based top-K masker."""
+
+    def __init__(self, config: PQCacheConfig):
+        """Initialize PQ cache masker with configuration."""
+        super().__init__(config)
+        self.heavy_size = config.heavy_size
+        self.pq_sub_dim = config.pq_sub_dim
+        self.pq_bits = config.pq_bits
 
     def add_mask(
         self,
@@ -35,4 +50,9 @@ class PQCache(TopKMasker):
     ) -> Any:
         """Get attention denominator."""
         # Bare metal implementation - no functionality
-        pass 
+        pass
+
+    @classmethod
+    def create_from_config(cls, config: PQCacheConfig) -> "PQCache":
+        """Create PQCache instance from configuration."""
+        return cls(config) 
