@@ -1,5 +1,5 @@
 """Efficient attention implementations."""
 
-from .base import EfficientAttention
+from .base import EfficientAttention, EfficientAttentionConfig
 
-__all__ = ["EfficientAttention"] 
+__all__ = ["EfficientAttention", "EfficientAttentionConfig"] 

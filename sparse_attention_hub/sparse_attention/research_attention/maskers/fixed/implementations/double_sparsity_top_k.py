@@ -8,18 +8,18 @@ from ..base import TopKMasker, TopKMaskerConfig
 
 
 @dataclass
-class DoubleSparsityConfig(TopKMaskerConfig):
-    """Configuration for DoubleSparsity masker."""
+class DoubleSparsityTopKMaskerConfig(TopKMaskerConfig):
+    """Configuration for DoubleSparsityTopKMasker."""
     group_factor: int
     label_bits: int
     channel_config: Any  # config with stats required for double sparsity
 
 
-class DoubleSparsity(TopKMasker):
-    """Double sparsity masker."""
+class DoubleSparsityTopKMasker(TopKMasker):
+    """Double sparsity top-K masker."""
 
-    def __init__(self, config: DoubleSparsityConfig):
-        """Initialize double sparsity masker with configuration."""
+    def __init__(self, config: DoubleSparsityTopKMaskerConfig):
+        """Initialize double sparsity top-K masker with configuration."""
         super().__init__(config)
         self.heavy_size = config.heavy_size
         self.group_factor = config.group_factor
@@ -55,6 +55,6 @@ class DoubleSparsity(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: DoubleSparsityConfig) -> "DoubleSparsity":
-        """Create DoubleSparsity instance from configuration."""
+    def create_from_config(cls, config: DoubleSparsityTopKMaskerConfig) -> "DoubleSparsityTopKMasker":
+        """Create DoubleSparsityTopKMasker instance from configuration."""
         return cls(config) 

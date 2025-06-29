@@ -1,5 +1,5 @@
 """Research attention implementations."""
 
-from .base import ResearchAttention
+from .base import ResearchAttention, ResearchAttentionConfig
 
-__all__ = ["ResearchAttention"] 
+__all__ = ["ResearchAttention", "ResearchAttentionConfig"] 

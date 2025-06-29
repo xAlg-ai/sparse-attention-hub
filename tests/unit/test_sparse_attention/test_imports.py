@@ -21,6 +21,28 @@ class TestSparseAttentionImports:
         assert EfficientAttention is not None
         assert ResearchAttention is not None
 
+    def test_config_classes_import(self):
+        """Test that config classes can be imported."""
+        from sparse_attention_hub.sparse_attention import (
+            SparseAttentionConfig,
+            EfficientAttentionConfig,
+            ResearchAttentionConfig,
+            DoubleSparsityConfig,
+            HashAttentionConfig,
+            DoubleSparsityTopKMaskerConfig,
+            HashAttentionTopKMaskerConfig,
+            ChannelConfig,
+        )
+        
+        assert SparseAttentionConfig is not None
+        assert EfficientAttentionConfig is not None
+        assert ResearchAttentionConfig is not None
+        assert DoubleSparsityConfig is not None
+        assert HashAttentionConfig is not None
+        assert DoubleSparsityTopKMaskerConfig is not None
+        assert HashAttentionTopKMaskerConfig is not None
+        assert ChannelConfig is not None
+
     def test_efficient_attention_implementations_import(self):
         """Test that efficient attention implementations can be imported."""
         from sparse_attention_hub.sparse_attention import (
@@ -55,8 +77,8 @@ class TestSparseAttentionImports:
             SinkMasker,
             OracleTopK,
             PQCache,
-            RHashAttention,
-            RDoubleSparsity,
+            HashAttentionTopKMasker,
+            DoubleSparsityTopKMasker,
         )
         
         assert LocalMasker is not None
@@ -64,8 +86,8 @@ class TestSparseAttentionImports:
         assert SinkMasker is not None
         assert OracleTopK is not None
         assert PQCache is not None
-        assert RHashAttention is not None
-        assert RDoubleSparsity is not None
+        assert HashAttentionTopKMasker is not None
+        assert DoubleSparsityTopKMasker is not None
 
     def test_sampling_masker_implementations_import(self):
         """Test that sampling masker implementations can be imported."""
@@ -104,6 +126,15 @@ class TestSparseAttentionImports:
             SparseAttention,
             EfficientAttention,
             ResearchAttention,
+            # Config classes
+            SparseAttentionConfig,
+            EfficientAttentionConfig,
+            ResearchAttentionConfig,
+            DoubleSparsityConfig,
+            HashAttentionConfig,
+            DoubleSparsityTopKMaskerConfig,
+            HashAttentionTopKMaskerConfig,
+            ChannelConfig,
             # Efficient implementations
             DoubleSparsity,
             HashAttention,
@@ -119,8 +150,8 @@ class TestSparseAttentionImports:
             SinkMasker,
             OracleTopK,
             PQCache,
-            RHashAttention,
-            RDoubleSparsity,
+            HashAttentionTopKMasker,
+            DoubleSparsityTopKMasker,
             # Sampling masker implementations
             RandomSamplingMasker,
             MagicPig,
@@ -135,10 +166,12 @@ class TestSparseAttentionImports:
         # Verify all classes are imported
         classes = [
             SparseAttention, EfficientAttention, ResearchAttention,
+            SparseAttentionConfig, EfficientAttentionConfig, ResearchAttentionConfig,
+            DoubleSparsityConfig, HashAttentionConfig, DoubleSparsityTopKMaskerConfig, HashAttentionTopKMaskerConfig, ChannelConfig,
             DoubleSparsity, HashAttention,
             ResearchMasker, SamplingMasker, FixedMasker, TopKMasker, TopPMasker,
             LocalMasker, CausalMasker, SinkMasker, OracleTopK, PQCache, 
-            RHashAttention, RDoubleSparsity,
+            HashAttentionTopKMasker, DoubleSparsityTopKMasker,
             RandomSamplingMasker, MagicPig,
             SparseAttentionGen, SparseAttentionHF,
             Mask, SparseAttentionMetadata,
@@ -152,10 +185,12 @@ class TestSparseAttentionImports:
         # Check that key classes are available from module-level import
         expected_classes = [
             'SparseAttention', 'EfficientAttention', 'ResearchAttention',
+            'SparseAttentionConfig', 'EfficientAttentionConfig', 'ResearchAttentionConfig',
+            'DoubleSparsityConfig', 'HashAttentionConfig', 'DoubleSparsityTopKMaskerConfig', 'HashAttentionTopKMaskerConfig', 'ChannelConfig',
             'DoubleSparsity', 'HashAttention',
             'ResearchMasker', 'SamplingMasker', 'FixedMasker', 'TopKMasker', 'TopPMasker',
             'LocalMasker', 'CausalMasker', 'SinkMasker', 'OracleTopK', 'PQCache',
-            'RHashAttention', 'RDoubleSparsity',
+            'HashAttentionTopKMasker', 'DoubleSparsityTopKMasker',
             'RandomSamplingMasker', 'MagicPig',
             'SparseAttentionGen', 'SparseAttentionHF',
             'Mask', 'SparseAttentionMetadata',
@@ -170,6 +205,9 @@ class TestSparseAttentionImports:
             SparseAttention,
             EfficientAttention,
             ResearchAttention,
+            SparseAttentionConfig,
+            EfficientAttentionConfig,
+            ResearchAttentionConfig,
             FixedMasker,
             TopKMasker,
             TopPMasker,
@@ -183,6 +221,10 @@ class TestSparseAttentionImports:
         assert issubclass(TopKMasker, FixedMasker)
         assert issubclass(TopPMasker, FixedMasker)
         assert issubclass(SamplingMasker, ResearchMasker)
+        
+        # Test config inheritance hierarchy
+        assert issubclass(EfficientAttentionConfig, SparseAttentionConfig)
+        assert issubclass(ResearchAttentionConfig, SparseAttentionConfig)
 
     def test_module_structure(self):
         """Test that the module structure is correct."""

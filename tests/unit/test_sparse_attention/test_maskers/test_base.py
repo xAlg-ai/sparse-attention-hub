@@ -1,6 +1,22 @@
 """Tests for masker base classes, configs, and create_from_config methods."""
 
 import pytest
+from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    ResearchMasker, MaskerConfig
+)
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.base import (
+    FixedMasker, FixedMaskerConfig,
+    LocalMasker, LocalMaskerConfig,
+    CausalMasker,
+    SinkMasker, SinkMaskerConfig,
+    OracleTopK, OracleTopKConfig,
+    PQCache, PQCacheConfig,
+    HashAttentionTopKMasker, HashAttentionTopKMaskerConfig,
+    DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig,
+)
+from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.base import (
+    SamplingMasker, SamplingMaskerConfig
+)
 
 
 @pytest.mark.unit
@@ -23,8 +39,8 @@ class TestMaskerConfigsAndCreation:
             SinkMasker, SinkMaskerConfig,
             OracleTopK, OracleTopKConfig,
             PQCache, PQCacheConfig,
-            RHashAttention, HashAttentionConfig,
-            RDoubleSparsity, DoubleSparsityConfig,
+            HashAttentionTopKMasker, HashAttentionTopKMaskerConfig,
+            DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig,
             FixedMaskerConfig, TopKMaskerConfig, TopPMaskerConfig
         )
         
@@ -38,10 +54,10 @@ class TestMaskerConfigsAndCreation:
         assert OracleTopKConfig is not None
         assert PQCache is not None
         assert PQCacheConfig is not None
-        assert RHashAttention is not None
-        assert HashAttentionConfig is not None
-        assert RDoubleSparsity is not None
-        assert DoubleSparsityConfig is not None
+        assert HashAttentionTopKMasker is not None
+        assert HashAttentionTopKMaskerConfig is not None
+        assert DoubleSparsityTopKMasker is not None
+        assert DoubleSparsityTopKMaskerConfig is not None
 
     def test_sampling_masker_imports(self):
         """Test that all sampling masker classes can be imported."""
@@ -126,16 +142,16 @@ class TestMaskerConfigsAndCreation:
     def test_hash_attention_config_and_creation(self):
         """Test HashAttention config and create_from_config method."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-            RHashAttention, HashAttentionConfig
+            HashAttentionTopKMasker, HashAttentionTopKMaskerConfig
         )
         
-        config = HashAttentionConfig(
+        config = HashAttentionTopKMaskerConfig(
             heavy_size=0.4,
             hat_bits=8,
             hat_mlp_layers=2,
             hat_mlp_hidden_size=64
         )
-        masker = RHashAttention.create_from_config(config)
+        masker = HashAttentionTopKMasker.create_from_config(config)
         
         assert masker.heavy_size == 0.4
         assert masker.hat_bits == 8
@@ -146,17 +162,17 @@ class TestMaskerConfigsAndCreation:
     def test_double_sparsity_config_and_creation(self):
         """Test DoubleSparsity config and create_from_config method."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-            RDoubleSparsity, DoubleSparsityConfig
+            DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig
         )
         
         channel_config = {'stats': 'required', 'channels': 64}
-        config = DoubleSparsityConfig(
+        config = DoubleSparsityTopKMaskerConfig(
             heavy_size=0.3,
             group_factor=4,
             label_bits=8,
             channel_config=channel_config
         )
-        masker = RDoubleSparsity.create_from_config(config)
+        masker = DoubleSparsityTopKMasker.create_from_config(config)
         
         assert masker.heavy_size == 0.3
         assert masker.group_factor == 4
@@ -205,7 +221,7 @@ class TestMaskerConfigsAndCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers import ResearchMasker
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             FixedMasker, TopKMasker, LocalMasker, CausalMasker, SinkMasker,
-            OracleTopK, PQCache, RHashAttention, RDoubleSparsity
+            OracleTopK, PQCache, HashAttentionTopKMasker, DoubleSparsityTopKMasker
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
             SamplingMasker, RandomSamplingMasker, MagicPig
@@ -222,8 +238,8 @@ class TestMaskerConfigsAndCreation:
         assert issubclass(SinkMasker, FixedMasker)
         assert issubclass(OracleTopK, TopKMasker)
         assert issubclass(PQCache, TopKMasker)
-        assert issubclass(RHashAttention, TopKMasker)
-        assert issubclass(RDoubleSparsity, TopKMasker)
+        assert issubclass(HashAttentionTopKMasker, TopKMasker)
+        assert issubclass(DoubleSparsityTopKMasker, TopKMasker)
         assert issubclass(RandomSamplingMasker, SamplingMasker)
         assert issubclass(MagicPig, SamplingMasker)
 
@@ -232,7 +248,7 @@ class TestMaskerConfigsAndCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers import MaskerConfig
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             FixedMaskerConfig, TopKMaskerConfig, LocalMaskerConfig, SinkMaskerConfig,
-            OracleTopKConfig, PQCacheConfig, HashAttentionConfig, DoubleSparsityConfig
+            OracleTopKConfig, PQCacheConfig, HashAttentionTopKMaskerConfig, DoubleSparsityTopKMaskerConfig
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
             SamplingMaskerConfig, RandomSamplingMaskerConfig, MagicPigConfig
@@ -248,7 +264,100 @@ class TestMaskerConfigsAndCreation:
         assert issubclass(SinkMaskerConfig, FixedMaskerConfig)
         assert issubclass(OracleTopKConfig, TopKMaskerConfig)
         assert issubclass(PQCacheConfig, TopKMaskerConfig)
-        assert issubclass(HashAttentionConfig, TopKMaskerConfig)
-        assert issubclass(DoubleSparsityConfig, TopKMaskerConfig)
+        assert issubclass(HashAttentionTopKMaskerConfig, TopKMaskerConfig)
+        assert issubclass(DoubleSparsityTopKMaskerConfig, TopKMaskerConfig)
         assert issubclass(RandomSamplingMaskerConfig, SamplingMaskerConfig)
         assert issubclass(MagicPigConfig, SamplingMaskerConfig)
+
+
+class TestResearchMasker:
+    """Test ResearchMasker base class."""
+
+    def test_research_masker_is_abstract(self):
+        """Test that ResearchMasker is abstract and cannot be instantiated."""
+        with pytest.raises(TypeError):
+            ResearchMasker()
+
+    def test_research_masker_has_required_methods(self):
+        """Test that ResearchMasker has required abstract methods."""
+        # Check that the class has the required abstract methods
+        assert hasattr(ResearchMasker, 'create_mask')
+        assert hasattr(ResearchMasker, 'create_masker_from_config')
+
+
+class TestMaskerConfig:
+    """Test MaskerConfig base class."""
+
+    def test_masker_config_is_dataclass(self):
+        """Test that MaskerConfig is a dataclass."""
+        # This should work since MaskerConfig is a dataclass
+        config = MaskerConfig()
+        assert isinstance(config, MaskerConfig)
+
+
+class TestFixedMasker:
+    """Test FixedMasker base class."""
+
+    def test_fixed_masker_is_abstract(self):
+        """Test that FixedMasker is abstract and cannot be instantiated."""
+        with pytest.raises(TypeError):
+            FixedMasker()
+
+    def test_fixed_masker_has_required_methods(self):
+        """Test that FixedMasker has required abstract methods."""
+        # Check that the class has the required abstract methods
+        assert hasattr(FixedMasker, 'create_mask')
+
+
+class TestFixedMaskerConfig:
+    """Test FixedMaskerConfig base class."""
+
+    def test_fixed_masker_config_is_dataclass(self):
+        """Test that FixedMaskerConfig is a dataclass."""
+        # This should work since FixedMaskerConfig is a dataclass
+        config = FixedMaskerConfig()
+        assert isinstance(config, FixedMaskerConfig)
+
+
+class TestSamplingMasker:
+    """Test SamplingMasker base class."""
+
+    def test_sampling_masker_is_abstract(self):
+        """Test that SamplingMasker is abstract and cannot be instantiated."""
+        with pytest.raises(TypeError):
+            SamplingMasker()
+
+    def test_sampling_masker_has_required_methods(self):
+        """Test that SamplingMasker has required abstract methods."""
+        # Check that the class has the required abstract methods
+        assert hasattr(SamplingMasker, 'create_mask')
+
+
+class TestSamplingMaskerConfig:
+    """Test SamplingMaskerConfig base class."""
+
+    def test_sampling_masker_config_is_dataclass(self):
+        """Test that SamplingMaskerConfig is a dataclass."""
+        # This should work since SamplingMaskerConfig is a dataclass
+        config = SamplingMaskerConfig()
+        assert isinstance(config, SamplingMaskerConfig)
+
+
+class TestMaskerInheritance:
+    """Test masker inheritance relationships."""
+
+    def test_fixed_masker_inheritance(self):
+        """Test that FixedMasker inherits from ResearchMasker."""
+        # FixedMasker should inherit from ResearchMasker
+        assert issubclass(FixedMasker, ResearchMasker)
+
+    def test_sampling_masker_inheritance(self):
+        """Test that SamplingMasker inherits from ResearchMasker."""
+        # SamplingMasker should inherit from ResearchMasker
+        assert issubclass(SamplingMasker, ResearchMasker)
+
+    def test_config_inheritance(self):
+        """Test that config classes inherit correctly."""
+        # FixedMaskerConfig and SamplingMaskerConfig should inherit from MaskerConfig
+        assert issubclass(FixedMaskerConfig, MaskerConfig)
+        assert issubclass(SamplingMaskerConfig, MaskerConfig)

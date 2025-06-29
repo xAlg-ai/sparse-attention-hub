@@ -1,9 +1,10 @@
 """Base fixed pattern masker implementations."""
 
+from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Any, List
 
-from ..base import ResearchMasker, MaskerConfig
+from ..base import MaskerConfig, ResearchMasker
 
 
 @dataclass
@@ -18,6 +19,34 @@ class FixedMasker(ResearchMasker):
     def __init__(self, config: FixedMaskerConfig):
         """Initialize fixed masker with configuration."""
         super().__init__(config)
+
+    @abstractmethod
+    def add_mask(
+        self,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        previous_attention_mask: Any,
+        prev_num: Any,
+        prev_den: Any,
+        maskers: List[ResearchMasker],
+    ) -> None:
+        """Add fixed mask to attention computation."""
+        pass
+
+    @abstractmethod
+    def get_attention_numerator(
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention numerator with fixed mask applied."""
+        pass
+
+    @abstractmethod
+    def get_attention_denominator(
+        self, keys: Any, queries: Any, values: Any, mask: Any
+    ) -> Any:
+        """Get attention denominator with fixed mask applied."""
+        pass
 
     @classmethod
     def create_from_config(cls, config: FixedMaskerConfig) -> "FixedMasker":

@@ -8,18 +8,18 @@ from ..base import TopKMasker, TopKMaskerConfig
 
 
 @dataclass
-class HashAttentionConfig(TopKMaskerConfig):
-    """Configuration for HashAttention masker."""
+class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
+    """Configuration for HashAttentionTopKMasker."""
     hat_bits: int
     hat_mlp_layers: int
     hat_mlp_hidden_size: int
 
 
-class HashAttention(TopKMasker):
-    """Hash attention masker."""
+class HashAttentionTopKMasker(TopKMasker):
+    """Hash attention top-K masker."""
 
-    def __init__(self, config: HashAttentionConfig):
-        """Initialize hash attention masker with configuration."""
+    def __init__(self, config: HashAttentionTopKMaskerConfig):
+        """Initialize hash attention top-K masker with configuration."""
         super().__init__(config)
         self.heavy_size = config.heavy_size
         self.hat_bits = config.hat_bits
@@ -55,6 +55,6 @@ class HashAttention(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: HashAttentionConfig) -> "HashAttention":
-        """Create HashAttention instance from configuration."""
+    def create_from_config(cls, config: HashAttentionTopKMaskerConfig) -> "HashAttentionTopKMasker":
+        """Create HashAttentionTopKMasker instance from configuration."""
         return cls(config) 

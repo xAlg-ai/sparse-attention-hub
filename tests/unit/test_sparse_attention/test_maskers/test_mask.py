@@ -1,6 +1,8 @@
 import torch
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 import numpy as np  
+import pytest
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import LocalMaskerConfig
 
 def test_create_mask_from_dense_mask():
     shape = (3, 5)
@@ -63,3 +65,26 @@ def test_getters_dense_index_n_dims(n_dims=3):
         data = data[start:end]
         indices = indices[start:end]
         assert torch.allclose(data, mask.view(-1)[indices])
+
+class TestLocalMaskerConfig:
+    """Test LocalMaskerConfig functionality."""
+
+    def test_local_masker_config_creation(self):
+        """Test LocalMaskerConfig can be created with valid parameters."""
+        config = LocalMaskerConfig(window_size=5)
+        assert config.window_size == 5
+
+    def test_local_masker_config_defaults(self):
+        """Test LocalMaskerConfig has correct default values."""
+        config = LocalMaskerConfig()
+        assert config.window_size == 1  # Assuming default is 1
+
+    def test_local_masker_config_validation(self):
+        """Test LocalMaskerConfig validates input parameters."""
+        # Test with valid window_size
+        config = LocalMaskerConfig(window_size=10)
+        assert config.window_size == 10
+
+        # Test with zero window_size (should be valid for local attention)
+        config = LocalMaskerConfig(window_size=0)
+        assert config.window_size == 0
