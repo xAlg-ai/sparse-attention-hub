@@ -1,0 +1,37 @@
+# Development dependencies for sparse-attention-hub
+# Linting and formatting
+black==22.10.0
+isort==5.12.0
+flake8==5.0.4
+pylint==2.17.4
+mypy==1.4.0
+bandit==1.7.5
+pyupgrade==3.10.1
+docformatter==1.7.5
+
+# Testing
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-xdist==3.3.1
+pytest-mock==3.11.1
+
+# Pre-commit hooks
+pre-commit==3.3.3
+
+# Type stubs
+types-PyYAML==6.0.12.11
+types-requests==2.31.0.2
+types-setuptools==68.0.0.3
+
+# Documentation
+sphinx==7.1.2
+sphinx-rtd-theme==1.3.0
+myst-parser==2.0.0
+
+# Jupyter for examples
+jupyter==1.0.0
+ipykernel==6.25.0
+
+# Additional development tools
+twine==4.0.2
+build==0.10.0
