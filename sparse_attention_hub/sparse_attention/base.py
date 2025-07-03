@@ -45,4 +45,15 @@ class SparseAttention(ABC):
         Returns:
             Instance of the sparse attention mechanism.
         """
-        return cls(config)
+        # Import here to avoid circular imports
+        from .research_attention import ResearchAttention, ResearchAttentionConfig
+        from .efficient_attention import EfficientAttention, EfficientAttentionConfig
+        
+        # Check config type and route to appropriate create_from_config method
+        if isinstance(config, ResearchAttentionConfig):
+            return ResearchAttention.create_from_config(config)
+        elif isinstance(config, EfficientAttentionConfig):
+            return EfficientAttention.create_from_config(config)
+        else:
+            # Fallback to default behavior for base config
+            return cls(config)
