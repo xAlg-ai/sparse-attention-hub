@@ -16,6 +16,8 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed impo
     PQCache, PQCacheConfig,
     HashAttentionTopKMasker, HashAttentionTopKMaskerConfig,
     DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig,
+    TopKMasker, TopKMaskerConfig,
+    TopPMasker, TopPMaskerConfig,
 )
 
 @pytest.mark.unit
@@ -33,6 +35,8 @@ class TestMaskerImports:
             PQCache, PQCacheConfig,
             HashAttentionTopKMasker, HashAttentionTopKMaskerConfig,
             DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig,
+            TopKMasker, TopKMaskerConfig,
+            TopPMasker, TopPMaskerConfig,
         )
         assert FixedMasker is not None
         assert LocalMasker is not None
@@ -50,6 +54,8 @@ class TestMaskerImports:
         assert PQCacheConfig is not None
         assert HashAttentionTopKMaskerConfig is not None
         assert DoubleSparsityTopKMaskerConfig is not None
+        assert TopKMaskerConfig is not None
+        assert TopPMaskerConfig is not None
 
 @pytest.mark.unit
 class TestMaskerConfigCreation:
@@ -76,7 +82,7 @@ class TestMaskerConfigCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             TopPMaskerConfig,
         )
-        config = TopPMaskerConfig(top_p=0.5)
+        config = TopPMaskerConfig()  # TopPMaskerConfig has no parameters
         assert config is not None
 
 @pytest.mark.unit

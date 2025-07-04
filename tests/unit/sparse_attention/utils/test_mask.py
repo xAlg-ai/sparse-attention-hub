@@ -1,3 +1,11 @@
+"""
+:author: Aditya Desai
+:copyright: 2025 Sparse Attention Hub
+:license: Apache 2.0
+:date: 2025-07-03
+:summary: Tests for mask. This file is part of the Sparse Attention Hub project.
+"""
+
 import torch
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 import numpy as np  

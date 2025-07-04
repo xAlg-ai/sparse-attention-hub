@@ -202,8 +202,26 @@ class TestSparseAttentionConfigsAndFactories:
         assert research_attention.maskers == []
         
         # Test that custom_attention method works
-        result = research_attention.custom_attention()
-        assert result == (None, None)
+        import torch
+        module = None  # Mock module
+        queries = torch.randn(2, 4, 10, 64)  # (b, h, sk, d)
+        keys = torch.randn(2, 4, 12, 64)     # (b, h, sq, d)
+        values = torch.randn(2, 4, 12, 64)   # (b, h, sq, d)
+        attention_mask = None
+        scaling = 1.0
+        dropout = 0.1
+        
+        result = research_attention.custom_attention(
+            module=module,
+            queries=queries,
+            keys=keys,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout
+        )
+        assert result[0] is not None  # attention_output should not be None
+        assert result[1] is None      # attention_weights should be None
 
     def test_research_attention_config_and_creation(self):
         """Test ResearchAttentionConfig and create_from_config method."""
