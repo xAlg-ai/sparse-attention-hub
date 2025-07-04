@@ -178,11 +178,17 @@ class Mask:
         Apply the mask to an input tensor.
         
         Args:
+            if mask is empty, return input_tensor # as if no mask is applied
+            if mask is not empty, then 0=> inactive and >0 => active with the corresponding weight
+
             input_tensor: Input tensor with shape same as the mask
             
         Returns:
             Output tensor after applying the mask
         """
+        if self.is_empty():
+            return input_tensor
+
         if input_tensor.shape != self.shape:
             raise ValueError(f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}")
         
@@ -212,6 +218,7 @@ class Mask:
         Returns:
             Mask object with all zeros in the specified representation
         """
+
         if mask_type == "dense":
             empty_mask = torch.zeros(shape, dtype=dtype)
             return cls.create_mask_from_dense_mask(shape, empty_mask, dtype)
@@ -231,6 +238,17 @@ class Mask:
         else:
             raise ValueError(f"mask_type must be 'dense' or 'index', got {mask_type}")
     
+    def is_empty(self) -> bool:
+        """
+        Check if the mask is empty.
+        """
+        if self.from_dense_mask:
+            return torch.all(self.mask == 0)
+        elif self.from_index:
+            return self.indices.numel() == 0
+        else:
+            raise RuntimeError("Mask object is in an invalid state")
+
     def __repr__(self) -> str:
         """String representation of the Mask object."""
         return f"Mask(shape={self.shape}, dtype={self.dtype}, from_dense_mask={self.from_dense_mask}, from_index={self.from_index})"
