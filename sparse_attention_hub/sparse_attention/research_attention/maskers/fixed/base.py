@@ -26,11 +26,11 @@ class FixedMasker(ResearchMasker):
         keys: Any,
         queries: Any,
         values: Any,
-        previous_attention_mask: Any,
-        prev_num: Any,
-        prev_den: Any,
-        maskers: List[ResearchMasker],
-    ) -> None:
+        attention_mask: Any,
+        sparse_meta_data: Any,
+        previous_mask: Any,
+        **kwargs
+    ) -> Any:
         """Add fixed mask to attention computation."""
         pass
 
@@ -67,6 +67,20 @@ class TopKMasker(FixedMasker):
         """Initialize top-K masker with configuration."""
         super().__init__(config)
 
+    @abstractmethod
+    def add_mask(
+        self,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        attention_mask: Any,
+        sparse_meta_data: Any,
+        previous_mask: Any,
+        **kwargs
+    ) -> Any:
+        """Add top-K mask to attention computation."""
+        pass
+
     @classmethod
     def create_from_config(cls, config: TopKMaskerConfig) -> "TopKMasker":
         """Create top-K masker instance from configuration."""
@@ -85,6 +99,20 @@ class TopPMasker(FixedMasker):
     def __init__(self, config: TopPMaskerConfig):
         """Initialize top-P masker with configuration."""
         super().__init__(config)
+
+    @abstractmethod
+    def add_mask(
+        self,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        attention_mask: Any,
+        sparse_meta_data: Any,
+        previous_mask: Any,
+        **kwargs
+    ) -> Any:
+        """Add top-P mask to attention computation."""
+        pass
 
     @classmethod
     def create_from_config(cls, config: TopPMaskerConfig) -> "TopPMasker":

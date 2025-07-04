@@ -1,7 +1,8 @@
 """Base sampling masker implementations."""
 
+from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Any
 
 from ..base import ResearchMasker, MaskerConfig
 
@@ -19,9 +20,21 @@ class SamplingMasker(ResearchMasker):
         """Initialize sampling masker with configuration."""
         super().__init__(config)
 
+    @abstractmethod
+    def add_mask(
+        self,
+        keys: Any,
+        queries: Any,
+        values: Any,
+        attention_mask: Any,
+        sparse_meta_data: Any,
+        previous_mask: Any,
+        **kwargs
+    ) -> Any:
+        """Add sampling mask to attention computation."""
+        pass
+
     @classmethod
     def create_from_config(cls, config: SamplingMaskerConfig) -> "SamplingMasker":
         """Create sampling masker instance from configuration."""
-        return cls(config)
-
-    pass 
+        return cls(config) 

@@ -26,11 +26,11 @@ class ResearchMasker(ABC):
         keys: Any,
         queries: Any,
         values: Any,
-        previous_attention_mask: Any,
-        prev_num: Any,
-        prev_den: Any,
-        maskers: List["ResearchMasker"],
-    ) -> None:
+        attention_mask: Any,
+        sparse_meta_data: Any,
+        previous_mask: Any,
+        **kwargs
+    ) -> Any:
         """Add mask to attention computation."""
         pass
 

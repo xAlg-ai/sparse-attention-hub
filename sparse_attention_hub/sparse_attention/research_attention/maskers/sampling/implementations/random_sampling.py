@@ -26,14 +26,14 @@ class RandomSamplingMasker(SamplingMasker):
         keys: Any,
         queries: Any,
         values: Any,
-        previous_attention_mask: Any,
-        prev_num: Any,
-        prev_den: Any,
-        maskers: List[ResearchMasker],
-    ) -> None:
+        attention_mask: Any,
+        sparse_meta_data: Any,
+        previous_mask: Any,
+        **kwargs
+    ) -> Any:
         """Add random sampling mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # just return the same mask for now
+        return previous_mask
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
