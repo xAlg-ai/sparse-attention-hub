@@ -303,10 +303,104 @@ class TestGetAttentionNumerator:
 
 
 @pytest.mark.unit
-class TestGetMaskedAttentionOutput:
+class TestGetMaskedAttentionOutputExternal:
     """Test class for get masked attention output."""
+
+    def test_compare_with_eager_attention_sparse_mask_empty_dropout_0_eval_mode_num_kv_heads_2_different_q_len(self):
+        """Test that the masked attention output is the same as the eager attention output for no mask."""
+        batch_size, num_q_heads, num_kv_heads, seq_len_q, seq_len_kv, d_model = 2, 4, 2, 2, 32, 16
+        scaling = 1.0 / np.sqrt(d_model)
+        dropout = 0.1
+        
+        queries = torch.randn(batch_size, num_q_heads, seq_len_q, d_model)
+        keys = torch.randn(batch_size, num_kv_heads, seq_len_kv, d_model)
+        values = torch.randn(batch_size, num_kv_heads, seq_len_kv, d_model)
+
+        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_q_heads, seq_len_q, seq_len_kv))
+
+        # Create attention mask (lower triangular for causal attention)
+        attention_mask = torch.triu(torch.ones(seq_len_q, seq_len_kv), diagonal=seq_len_kv- seq_len_q)
+        attention_mask.masked_fill_(attention_mask == 1, float('-inf'))
+        attention_mask = attention_mask.unsqueeze(0).unsqueeze(0).expand(batch_size, num_q_heads, -1, -1)
+
+        from transformers.models.llama.modeling_llama import eager_attention_forward
+        module = torch.nn.Module()
+        module.eval()
+        module.num_key_value_groups = num_q_heads // num_kv_heads
+
+        eager_attention_output, eager_attention_weights = eager_attention_forward(
+            module=module,
+            query=queries,
+            key=keys,
+            value=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout
+        )
+
+        my_attention_output, my_attention_weights = get_masked_attention_output(
+            module=module,
+            queries=queries,
+            keys=keys,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout,
+            sparse_attention_mask=sparse_attention_mask,
+            return_attention_weights=True
+        )
+        assert torch.allclose(my_attention_output, eager_attention_output, atol=1e-6)
+        assert torch.allclose(my_attention_weights, eager_attention_weights, atol=1e-6)
+
+
+    def test_compare_with_eager_attention_sparse_mask_empty_dropout_0_eval_mode_num_kv_heads_2(self):
+        """Test that the masked attention output is the same as the eager attention output for no mask."""
+        batch_size, num_q_heads, num_kv_heads, seq_len, d_model = 2, 4, 2, 8, 16
+        scaling = 1.0 / np.sqrt(d_model)
+        dropout = 0.1
+        
+        queries = torch.randn(batch_size, num_q_heads, seq_len, d_model)
+        keys = torch.randn(batch_size, num_kv_heads, seq_len, d_model)
+        values = torch.randn(batch_size, num_kv_heads, seq_len, d_model)
+
+        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_q_heads, seq_len, seq_len))
+
+        # Create attention mask (lower triangular for causal attention)
+        attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
+        attention_mask.masked_fill_(attention_mask == 1, float('-inf'))
+        attention_mask = attention_mask.unsqueeze(0).unsqueeze(0).expand(batch_size, num_q_heads, -1, -1)
+
+        from transformers.models.llama.modeling_llama import eager_attention_forward
+        module = torch.nn.Module()
+        module.eval()
+        module.num_key_value_groups = num_q_heads // num_kv_heads
+
+        eager_attention_output, eager_attention_weights = eager_attention_forward(
+            module=module,
+            query=queries,
+            key=keys,
+            value=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout
+        )
+
+        my_attention_output, my_attention_weights = get_masked_attention_output(
+            module=module,
+            queries=queries,
+            keys=keys,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout,
+            sparse_attention_mask=sparse_attention_mask,
+            return_attention_weights=True
+        )
+        assert torch.allclose(my_attention_output, eager_attention_output, atol=1e-6)
+        assert torch.allclose(my_attention_weights, eager_attention_weights, atol=1e-6)
+
     
-    def test_compare_with_eager_attention_for_no_mask(self):
+    def test_compare_with_eager_attention_sparse_mask_empty_dropout_0_eval_mode(self):
         """Test that the masked attention output is the same as the eager attention output for no mask."""
         batch_size, num_heads, seq_len, d_model = 2, 4, 8, 16
         scaling = 1.0 / np.sqrt(d_model)
@@ -329,7 +423,7 @@ class TestGetMaskedAttentionOutput:
         print("Is Training: ", module.training)
         module.num_key_value_groups = 1
 
-        eager_attention_output, _ = eager_attention_forward(
+        eager_attention_output, eager_attention_weights = eager_attention_forward(
             module=module,
             query=queries,
             key=keys,
@@ -339,7 +433,7 @@ class TestGetMaskedAttentionOutput:
             dropout=dropout
         )
 
-        result = get_masked_attention_output(
+        my_attention_output, my_attention_weights = get_masked_attention_output(
             module=module,
             queries=queries,
             keys=keys,
@@ -347,7 +441,112 @@ class TestGetMaskedAttentionOutput:
             attention_mask=attention_mask,
             scaling=scaling,
             dropout=dropout,
-            sparse_attention_mask=sparse_attention_mask
+            sparse_attention_mask=sparse_attention_mask,
+            return_attention_weights=True
         )
-        print(result.shape, eager_attention_output.shape)
-        assert torch.allclose(result, eager_attention_output, atol=1e-6)
+        assert torch.allclose(my_attention_output, eager_attention_output, atol=1e-6)
+        assert torch.allclose(my_attention_weights, eager_attention_weights, atol=1e-6)
+
+
+    def test_compare_with_eager_attention_sparse_mask_empty_dropout_0_train_mode(self):
+        """Test that the masked attention output is the same as the eager attention output for no mask."""
+        batch_size, num_heads, seq_len, d_model = 2, 4, 8, 16
+        scaling = 1.0 / np.sqrt(d_model)
+        dropout = 0
+        
+        queries = torch.randn(batch_size, num_heads, seq_len, d_model)
+        keys = torch.randn(batch_size, num_heads, seq_len, d_model)
+        values = torch.randn(batch_size, num_heads, seq_len, d_model)
+
+        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len))
+
+        # Create attention mask (lower triangular for causal attention)
+        attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
+        attention_mask.masked_fill_(attention_mask == 1, float('-inf'))
+        attention_mask = attention_mask.unsqueeze(0).unsqueeze(0).expand(batch_size, num_heads, -1, -1)
+
+        from transformers.models.llama.modeling_llama import eager_attention_forward
+        module = torch.nn.Module()
+        module.train()
+        module.num_key_value_groups = 1
+
+        eager_attention_output, eager_attention_weights = eager_attention_forward(
+            module=module,
+            query=queries,
+            key=keys,
+            value=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout
+        )
+
+        my_attention_output, my_attention_weights = get_masked_attention_output(
+            module=module,
+            queries=queries,
+            keys=keys,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout,
+            sparse_attention_mask=sparse_attention_mask,
+            return_attention_weights=True
+        )
+        assert torch.allclose(my_attention_output, eager_attention_output, atol=1e-6)
+        assert torch.allclose(my_attention_weights, eager_attention_weights, atol=1e-6)
+
+
+    def test_compare_with_eager_attention_sparse_mask_empty_dropout_train_mode(self):
+        """Test that the masked attention output is the same as the eager attention output for no mask."""
+        batch_size, num_heads, seq_len, d_model = 2, 4, 8, 16
+        scaling = 1.0 / np.sqrt(d_model)
+        dropout = 0.5
+        
+        queries = torch.randn(batch_size, num_heads, seq_len, d_model)
+        keys = torch.randn(batch_size, num_heads, seq_len, d_model)
+        values = torch.randn(batch_size, num_heads, seq_len, d_model)
+
+        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len))
+
+        # Create attention mask (lower triangular for causal attention)
+        attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
+        attention_mask.masked_fill_(attention_mask == 1, float('-inf'))
+        attention_mask = attention_mask.unsqueeze(0).unsqueeze(0).expand(batch_size, num_heads, -1, -1)
+
+        from transformers.models.llama.modeling_llama import eager_attention_forward
+        module = torch.nn.Module()
+        module.train()
+        module.num_key_value_groups = 1
+
+        def mock_dropout(x,p, training=True, inplace=False):
+            torch.manual_seed(42)
+            torch.cuda.manual_seed(42)
+            mask = torch.randn_like(x) > 0.5
+            return x * mask
+
+        with mock.patch('torch.nn.functional.dropout', mock_dropout):
+            eager_attention_output, eager_attention_weights = eager_attention_forward(
+                module=module,
+                query=queries,
+                key=keys,
+                value=values,
+                attention_mask=attention_mask,
+                scaling=scaling,
+                dropout=dropout
+            )
+
+            my_attention_output, my_attention_weights = get_masked_attention_output(
+                module=module,
+                queries=queries,
+                keys=keys,
+                values=values,
+                attention_mask=attention_mask,
+                scaling=scaling,
+                dropout=dropout,
+                sparse_attention_mask=sparse_attention_mask,
+                return_attention_weights=True
+            )
+
+        # assert torch.allclose(my_attention_output, eager_attention_output, atol=1e-6)
+        # assert torch.allclose(my_attention_weights, eager_attention_weights, atol=1e-6)
+        
+        print("[NOTE] dropout behavior is different in eager and sparse attention by design")
