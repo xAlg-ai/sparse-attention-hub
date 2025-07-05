@@ -89,7 +89,8 @@ class ResearchAttention(SparseAttention):
             )
         
         # Call compute_masked_attention_output on the result of the last mask
-        attention_output = get_masked_attention_output(
+        # Always request attention weights to match the expected return signature
+        attention_output, attention_weights = get_masked_attention_output(
             module=module,
             queries=queries,
             keys=keys,
@@ -98,10 +99,11 @@ class ResearchAttention(SparseAttention):
             scaling=scaling,
             dropout=dropout,
             sparse_attention_mask=sparse_attention_mask,
+            return_attention_weights=True,
             **kwargs
         )
         
-        return attention_output, None  # Return None for attention weights as they're not computed
+        return attention_output, attention_weights
 
     @classmethod
     def create_from_config(cls, config: ResearchAttentionConfig) -> "ResearchAttention":

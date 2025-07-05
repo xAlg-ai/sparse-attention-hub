@@ -237,10 +237,15 @@ class TestGetAttentionDenominator:
         # Create a sparse attention mask (random pattern)
         sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len))
 
+        module = torch.nn.Module()
+        module.eval()
+        module.num_key_value_groups = 1
+
         with mock.patch('sparse_attention_hub.sparse_attention.utils.mask_attention_utils._compute_masked_exp_attention_weights') as mock_compute_masked_exp_attention_weights:
             mock_compute_masked_exp_attention_weights.return_value = torch.randn(batch_size, num_heads, seq_len, seq_len)
             true_denominator = torch.sum(mock_compute_masked_exp_attention_weights.return_value, dim=-1, keepdim=True)
             denominator = get_attention_denominator(
+                module=module,
                 queries=queries,
                 keys=keys,
                 attention_mask=attention_mask,
