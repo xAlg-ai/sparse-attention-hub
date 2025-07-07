@@ -35,20 +35,6 @@ class FixedMasker(ResearchMasker):
         """Add fixed mask to attention computation."""
         pass
 
-    @abstractmethod
-    def get_attention_numerator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention numerator with fixed mask applied."""
-        pass
-
-    @abstractmethod
-    def get_attention_denominator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention denominator with fixed mask applied."""
-        pass
-
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "FixedMasker":
         """Create fixed masker instance from configuration."""

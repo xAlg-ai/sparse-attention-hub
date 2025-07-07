@@ -39,20 +39,6 @@ class OracleTopK(TopKMasker):
         # just return the same mask for now
         return previous_mask
 
-    def get_attention_numerator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
-
-    def get_attention_denominator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
-
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "OracleTopK":
         """Create OracleTopK instance from configuration."""

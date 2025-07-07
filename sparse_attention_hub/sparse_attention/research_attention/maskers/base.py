@@ -34,20 +34,6 @@ class ResearchMasker(ABC):
         """Add mask to attention computation."""
         pass
 
-    @abstractmethod
-    def get_attention_numerator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention numerator with mask applied."""
-        pass
-
-    @abstractmethod
-    def get_attention_denominator(
-        self, keys: Any, queries: Any, values: Any, mask: Any
-    ) -> Any:
-        """Get attention denominator with mask applied."""
-        pass
-
     @classmethod
     @abstractmethod
     def create_from_config(cls, config: MaskerConfig) -> "ResearchMasker":
