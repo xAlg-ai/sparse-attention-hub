@@ -1,4 +1,4 @@
-"""HuggingFace model hub implementation (bare metal)."""
+"""HuggingFace model hub implementation."""
 
 from typing import Any, Callable, Dict, Optional
 
@@ -24,8 +24,16 @@ class ModelHubHF(ModelHub):
             hook_generator: Function that generates the hook
             hook_name: Name identifier for the hook
         """
-        # Bare metal implementation - no functionality
-        pass
+        if hook_name in self._registered_hooks:
+            self.removePreAttentionHooks(model, hook_name)
+        
+        hooks = []
+        for name, module in model.named_modules():
+            if 'attention' in name.lower() or hasattr(module, 'attention'):
+                hook = module.register_forward_pre_hook(hook_generator())
+                hooks.append((module, hook))
+        
+        self._registered_hooks[hook_name] = hooks
 
     def removePreAttentionHooks(self, model: Any, hook_name: str) -> None:
         """Remove pre-attention hooks from HuggingFace model.
@@ -34,8 +42,10 @@ class ModelHubHF(ModelHub):
             model: HuggingFace model instance
             hook_name: Name identifier for the hook to remove
         """
-        # Bare metal implementation - no functionality
-        pass
+        if hook_name in self._registered_hooks:
+            for module, hook in self._registered_hooks[hook_name]:
+                hook.remove()
+            del self._registered_hooks[hook_name]
 
     def replaceAttentionInterface(
         self,
@@ -50,8 +60,15 @@ class ModelHubHF(ModelHub):
             attention_interface_callable: New attention interface function
             attention_interface_name: Name identifier for the interface
         """
-        # Bare metal implementation - no functionality
-        pass
+        if attention_interface_name not in self._original_attention_interfaces:
+            self._original_attention_interfaces[attention_interface_name] = {}
+        
+        for name, module in model.named_modules():
+            if 'attention' in name.lower() and hasattr(module, 'forward'):
+                # Store original forward method
+                self._original_attention_interfaces[attention_interface_name][name] = module.forward
+                # Replace with custom attention
+                module.forward = attention_interface_callable
 
     def revertAttentionInterface(self, model: Any) -> None:
         """Revert attention interface to original in HuggingFace model.
@@ -59,5 +76,8 @@ class ModelHubHF(ModelHub):
         Args:
             model: HuggingFace model instance
         """
-        # Bare metal implementation - no functionality
-        pass
+        for interface_name, modules in self._original_attention_interfaces.items():
+            for name, module in model.named_modules():
+                if name in modules:
+                    module.forward = modules[name]
+        self._original_attention_interfaces.clear()
