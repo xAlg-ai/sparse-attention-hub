@@ -34,8 +34,8 @@ class ResultStorage:
 
         file_path = os.path.join(self.storage_path, f"{result_id}.json")
 
-        with open(file_path, "w") as f:
-            json.dump(result_data, f, indent=2)
+        with open(file_path, "w", encoding="utf-8") as file_handle:
+            json.dump(result_data, file_handle, indent=2)
 
         return result_id
 
@@ -53,8 +53,8 @@ class ResultStorage:
         if not os.path.exists(file_path):
             return None
 
-        with open(file_path, "r") as f:
-            result: Optional[Dict[str, Any]] = json.load(f)
+        with open(file_path, "r", encoding="utf-8") as file_handle:
+            result: Optional[Dict[str, Any]] = json.load(file_handle)
             return result
 
     def list_results(self) -> List[Dict[str, str]]:

@@ -93,8 +93,8 @@ class MicroMetricLogger:
         log_filename = f"metrics_{datetime.now().strftime('%Y%m%d')}.jsonl"
         log_path = os.path.join(self.path_to_log, log_filename)
 
-        with open(log_path, "a") as f:
-            f.write(json.dumps(log_entry) + "\n")
+        with open(log_path, "a", encoding="utf-8") as file_handle:
+            file_handle.write(json.dumps(log_entry) + "\n")
 
     def get_available_metrics(self) -> List[MicroMetric]:
         """Get list of available metrics.

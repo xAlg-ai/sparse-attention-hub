@@ -25,9 +25,10 @@ class PipelineHF(Pipeline):
             Model outputs
         """
         # TODO: Implement HF pipeline execution
-        preprocessed = self.preprocess(inputs)
-        outputs = self.model(preprocessed, **kwargs)
-        return self.postprocess(outputs)
+        # preprocessed = self.preprocess(inputs)
+        # outputs = self.model(preprocessed, **kwargs)
+        # return self.postprocess(outputs)
+        return None
 
     def preprocess(self, inputs: Any) -> Any:
         """Preprocess inputs using HuggingFace tokenizer.

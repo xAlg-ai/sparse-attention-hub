@@ -44,14 +44,14 @@ class PlotGenerator:
         """
         if granularity == Granularity.PER_TOKEN:
             return self._generate_plot_1(granularity, data, **kwargs)
-        elif granularity == Granularity.PER_HEAD:
+        if granularity == Granularity.PER_HEAD:
             return self._generate_plot_2(granularity, data, **kwargs)
-        elif granularity == Granularity.PER_LAYER:
+        if granularity == Granularity.PER_LAYER:
             return self._generate_plot_1(granularity, data, **kwargs)
         else:
             raise ValueError(f"Unsupported granularity: {granularity}")
 
-    def _generate_plot_1(
+    def _generate_plot_1(  # pylint: disable=unused-argument
         self,
         granularity: Granularity,
         data: Optional[Dict[str, Any]] = None,
@@ -68,7 +68,7 @@ class PlotGenerator:
             Path to generated plot
         """
         # TODO: Implement plot generation
-        fig, ax = plt.subplots(figsize=(10, 6))
+        _, axes = plt.subplots(figsize=(10, 6))
 
         if data is None:
             # Generate sample data for demonstration
@@ -98,7 +98,7 @@ class PlotGenerator:
 
         return filepath
 
-    def _generate_plot_2(
+    def _generate_plot_2(  # pylint: disable=unused-argument
         self,
         granularity: Granularity,
         data: Optional[Dict[str, Any]] = None,
@@ -115,7 +115,7 @@ class PlotGenerator:
             Path to generated plot
         """
         # TODO: Implement heatmap generation
-        fig, ax = plt.subplots(figsize=(8, 8))
+        _, axes = plt.subplots(figsize=(8, 8))
 
         if data is None:
             # Generate sample attention matrix
@@ -168,9 +168,9 @@ class PlotGenerator:
         Returns:
             Path to generated comparison plot
         """
-        fig, ax = plt.subplots(figsize=(12, 8))
+        _, axes = plt.subplots(figsize=(12, 8))
 
-        for label, data in data_dict.items():
+        for _, _ in data_dict.items():
             # Plot each dataset
             # Implementation depends on data structure
             pass

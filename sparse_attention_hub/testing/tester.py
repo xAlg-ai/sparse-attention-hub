@@ -67,6 +67,7 @@ class Tester:
                 ],
                 capture_output=not verbose,
                 text=True,
+                check=False,
             )
 
             success = result.returncode == 0
@@ -83,9 +84,9 @@ class Tester:
 
             return success
 
-        except Exception as e:
+        except Exception as exc:
             if verbose:
-                print(f"✗ Error running unit tests: {e}")
+                print(f"✗ Error running unit tests: {exc}")
             return False
 
     def execute_integration_tests(self, verbose: bool = True) -> bool:
@@ -113,6 +114,7 @@ class Tester:
                 ],
                 capture_output=not verbose,
                 text=True,
+                check=False,
             )
 
             success = result.returncode == 0
@@ -129,9 +131,9 @@ class Tester:
 
             return success
 
-        except Exception as e:
+        except Exception as exc:
             if verbose:
-                print(f"✗ Error running integration tests: {e}")
+                print(f"✗ Error running integration tests: {exc}")
             return False
 
     def execute_specific_test(self, test_path: str, verbose: bool = True) -> bool:
@@ -159,6 +161,7 @@ class Tester:
                 ],
                 capture_output=not verbose,
                 text=True,
+                check=False,
             )
 
             success = result.returncode == 0
@@ -175,9 +178,9 @@ class Tester:
 
             return success
 
-        except Exception as e:
+        except Exception as exc:
             if verbose:
-                print(f"✗ Error running test {test_path}: {e}")
+                print(f"✗ Error running test {test_path}: {exc}")
             return False
 
     def _print_summary(self, results: Dict[str, bool]) -> None:
@@ -211,7 +214,7 @@ class Tester:
 
         # Discover unit tests
         if os.path.exists(self.unit_test_dir):
-            for root, dirs, files in os.walk(self.unit_test_dir):
+            for root, _, files in os.walk(self.unit_test_dir):
                 for file in files:
                     if file.startswith("test_") and file.endswith(".py"):
                         discovered["unit"].append(os.path.join(root, file))

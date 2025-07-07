@@ -14,7 +14,9 @@ class SparseAttentionServer:
         self._pipeline: Optional[Pipeline] = None
         self._model_hub: Optional[ModelHub] = None
 
-    def execute(self, model_hub: ModelHub, sparse_attention_strategy: Any) -> None:
+    def execute(  # pylint: disable=unused-argument
+        self, model_hub: ModelHub, sparse_attention_strategy: Any
+    ) -> None:
         """Execute the server with given model hub and attention strategy.
 
         Args:
