@@ -53,7 +53,7 @@ class ModelHubHF(ModelHub):
             for module, hook in hooks:
                 try:
                     hook.remove()
-                except:
+                except Exception:
                     pass  # Ignore cleanup errors
             raise RuntimeError(f"Failed to add pre-attention hooks: {e}") from e
 

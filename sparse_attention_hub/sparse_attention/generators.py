@@ -1,12 +1,9 @@
 """Sparse attention generators and interfaces."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Tuple, Union
-
-import torch
+from typing import Any, Callable
 
 from .base import SparseAttention
-from .utils import Mask, get_masked_attention_output
 
 
 class SparseAttentionGen(ABC):
@@ -45,7 +42,6 @@ class SparseAttentionHF(SparseAttentionGen):
             if len(args) >= 3:
                 # Standard MultiheadAttention call: (query, key, value, ...)
                 query, key, value = args[0], args[1], args[2]
-                attention_mask = kwargs.get("attn_mask", None)
 
                 # Get dimensions
                 if query.dim() == 3:  # (batch, seq_len, embed_dim)
