@@ -60,7 +60,22 @@ def get_masked_attention_output(
     
     # Apply attention mask if provided
     if attention_mask is not None:
-        scores = scores + attention_mask
+        # Handle different attention mask shapes
+        if attention_mask.dim() == 2:
+            # Shape: (seq_len, seq_len) -> expand to (batch, heads, seq_len, seq_len)
+            attention_mask = attention_mask.unsqueeze(0).unsqueeze(0).expand(scores.shape)
+        elif attention_mask.dim() == 3:
+            # Shape: (batch, seq_len, seq_len) -> expand to (batch, heads, seq_len, seq_len)
+            attention_mask = attention_mask.unsqueeze(1).expand(scores.shape)
+        elif attention_mask.dim() == 4:
+            # Already correct shape: (batch, heads, seq_len, seq_len)
+            pass
+        else:
+            # Unsupported shape, skip mask
+            attention_mask = None
+        
+        if attention_mask is not None:
+            scores = scores + attention_mask
     
     # Apply sparse attention mask
     if not sparse_attention_mask.is_empty():

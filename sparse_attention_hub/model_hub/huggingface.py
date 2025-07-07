@@ -144,7 +144,9 @@ class ModelHubHF(ModelHub):
         has_attention_attributes = (
             hasattr(module, 'forward') and
             (hasattr(module, 'query') or hasattr(module, 'q_proj') or 
-             hasattr(module, 'attention') or hasattr(module, 'attn'))
+             hasattr(module, 'attention') or hasattr(module, 'attn') or
+             hasattr(module, 'out_proj') or hasattr(module, 'in_proj_weight') or
+             hasattr(module, 'q_proj_weight'))  # PyTorch MultiheadAttention attributes
         )
         
         return has_attention_name and has_attention_attributes
