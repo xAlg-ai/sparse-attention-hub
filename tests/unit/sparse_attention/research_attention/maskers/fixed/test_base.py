@@ -1,4 +1,4 @@
-""" 
+"""
 Author: Aditya Desai
 :copyright: 2025 Sparse Attention hub
 :license: Apache 2.0
@@ -7,28 +7,6 @@ Author: Aditya Desai
 """
 
 import pytest
-
-from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-    CausalMasker,
-    DoubleSparsityTopKMasker,
-    DoubleSparsityTopKMaskerConfig,
-    FixedMasker,
-    FixedMaskerConfig,
-    HashAttentionTopKMasker,
-    HashAttentionTopKMaskerConfig,
-    LocalMasker,
-    LocalMaskerConfig,
-    OracleTopK,
-    OracleTopKConfig,
-    PQCache,
-    PQCacheConfig,
-    SinkMasker,
-    SinkMaskerConfig,
-    TopKMasker,
-    TopKMaskerConfig,
-    TopPMasker,
-    TopPMaskerConfig,
-)
 
 
 @pytest.mark.unit
@@ -76,6 +54,11 @@ class TestMaskerImports:
         assert HashAttentionTopKMaskerConfig is not None
         assert DoubleSparsityTopKMaskerConfig is not None
         assert TopKMaskerConfig is not None
+        assert TopPMaskerConfig is not None
+
+        assert TopKMasker is not None
+        assert TopKMaskerConfig is not None
+        assert TopPMasker is not None
         assert TopPMaskerConfig is not None
 
 

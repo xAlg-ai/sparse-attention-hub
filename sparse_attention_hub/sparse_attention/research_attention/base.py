@@ -1,6 +1,5 @@
 """Base classes for research attention mechanisms."""
 
-from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, List, Optional, Tuple
 
@@ -10,32 +9,6 @@ from ..base import SparseAttention, SparseAttentionConfig
 from ..utils.mask import Mask
 from ..utils.mask_attention_utils import get_masked_attention_output
 from .maskers.base import MaskerConfig, ResearchMasker
-from .maskers.fixed import (
-    CausalMasker,
-    DoubleSparsityTopKMasker,
-    DoubleSparsityTopKMaskerConfig,
-    FixedMaskerConfig,
-    HashAttentionTopKMasker,
-    HashAttentionTopKMaskerConfig,
-    LocalMasker,
-    LocalMaskerConfig,
-    OracleTopK,
-    OracleTopKConfig,
-    PQCache,
-    PQCacheConfig,
-    SinkMasker,
-    SinkMaskerConfig,
-    TopKMasker,
-    TopKMaskerConfig,
-    TopPMasker,
-    TopPMaskerConfig,
-)
-from .maskers.sampling import (
-    MagicPig,
-    MagicPigConfig,
-    RandomSamplingMasker,
-    RandomSamplingMaskerConfig,
-)
 
 
 @dataclass

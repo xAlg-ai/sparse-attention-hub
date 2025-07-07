@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple, Type
+from typing import Any, Optional, Tuple
 
 from ..base import SparseAttention, SparseAttentionConfig
 

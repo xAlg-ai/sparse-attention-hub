@@ -1,9 +1,8 @@
 """Random sampling masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import Any
 
-from ...base import ResearchMasker
 from ..base import SamplingMasker, SamplingMaskerConfig
 
 

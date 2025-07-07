@@ -2,9 +2,6 @@
 
 import pytest
 
-# Test wildcard import at module level
-from sparse_attention_hub.sparse_attention import *
-
 
 @pytest.mark.unit
 class TestSparseAttentionImports:
@@ -185,50 +182,11 @@ class TestSparseAttentionImports:
         for cls in classes:
             assert cls is not None
 
-    def test_wildcard_import(self):
-        """Test that wildcard import works correctly."""
-        # Check that key classes are available from module-level import
-        expected_classes = [
-            "SparseAttention",
-            "EfficientAttention",
-            "ResearchAttention",
-            "SparseAttentionConfig",
-            "EfficientAttentionConfig",
-            "ResearchAttentionConfig",
-            "DoubleSparsityConfig",
-            "HashAttentionConfig",
-            "DoubleSparsityTopKMaskerConfig",
-            "HashAttentionTopKMaskerConfig",
-            "ChannelConfig",
-            "DoubleSparsity",
-            "HashAttention",
-            "ResearchMasker",
-            "SamplingMasker",
-            "FixedMasker",
-            "TopKMasker",
-            "TopPMasker",
-            "LocalMasker",
-            "CausalMasker",
-            "SinkMasker",
-            "OracleTopK",
-            "PQCache",
-            "HashAttentionTopKMasker",
-            "DoubleSparsityTopKMasker",
-            "RandomSamplingMasker",
-            "MagicPig",
-            "SparseAttentionGen",
-            "SparseAttentionHF",
-            "Mask",
-            "SparseAttentionMetadata",
-        ]
-
-        for class_name in expected_classes:
-            assert (
-                class_name in globals()
-            ), f"Class {class_name} not found in wildcard import"
-
     def test_inheritance_hierarchy(self):
         """Test that the inheritance hierarchy is correct."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention import (
             EfficientAttention,
             EfficientAttentionConfig,

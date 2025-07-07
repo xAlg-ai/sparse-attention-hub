@@ -1,6 +1,6 @@
 """Mask class for representing attention masks in both dense and sparse formats."""
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -142,7 +142,6 @@ class Mask:
             data = self.mask.view(-1)[non_zero_indices]
 
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
-            ptr_size = np.prod(self.shape[:-1]) + 1
             # Vectorized version: count nonzero per row and cumsum
             counts = torch.count_nonzero(self.mask.view(-1, self.shape[-1]), dim=1)
             ptr = torch.cat(
@@ -246,7 +245,7 @@ class Mask:
         Check if the mask is empty.
         """
         if self.from_dense_mask:
-            return torch.all(self.mask == 0)
+            return torch.all(self.mask == 0).item()
         elif self.from_index:
             return self.indices.numel() == 0
         else:

@@ -1,1 +1,1 @@
-
+"""Tests for integrations functionality."""

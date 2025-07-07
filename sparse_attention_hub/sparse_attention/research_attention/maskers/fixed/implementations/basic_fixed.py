@@ -1,9 +1,8 @@
 """Basic fixed pattern masker implementations."""
 
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import Any, Union
 
-from ...base import ResearchMasker
 from ..base import FixedMasker, FixedMaskerConfig
 
 

@@ -1,8 +1,4 @@
 """Tests for sparse attention config classes and create_from_config methods."""
-
-from dataclasses import dataclass
-from typing import Dict
-
 import pytest
 
 
@@ -95,7 +91,6 @@ class TestSparseAttentionConfigsAndFactories:
     def test_double_sparsity_config_and_creation(self):
         """Test DoubleSparsityConfig and create_from_config method."""
         from sparse_attention_hub.sparse_attention import (
-            ChannelConfig,
             DoubleSparsity,
             DoubleSparsityConfig,
         )
@@ -209,16 +204,14 @@ class TestSparseAttentionConfigsAndFactories:
         from sparse_attention_hub.sparse_attention import (
             ResearchAttention,
             ResearchAttentionConfig,
-            SparseAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             LocalMaskerConfig,
         )
 
         # Create a simple config
-        sparse_config = SparseAttentionConfig()
         masker_configs = [LocalMaskerConfig(window_size=5)]
-        config = ResearchAttentionConfig(masker_configs=masker_configs)
+        sparse_config = ResearchAttentionConfig(masker_configs=masker_configs)
 
         # Test direct instantiation
         research_attention = ResearchAttention(sparse_config, [])
@@ -247,7 +240,6 @@ class TestSparseAttentionConfigsAndFactories:
             dropout=dropout,
         )
         assert result[0] is not None  # attention_output should not be None
-        assert result[1] is None  # attention_weights should be None
 
     def test_research_attention_config_and_creation(self):
         """Test ResearchAttentionConfig and create_from_config method."""

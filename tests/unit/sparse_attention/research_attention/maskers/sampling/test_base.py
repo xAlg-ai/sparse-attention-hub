@@ -1,4 +1,4 @@
-""" 
+"""
 Author: Aditya Desai
 :copyright: 2025 Sparse Attention hub
 :license: Apache 2.0

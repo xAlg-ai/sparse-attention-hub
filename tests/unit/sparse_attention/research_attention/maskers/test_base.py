@@ -8,31 +8,59 @@
 
 import pytest
 
-from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
-    MaskerConfig,
-    ResearchMasker,
-)
-from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-    CausalMasker,
-    DoubleSparsityTopKMasker,
-    DoubleSparsityTopKMaskerConfig,
-    FixedMasker,
-    FixedMaskerConfig,
-    HashAttentionTopKMasker,
-    HashAttentionTopKMaskerConfig,
-    LocalMasker,
-    LocalMaskerConfig,
-    OracleTopK,
-    OracleTopKConfig,
-    PQCache,
-    PQCacheConfig,
-    SinkMasker,
-    SinkMaskerConfig,
-)
-from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
-    SamplingMasker,
-    SamplingMaskerConfig,
-)
+
+@pytest.mark.unit
+class TestMaskerConfigImports:
+    """Test class for masker config imports."""
+
+    def test_masker_config_imports(self):
+        """Test that all masker configs can be imported."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+            MaskerConfig,
+            ResearchMasker,
+        )
+        assert MaskerConfig is not None
+        assert ResearchMasker is not None
+
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
+            CausalMasker,
+            DoubleSparsityTopKMasker,
+            DoubleSparsityTopKMaskerConfig,
+            FixedMasker,
+            FixedMaskerConfig,
+            HashAttentionTopKMasker,
+            HashAttentionTopKMaskerConfig,
+            LocalMasker,
+            LocalMaskerConfig,
+            OracleTopK,
+            OracleTopKConfig,
+            PQCache,
+            PQCacheConfig,
+            SinkMasker,
+            SinkMaskerConfig,
+        )
+        assert CausalMasker is not None
+        assert DoubleSparsityTopKMasker is not None
+        assert DoubleSparsityTopKMaskerConfig is not None
+        assert FixedMasker is not None
+        assert FixedMaskerConfig is not None
+        assert HashAttentionTopKMasker is not None
+        assert HashAttentionTopKMaskerConfig is not None
+        assert LocalMasker is not None
+        assert LocalMaskerConfig is not None
+        assert OracleTopK is not None
+        assert OracleTopKConfig is not None
+        assert PQCache is not None
+        assert PQCacheConfig is not None
+        assert SinkMasker is not None
+        assert SinkMaskerConfig is not None
+
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
+            SamplingMasker,
+            SamplingMaskerConfig,
+        )
+        assert SamplingMasker is not None
+        assert SamplingMaskerConfig is not None
 
 
 @pytest.mark.unit
@@ -74,6 +102,9 @@ class TestConcreteMaskerCreation:
             LocalMasker,
             LocalMaskerConfig,
         )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
 
         config = LocalMaskerConfig(window_size=10)
         masker = ResearchMasker.create_masker_from_config(config)
@@ -85,6 +116,9 @@ class TestConcreteMaskerCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             CausalMasker,
             FixedMaskerConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
         )
 
         config = FixedMaskerConfig()
@@ -98,7 +132,9 @@ class TestConcreteMaskerCreation:
             SinkMasker,
             SinkMaskerConfig,
         )
-
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         config = SinkMaskerConfig(sink_size=5)
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is SinkMasker
@@ -110,7 +146,9 @@ class TestConcreteMaskerCreation:
             OracleTopK,
             OracleTopKConfig,
         )
-
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         config = OracleTopKConfig(heavy_size=100)
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is OracleTopK
@@ -121,6 +159,9 @@ class TestConcreteMaskerCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             PQCache,
             PQCacheConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
         )
 
         config = PQCacheConfig(heavy_size=100, pq_sub_dim=8, pq_bits=4)
@@ -133,6 +174,9 @@ class TestConcreteMaskerCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
         )
 
         config = HashAttentionTopKMaskerConfig(
@@ -148,6 +192,9 @@ class TestConcreteMaskerCreation:
             DoubleSparsityTopKMasker,
             DoubleSparsityTopKMaskerConfig,
         )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
 
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=100, group_factor=4, label_bits=8, channel_config="auto"
@@ -162,6 +209,9 @@ class TestConcreteMaskerCreation:
             RandomSamplingMasker,
             RandomSamplingMaskerConfig,
         )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
 
         config = RandomSamplingMaskerConfig(sampling_rate=0.5)
         masker = ResearchMasker.create_masker_from_config(config)
@@ -173,6 +223,9 @@ class TestConcreteMaskerCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
             MagicPig,
             MagicPigConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
         )
 
         config = MagicPigConfig(sampling_rate=0.5, lsh_l=4, lsh_k=8)

@@ -31,11 +31,9 @@ class TestSparseAttentionAndConfigCreation:
     def test_research_attention_creation(self):
         """Test that sparse attention can be created."""
         from sparse_attention_hub.sparse_attention import (
-            SparseAttention,
-            SparseAttentionConfig,
+            SparseAttention
         )
         from sparse_attention_hub.sparse_attention.research_attention import (
-            ResearchAttention,
             ResearchAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
@@ -72,7 +70,6 @@ class TestSparseAttentionAndConfigCreation:
         """Test that efficient attention can be created."""
         from sparse_attention_hub.sparse_attention import (
             SparseAttention,
-            SparseAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.efficient_attention.implementations.hash_attention import (
             HashAttention,

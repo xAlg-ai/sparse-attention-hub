@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import Any, Union
 
 from ..base import MaskerConfig, ResearchMasker
 

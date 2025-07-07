@@ -2,10 +2,6 @@
 
 import pytest
 
-from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-    OracleTopKConfig,
-)
-
 
 @pytest.mark.integration
 class TestEndToEndSparseAttention:

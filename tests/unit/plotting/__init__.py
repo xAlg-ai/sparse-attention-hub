@@ -1,1 +1,1 @@
-
+"""Tests for plotting functionality."""

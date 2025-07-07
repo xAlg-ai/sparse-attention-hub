@@ -39,7 +39,7 @@ check_tool() {
 run_flake8() {
     echo -e "${BLUE}Running flake8...${NC}"
     if check_tool "flake8"; then
-        echo flake8 \
+        flake8 \
             --max-line-length=88 \
             --extend-ignore=E203,W503,E501 \
             --exclude=build,dist,.git,__pycache__,.pytest_cache,.venv \

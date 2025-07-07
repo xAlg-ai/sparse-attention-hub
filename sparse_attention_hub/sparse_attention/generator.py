@@ -3,8 +3,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from .base import SparseAttention
-
 
 class SparseAttentionGen(ABC):
     """Abstract base class for sparse attention generators."""
