@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+import torch
 
 
 @dataclass
@@ -24,7 +25,17 @@ class SparseAttention(ABC):
         self.sparse_attention_config = sparse_attention_config
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(
+        self,
+        module: Any,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+        scaling: float,
+        dropout: float,
+        **kwargs: Any,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute custom attention mechanism.
 
         Returns:

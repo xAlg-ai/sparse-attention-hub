@@ -30,7 +30,7 @@ class FixedMasker(ResearchMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add fixed mask to attention computation."""
         pass
@@ -50,8 +50,10 @@ class FixedMasker(ResearchMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: FixedMaskerConfig) -> "FixedMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "FixedMasker":
         """Create fixed masker instance from configuration."""
+        if not isinstance(config, FixedMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
 
 
@@ -78,7 +80,7 @@ class TopKMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add top-K mask to attention computation."""
         pass
@@ -114,7 +116,7 @@ class TopPMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add top-P mask to attention computation."""
         pass

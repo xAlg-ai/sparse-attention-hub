@@ -134,7 +134,7 @@ def get_attention_denominator(
     scaling: float,
     dropout: float,
     sparse_attention_mask: Mask,
-    **kwargs,
+    **kwargs: Any,
 ) -> torch.Tensor:
     """Get masked attention denominator.
 
@@ -174,7 +174,7 @@ def get_attention_numerator(
     scaling: float,
     dropout: float,
     sparse_attention_mask: Mask,
-    **kwargs,
+    **kwargs: Any,
 ) -> torch.Tensor:
     """Get masked attention numerator.
 
@@ -220,7 +220,7 @@ def get_masked_attention_output(
     dropout: float,
     sparse_attention_mask: Mask,
     return_attention_weights: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     """Get masked attention output by dividing numerator by denominator.
 

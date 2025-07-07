@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Union
-
+import torch
 from ..base import EfficientAttention, EfficientAttentionConfig, SparseAttentionConfig
 
 
@@ -20,9 +20,9 @@ class DoubleSparsityConfig(EfficientAttentionConfig):
     heavy_size: Union[int, float]
     sink_size: int
     local_size: int
-    ds_channel_config: str  # config file
+    ds_channel_config: ChannelConfig
     ds_bits: int
-    ds_group_factor: float
+    ds_group_factor: int
 
 
 class DoubleSparsity(EfficientAttention):
@@ -48,7 +48,17 @@ class DoubleSparsity(EfficientAttention):
         self.label_bits = label_bits
         self.channel_config = channel_config
 
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(
+        self,
+        module: Any,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+        scaling: float,
+        dropout: float,
+        **kwargs: Any,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute double sparsity attention.
 
         Returns:
@@ -58,7 +68,7 @@ class DoubleSparsity(EfficientAttention):
         pass
 
     @classmethod
-    def create_from_config(cls, config: DoubleSparsityConfig) -> "DoubleSparsity":
+    def create_from_config(cls, config: SparseAttentionConfig) -> "DoubleSparsity":
         """Create double sparsity instance from configuration.
 
         Args:
@@ -66,7 +76,13 @@ class DoubleSparsity(EfficientAttention):
 
         Returns:
             Instance of the double sparsity attention mechanism.
+
+        Raises:
+            TypeError: If config is not a DoubleSparsityConfig.
         """
+        if not isinstance(config, DoubleSparsityConfig):
+            raise TypeError(f"Expected DoubleSparsityConfig, got {type(config)}")
+
         return cls(
             sparse_attention_config=config,
             group_factor=config.ds_group_factor,

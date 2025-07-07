@@ -1,8 +1,10 @@
 """Base classes for efficient attention mechanisms."""
 
+
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+import torch
 
 from ..base import SparseAttention, SparseAttentionConfig
 
@@ -26,7 +28,17 @@ class EfficientAttention(SparseAttention):
         super().__init__(sparse_attention_config)
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(
+        self,
+        module: Any,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+        scaling: float,
+        dropout: float,
+        **kwargs: Any,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute efficient attention mechanism.
 
         Returns:
@@ -35,9 +47,7 @@ class EfficientAttention(SparseAttention):
         pass
 
     @classmethod
-    def create_from_config(
-        cls, config: EfficientAttentionConfig
-    ) -> "EfficientAttention":
+    def create_from_config(cls, config: SparseAttentionConfig) -> "EfficientAttention":
         """Create efficient attention instance from configuration.
 
         Args:
@@ -45,8 +55,15 @@ class EfficientAttention(SparseAttention):
 
         Returns:
             Instance of the efficient attention mechanism.
+
+        Raises:
+            TypeError: If config is not an EfficientAttentionConfig.
         """
+        if not isinstance(config, EfficientAttentionConfig):
+            raise TypeError(f"Expected EfficientAttentionConfig, got {type(config)}")
+
         # Import here to avoid circular imports
+        from typing import Type, cast
         from .implementations import (
             DoubleSparsity,
             DoubleSparsityConfig,
@@ -67,5 +84,7 @@ class EfficientAttention(SparseAttention):
                 f"No efficient attention class found for config type: {type(config)}"
             )
 
+        # Cast to help mypy understand the type
+        concrete_class = cast(Type[EfficientAttention], concrete_class)
         # Call the concrete class's create_from_config method
         return concrete_class.create_from_config(config)

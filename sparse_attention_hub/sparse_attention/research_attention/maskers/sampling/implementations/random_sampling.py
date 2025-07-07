@@ -32,7 +32,7 @@ class RandomSamplingMasker(SamplingMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add random sampling mask."""
         # just return the same mask for now
@@ -53,9 +53,7 @@ class RandomSamplingMasker(SamplingMasker):
         pass
 
     @classmethod
-    def create_from_config(
-        cls, config: MaskerConfig
-    ) -> "RandomSamplingMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "RandomSamplingMasker":
         """Create RandomSamplingMasker instance from configuration."""
         if not isinstance(config, RandomSamplingMaskerConfig):
             raise ValueError(f"Invalid config type: {type(config)}")

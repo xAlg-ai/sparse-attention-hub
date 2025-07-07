@@ -35,7 +35,7 @@ class PQCache(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs : Any,
+        **kwargs: Any,
     ) -> Any:
         """Add PQ cache mask."""
         # just return the same mask for now

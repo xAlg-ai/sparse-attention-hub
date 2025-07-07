@@ -32,7 +32,7 @@ class LocalMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add local mask."""
         # just return the same mask for now
@@ -75,7 +75,7 @@ class CausalMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add causal mask."""
         # just return the same mask for now
@@ -96,8 +96,10 @@ class CausalMasker(FixedMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: FixedMaskerConfig) -> "CausalMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "CausalMasker":
         """Create CausalMasker instance from configuration."""
+        if not isinstance(config, FixedMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
 
 
@@ -124,7 +126,7 @@ class SinkMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add sink mask."""
         # just return the same mask for now

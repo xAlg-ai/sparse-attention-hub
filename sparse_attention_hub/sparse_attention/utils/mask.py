@@ -230,7 +230,7 @@ class Mask:
 
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             # All rows have 0 non-zero elements, so ptr is just zeros
-            ptr_size = np.prod(shape[:-1]) + 1
+            ptr_size = int(np.prod(shape[:-1]) + 1)
             ptr = torch.zeros(ptr_size, dtype=torch.long)
 
             # No data since all values are zero
@@ -245,7 +245,7 @@ class Mask:
         Check if the mask is empty.
         """
         if self.from_dense_mask:
-            return torch.all(self.mask == 0).item()
+            return bool(torch.all(self.mask == 0).item())
         elif self.from_index:
             return self.indices.numel() == 0
         else:

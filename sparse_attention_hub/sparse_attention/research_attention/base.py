@@ -44,7 +44,7 @@ class ResearchAttention(SparseAttention):
         attention_mask: Optional[torch.Tensor],
         scaling: float,
         dropout: float,
-        **kwargs,
+        **kwargs: Any,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute research attention mechanism with masking.
 
@@ -100,7 +100,7 @@ class ResearchAttention(SparseAttention):
         return attention_output, attention_weights
 
     @classmethod
-    def create_from_config(cls, config: ResearchAttentionConfig) -> "ResearchAttention":
+    def create_from_config(cls, config: SparseAttentionConfig) -> "ResearchAttention":
         """Create research attention instance from configuration.
 
         Args:
@@ -108,7 +108,13 @@ class ResearchAttention(SparseAttention):
 
         Returns:
             Instance of the research attention mechanism.
+
+        Raises:
+            TypeError: If config is not a ResearchAttentionConfig.
         """
+        if not isinstance(config, ResearchAttentionConfig):
+            raise TypeError(f"Expected ResearchAttentionConfig, got {type(config)}")
+
         # Create ResearchMasker objects from the configs using the factory method
         maskers = []
         for masker_config in config.masker_configs:

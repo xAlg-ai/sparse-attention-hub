@@ -37,7 +37,7 @@ class HashAttentionTopKMasker(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add hash attention mask."""
         # just return the same mask for now
@@ -58,9 +58,7 @@ class HashAttentionTopKMasker(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(
-        cls, config: MaskerConfig
-    ) -> "HashAttentionTopKMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "HashAttentionTopKMasker":
         """Create HashAttentionTopKMasker instance from configuration."""
         if not isinstance(config, HashAttentionTopKMaskerConfig):
             raise ValueError(f"Invalid config type: {type(config)}")

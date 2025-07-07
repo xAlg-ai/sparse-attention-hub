@@ -35,7 +35,7 @@ class MagicPig(SamplingMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add Magic Pig mask."""
         # just return the same mask for now

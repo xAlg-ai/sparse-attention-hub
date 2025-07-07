@@ -32,7 +32,7 @@ class OracleTopK(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add oracle top-K mask."""
         # just return the same mask for now

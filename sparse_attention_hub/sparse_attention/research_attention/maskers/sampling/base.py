@@ -30,12 +30,14 @@ class SamplingMasker(ResearchMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add sampling mask to attention computation."""
         pass
 
     @classmethod
-    def create_from_config(cls, config: SamplingMaskerConfig) -> "SamplingMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "SamplingMasker":
         """Create sampling masker instance from configuration."""
+        if not isinstance(config, SamplingMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)

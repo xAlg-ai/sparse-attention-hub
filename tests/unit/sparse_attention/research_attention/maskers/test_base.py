@@ -19,6 +19,7 @@ class TestMaskerConfigImports:
             MaskerConfig,
             ResearchMasker,
         )
+
         assert MaskerConfig is not None
         assert ResearchMasker is not None
 
@@ -39,6 +40,7 @@ class TestMaskerConfigImports:
             SinkMasker,
             SinkMaskerConfig,
         )
+
         assert CausalMasker is not None
         assert DoubleSparsityTopKMasker is not None
         assert DoubleSparsityTopKMaskerConfig is not None
@@ -59,6 +61,7 @@ class TestMaskerConfigImports:
             SamplingMasker,
             SamplingMaskerConfig,
         )
+
         assert SamplingMasker is not None
         assert SamplingMaskerConfig is not None
 
@@ -135,6 +138,7 @@ class TestConcreteMaskerCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers import (
             ResearchMasker,
         )
+
         config = SinkMaskerConfig(sink_size=5)
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is SinkMasker
@@ -149,6 +153,7 @@ class TestConcreteMaskerCreation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers import (
             ResearchMasker,
         )
+
         config = OracleTopKConfig(heavy_size=100)
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is OracleTopK

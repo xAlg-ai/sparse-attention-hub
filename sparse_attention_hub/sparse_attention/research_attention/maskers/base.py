@@ -9,8 +9,6 @@ from typing import Any
 class MaskerConfig:
     """Base configuration class for all maskers."""
 
-    pass
-
 
 class ResearchMasker(ABC):
     """Abstract base class for research maskers."""
@@ -31,7 +29,7 @@ class ResearchMasker(ABC):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add mask to attention computation."""
         pass
@@ -52,8 +50,15 @@ class ResearchMasker(ABC):
 
     @classmethod
     @abstractmethod
-    def create_from_config(cls, config: Any) -> "ResearchMasker":
-        """Create masker instance from configuration."""
+    def create_from_config(cls, config: MaskerConfig) -> "ResearchMasker":
+        """Create masker instance from configuration.
+
+        Args:
+            config: Configuration for the masker.
+
+        Returns:
+            Instance of the masker.
+        """
         pass
 
     @classmethod
@@ -114,4 +119,10 @@ class ResearchMasker(ABC):
         masker_class = cls._MASKER_REGISTRY.get(type(config))
         if masker_class is None:
             raise ValueError(f"No masker class found for config type: {type(config)}")
+
+        # Import here to avoid circular imports
+        from typing import Type, cast
+
+        # Cast to help mypy understand the type
+        masker_class = cast(Type[ResearchMasker], masker_class)
         return masker_class.create_from_config(config)

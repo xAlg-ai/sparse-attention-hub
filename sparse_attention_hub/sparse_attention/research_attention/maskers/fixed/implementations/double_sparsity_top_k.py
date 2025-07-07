@@ -37,7 +37,7 @@ class DoubleSparsityTopKMasker(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any:
         """Add double sparsity mask."""
         # just return the same mask for now
@@ -58,9 +58,7 @@ class DoubleSparsityTopKMasker(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(
-        cls, config: MaskerConfig
-    ) -> "DoubleSparsityTopKMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "DoubleSparsityTopKMasker":
         """Create DoubleSparsityTopKMasker instance from configuration."""
         if not isinstance(config, DoubleSparsityTopKMaskerConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
