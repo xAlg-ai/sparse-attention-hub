@@ -31,4 +31,4 @@ class SparseAttentionHF(SparseAttentionGen):
         Returns:
             Output from the sparse attention mechanism
         """
-        pass 
+        pass
