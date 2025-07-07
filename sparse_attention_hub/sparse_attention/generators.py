@@ -34,7 +34,9 @@ class SparseAttentionHF(SparseAttentionGen):
             Callable that can be used as attention function in HF models.
         """
 
-        def custom_attention_fn(*args: Any, **kwargs: Any) -> Union[Any, Tuple[Any, Any]]:
+        def custom_attention_fn(
+            *args: Any, **kwargs: Any
+        ) -> Union[Any, Tuple[Any, Any]]:
             """Custom attention function compatible with PyTorch models."""
             # For nn.MultiheadAttention, the signature is (query, key, value, ...)
             # For other attention modules, it might be different
