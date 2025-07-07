@@ -4,9 +4,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, List, Optional, Union
 
+
 @dataclass
 class MaskerConfig:
     """Base configuration class for all maskers."""
+
     pass
 
 
@@ -29,7 +31,7 @@ class ResearchMasker(ABC):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add mask to attention computation."""
         pass
@@ -57,33 +59,45 @@ class ResearchMasker(ABC):
     @classmethod
     def create_masker_from_config(cls, config: MaskerConfig) -> "ResearchMasker":
         """Create masker instance from configuration using the registry.
-        
+
         Args:
             config: Configuration for the masker.
-            
+
         Returns:
             Instance of the concrete masker class.
-            
+
         Raises:
             ValueError: If no masker class is found for the config type.
         """
 
         if cls._MASKER_REGISTRY is None:
             from .fixed import (
-                LocalMasker, LocalMaskerConfig,
-                CausalMasker, FixedMaskerConfig,
-                SinkMasker, SinkMaskerConfig,
-                OracleTopK, OracleTopKConfig,
-                TopKMasker, TopKMaskerConfig,
-                TopPMasker, TopPMaskerConfig,
-                HashAttentionTopKMasker, HashAttentionTopKMaskerConfig,
-                DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig,
-                PQCache, PQCacheConfig
+                CausalMasker,
+                DoubleSparsityTopKMasker,
+                DoubleSparsityTopKMaskerConfig,
+                FixedMaskerConfig,
+                HashAttentionTopKMasker,
+                HashAttentionTopKMaskerConfig,
+                LocalMasker,
+                LocalMaskerConfig,
+                OracleTopK,
+                OracleTopKConfig,
+                PQCache,
+                PQCacheConfig,
+                SinkMasker,
+                SinkMaskerConfig,
+                TopKMasker,
+                TopKMaskerConfig,
+                TopPMasker,
+                TopPMaskerConfig,
             )
             from .sampling import (
-                RandomSamplingMasker, RandomSamplingMaskerConfig,
-                MagicPig, MagicPigConfig
+                MagicPig,
+                MagicPigConfig,
+                RandomSamplingMasker,
+                RandomSamplingMaskerConfig,
             )
+
             cls._MASKER_REGISTRY = {
                 LocalMaskerConfig: LocalMasker,
                 FixedMaskerConfig: CausalMasker,  # Default for FixedMaskerConfig
@@ -100,4 +114,4 @@ class ResearchMasker(ABC):
         masker_class = cls._MASKER_REGISTRY.get(type(config))
         if masker_class is None:
             raise ValueError(f"No masker class found for config type: {type(config)}")
-        return masker_class.create_from_config(config) 
+        return masker_class.create_from_config(config)

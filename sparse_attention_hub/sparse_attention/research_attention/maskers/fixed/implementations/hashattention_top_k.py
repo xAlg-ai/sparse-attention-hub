@@ -10,6 +10,7 @@ from ..base import TopKMasker, TopKMaskerConfig
 @dataclass
 class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     """Configuration for HashAttentionTopKMasker."""
+
     hat_bits: int
     hat_mlp_layers: int
     hat_mlp_hidden_size: int
@@ -34,7 +35,7 @@ class HashAttentionTopKMasker(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add hash attention mask."""
         # just return the same mask for now
@@ -55,6 +56,8 @@ class HashAttentionTopKMasker(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: HashAttentionTopKMaskerConfig) -> "HashAttentionTopKMasker":
+    def create_from_config(
+        cls, config: HashAttentionTopKMaskerConfig
+    ) -> "HashAttentionTopKMasker":
         """Create HashAttentionTopKMasker instance from configuration."""
-        return cls(config) 
+        return cls(config)

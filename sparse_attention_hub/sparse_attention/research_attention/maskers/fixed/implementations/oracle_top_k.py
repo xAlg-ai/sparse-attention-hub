@@ -10,6 +10,7 @@ from ..base import TopKMasker, TopKMaskerConfig
 @dataclass
 class OracleTopKConfig(TopKMaskerConfig):
     """Configuration for OracleTopK masker."""
+
     pass
 
 
@@ -29,7 +30,7 @@ class OracleTopK(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add oracle top-K mask."""
         # just return the same mask for now
@@ -52,4 +53,4 @@ class OracleTopK(TopKMasker):
     @classmethod
     def create_from_config(cls, config: OracleTopKConfig) -> "OracleTopK":
         """Create OracleTopK instance from configuration."""
-        return cls(config) 
+        return cls(config)

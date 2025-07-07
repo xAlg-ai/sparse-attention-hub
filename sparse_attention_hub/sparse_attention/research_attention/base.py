@@ -7,38 +7,54 @@ from typing import Any, List, Optional, Tuple
 import torch
 
 from ..base import SparseAttention, SparseAttentionConfig
-from .maskers.base import ResearchMasker, MaskerConfig
-from .maskers.fixed import (
-    LocalMasker, LocalMaskerConfig,
-    CausalMasker, FixedMaskerConfig,
-    SinkMasker, SinkMaskerConfig,
-    OracleTopK, OracleTopKConfig,
-    TopKMasker, TopKMaskerConfig,
-    TopPMasker, TopPMaskerConfig,
-    HashAttentionTopKMasker, HashAttentionTopKMaskerConfig,
-    DoubleSparsityTopKMasker, DoubleSparsityTopKMaskerConfig,
-    PQCache, PQCacheConfig
-)
-from .maskers.sampling import (
-    RandomSamplingMasker, RandomSamplingMaskerConfig,
-    MagicPig, MagicPigConfig
-)
 from ..utils.mask import Mask
 from ..utils.mask_attention_utils import get_masked_attention_output
+from .maskers.base import MaskerConfig, ResearchMasker
+from .maskers.fixed import (
+    CausalMasker,
+    DoubleSparsityTopKMasker,
+    DoubleSparsityTopKMaskerConfig,
+    FixedMaskerConfig,
+    HashAttentionTopKMasker,
+    HashAttentionTopKMaskerConfig,
+    LocalMasker,
+    LocalMaskerConfig,
+    OracleTopK,
+    OracleTopKConfig,
+    PQCache,
+    PQCacheConfig,
+    SinkMasker,
+    SinkMaskerConfig,
+    TopKMasker,
+    TopKMaskerConfig,
+    TopPMasker,
+    TopPMaskerConfig,
+)
+from .maskers.sampling import (
+    MagicPig,
+    MagicPigConfig,
+    RandomSamplingMasker,
+    RandomSamplingMaskerConfig,
+)
 
 
 @dataclass
 class ResearchAttentionConfig(SparseAttentionConfig):
     """Configuration class for research attention mechanisms."""
+
     masker_configs: List[MaskerConfig]
 
 
 class ResearchAttention(SparseAttention):
     """Base class for research attention mechanisms with maskers."""
 
-    def __init__(self, sparse_attention_config: SparseAttentionConfig, maskers: List[ResearchMasker]) -> None:
+    def __init__(
+        self,
+        sparse_attention_config: SparseAttentionConfig,
+        maskers: List[ResearchMasker],
+    ) -> None:
         """Initialize research attention mechanism.
-        
+
         Args:
             sparse_attention_config: Configuration for the sparse attention mechanism.
             maskers: List of research maskers to apply.
@@ -55,7 +71,7 @@ class ResearchAttention(SparseAttention):
         attention_mask: Optional[torch.Tensor],
         scaling: float,
         dropout: float,
-        **kwargs
+        **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute research attention mechanism with masking.
 
@@ -73,9 +89,14 @@ class ResearchAttention(SparseAttention):
             Tuple of attention output and optional attention weights.
         """
         # Create an empty Mask object
-        mask_shape = (queries.shape[0], queries.shape[1], queries.shape[2], keys.shape[2])
+        mask_shape = (
+            queries.shape[0],
+            queries.shape[1],
+            queries.shape[2],
+            keys.shape[2],
+        )
         sparse_attention_mask = Mask.create_empty_mask(mask_shape)
-        
+
         # Apply all maskers sequentially, each one on the output of the previous one
         for masker in self.maskers:
             sparse_attention_mask = masker.add_mask(
@@ -85,9 +106,9 @@ class ResearchAttention(SparseAttention):
                 attention_mask=attention_mask,
                 sparse_meta_data=None,  # TODO: Define sparse_meta_data structure
                 previous_mask=sparse_attention_mask,
-                **kwargs
+                **kwargs,
             )
-        
+
         # Call compute_masked_attention_output on the result of the last mask
         # Always request attention weights to match the expected return signature
         attention_output, attention_weights = get_masked_attention_output(
@@ -100,18 +121,18 @@ class ResearchAttention(SparseAttention):
             dropout=dropout,
             sparse_attention_mask=sparse_attention_mask,
             return_attention_weights=True,
-            **kwargs
+            **kwargs,
         )
-        
+
         return attention_output, attention_weights
 
     @classmethod
     def create_from_config(cls, config: ResearchAttentionConfig) -> "ResearchAttention":
         """Create research attention instance from configuration.
-        
+
         Args:
             config: Configuration for the research attention mechanism.
-            
+
         Returns:
             Instance of the research attention mechanism.
         """
@@ -120,5 +141,5 @@ class ResearchAttention(SparseAttention):
         for masker_config in config.masker_configs:
             masker = ResearchMasker.create_masker_from_config(masker_config)
             maskers.append(masker)
-        
-        return cls(config, maskers) 
+
+        return cls(config, maskers)

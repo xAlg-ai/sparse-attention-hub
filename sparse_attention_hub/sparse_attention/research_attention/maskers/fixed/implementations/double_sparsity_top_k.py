@@ -1,7 +1,7 @@
 """Double sparsity top-K masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any, List, Union, Any
+from typing import Any, List, Union
 
 from ...base import ResearchMasker
 from ..base import TopKMasker, TopKMaskerConfig
@@ -10,6 +10,7 @@ from ..base import TopKMasker, TopKMaskerConfig
 @dataclass
 class DoubleSparsityTopKMaskerConfig(TopKMaskerConfig):
     """Configuration for DoubleSparsityTopKMasker."""
+
     group_factor: int
     label_bits: int
     channel_config: Any  # config with stats required for double sparsity
@@ -34,7 +35,7 @@ class DoubleSparsityTopKMasker(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add double sparsity mask."""
         # just return the same mask for now
@@ -55,6 +56,8 @@ class DoubleSparsityTopKMasker(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: DoubleSparsityTopKMaskerConfig) -> "DoubleSparsityTopKMasker":
+    def create_from_config(
+        cls, config: DoubleSparsityTopKMaskerConfig
+    ) -> "DoubleSparsityTopKMasker":
         """Create DoubleSparsityTopKMasker instance from configuration."""
-        return cls(config) 
+        return cls(config)

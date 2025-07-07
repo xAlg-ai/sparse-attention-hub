@@ -10,6 +10,7 @@ from ..base import FixedMasker, FixedMaskerConfig
 @dataclass
 class LocalMaskerConfig(FixedMaskerConfig):
     """Configuration for LocalMasker."""
+
     window_size: Union[float, int]
 
 
@@ -29,7 +30,7 @@ class LocalMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add local mask."""
         # just return the same mask for now
@@ -70,7 +71,7 @@ class CausalMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add causal mask."""
         # just return the same mask for now
@@ -99,6 +100,7 @@ class CausalMasker(FixedMasker):
 @dataclass
 class SinkMaskerConfig(FixedMaskerConfig):
     """Configuration for SinkMasker."""
+
     sink_size: Union[float, int]
 
 
@@ -118,7 +120,7 @@ class SinkMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add sink mask."""
         # just return the same mask for now
@@ -141,4 +143,4 @@ class SinkMasker(FixedMasker):
     @classmethod
     def create_from_config(cls, config: SinkMaskerConfig) -> "SinkMasker":
         """Create SinkMasker instance from configuration."""
-        return cls(config) 
+        return cls(config)

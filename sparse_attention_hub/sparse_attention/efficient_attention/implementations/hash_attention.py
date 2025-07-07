@@ -9,6 +9,7 @@ from ..base import EfficientAttention, EfficientAttentionConfig, SparseAttention
 @dataclass
 class HashAttentionConfig(EfficientAttentionConfig):
     """Configuration for HashAttention efficient attention mechanism."""
+
     heavy_size: Union[int, float]
     sink_size: int
     local_size: int
@@ -27,10 +28,10 @@ class HashAttention(EfficientAttention):
         hat_bits: int,
         hat_mlp_layers: int,
         hat_mlp_hidden_size: int,
-        hat_weights: Dict
+        hat_weights: Dict,
     ) -> None:
         """Initialize hash attention mechanism.
-        
+
         Args:
             sparse_attention_config: Configuration for the sparse attention mechanism.
             hat_bits: Number of bits for hash attention.
@@ -56,10 +57,10 @@ class HashAttention(EfficientAttention):
     @classmethod
     def create_from_config(cls, config: HashAttentionConfig) -> "HashAttention":
         """Create hash attention instance from configuration.
-        
+
         Args:
             config: Configuration for the hash attention mechanism.
-            
+
         Returns:
             Instance of the hash attention mechanism.
         """
@@ -68,5 +69,5 @@ class HashAttention(EfficientAttention):
             hat_bits=config.hat_bits,
             hat_mlp_layers=config.hat_mlp_layers,
             hat_mlp_hidden_size=config.hat_mlp_hidden_size,
-            hat_weights=config.hat_weights
-        ) 
+            hat_weights=config.hat_weights,
+        )

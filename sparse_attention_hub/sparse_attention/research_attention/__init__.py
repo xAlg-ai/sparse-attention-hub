@@ -2,4 +2,4 @@
 
 from .base import ResearchAttention, ResearchAttentionConfig
 
-__all__ = ["ResearchAttention", "ResearchAttentionConfig"] 
+__all__ = ["ResearchAttention", "ResearchAttentionConfig"]

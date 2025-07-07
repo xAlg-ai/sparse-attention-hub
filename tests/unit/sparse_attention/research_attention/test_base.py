@@ -16,10 +16,13 @@ class TestImports:
     def test_imports(self):
         """Test that all imports are working."""
         from sparse_attention_hub.sparse_attention.research_attention import (
-            ResearchAttention, ResearchAttentionConfig
+            ResearchAttention,
+            ResearchAttentionConfig,
         )
+
         assert ResearchAttention is not None
         assert ResearchAttentionConfig is not None
+
 
 @pytest.mark.unit
 class TestResearchAttentionAndConfigCreation:
@@ -28,17 +31,22 @@ class TestResearchAttentionAndConfigCreation:
     def test_research_attention_creation(self):
         """Test that research attention can be created."""
         from sparse_attention_hub.sparse_attention.research_attention import (
-            ResearchAttention, ResearchAttentionConfig
+            ResearchAttention,
+            ResearchAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-            LocalMaskerConfig, LocalMasker,
-            SinkMaskerConfig, SinkMasker,
-            OracleTopKConfig, OracleTopK
+            LocalMasker,
+            LocalMaskerConfig,
+            OracleTopK,
+            OracleTopKConfig,
+            SinkMasker,
+            SinkMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
-            RandomSamplingMaskerConfig, RandomSamplingMasker
+            RandomSamplingMasker,
+            RandomSamplingMaskerConfig,
         )
-    
+
         masker_configs = [
             SinkMaskerConfig(sink_size=10),
             LocalMaskerConfig(window_size=10),
@@ -56,17 +64,21 @@ class TestResearchAttentionAndConfigCreation:
         assert isinstance(attention.maskers[2], OracleTopK)
         assert isinstance(attention.maskers[3], RandomSamplingMasker)
 
+
 @pytest.mark.unit
 class TestInheritance:
     """Test class for inheritance."""
 
     def test_inheritance(self):
         """Test that research attention inherits from sparse attention."""
-        from sparse_attention_hub.sparse_attention.research_attention import (
-            ResearchAttention, ResearchAttentionConfig
-        )
         from sparse_attention_hub.sparse_attention import (
-            SparseAttention, SparseAttentionConfig
+            SparseAttention,
+            SparseAttentionConfig,
         )
+        from sparse_attention_hub.sparse_attention.research_attention import (
+            ResearchAttention,
+            ResearchAttentionConfig,
+        )
+
         assert issubclass(ResearchAttention, SparseAttention)
         assert issubclass(ResearchAttentionConfig, SparseAttentionConfig)

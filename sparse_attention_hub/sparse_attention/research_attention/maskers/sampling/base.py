@@ -2,14 +2,15 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Union, Any
+from typing import Any, Union
 
-from ..base import ResearchMasker, MaskerConfig
+from ..base import MaskerConfig, ResearchMasker
 
 
 @dataclass
 class SamplingMaskerConfig(MaskerConfig):
     """Base configuration for sampling maskers."""
+
     sampling_rate: Union[float, int]
 
 
@@ -29,7 +30,7 @@ class SamplingMasker(ResearchMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add sampling mask to attention computation."""
         pass
@@ -37,4 +38,4 @@ class SamplingMasker(ResearchMasker):
     @classmethod
     def create_from_config(cls, config: SamplingMaskerConfig) -> "SamplingMasker":
         """Create sampling masker instance from configuration."""
-        return cls(config) 
+        return cls(config)

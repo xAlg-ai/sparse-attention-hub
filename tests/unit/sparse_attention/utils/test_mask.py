@@ -6,16 +6,24 @@
 :summary: Tests for mask. This file is part of the Sparse Attention Hub project.
 """
 
-import torch
-from sparse_attention_hub.sparse_attention.utils.mask import Mask
-import numpy as np  
+import numpy as np
 import pytest
+import torch
+
+from sparse_attention_hub.sparse_attention.utils.mask import Mask
+
 
 @pytest.mark.unit
 class TestMask:
     def test_create_mask_from_dense_mask(self):
         shape = (3, 5)
-        mask = torch.tensor([[1.0, 0.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 1.0, 0.0, 1.0]])
+        mask = torch.tensor(
+            [
+                [1.0, 0.0, 1.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 1.0, 0.0],
+                [1.0, 0.0, 1.0, 0.0, 1.0],
+            ]
+        )
         mask_object = Mask.create_mask_from_dense_mask(shape, mask)
         assert mask_object.shape == shape
         assert torch.allclose(mask_object.mask, mask)
@@ -35,10 +43,16 @@ class TestMask:
 
     def test_getters_dense_index(self):
         shape = (3, 5)
-        mask = torch.tensor([[1.0, 0.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 1.0, 0.0, 1.0]])
+        mask = torch.tensor(
+            [
+                [1.0, 0.0, 1.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 1.0, 0.0],
+                [1.0, 0.0, 1.0, 0.0, 1.0],
+            ]
+        )
         dense_mask_object = Mask.create_mask_from_dense_mask(shape, mask)
         indices, ptr, data = dense_mask_object.get_index_mask()
-        
+
         index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data)
         dense_mask = index_mask_object.get_dense_mask()
         assert torch.allclose(dense_mask, mask)
@@ -60,15 +74,13 @@ class TestMask:
         assert torch.allclose(_ptr, ptr)
         assert torch.allclose(_data, data)
 
-
-
     def test_getters_dense_index_n_dims(self):
         n_dims = 3
         shape = tuple([5] * n_dims)
         mask = (torch.rand(shape) > 0.5) * torch.rand(shape)
         dense_mask_object = Mask.create_mask_from_dense_mask(shape, mask)
         indices, ptr, data = dense_mask_object.get_index_mask()
-        
+
         for i in range(np.prod(shape[:-1])):
             start = ptr[i]
             end = ptr[i + 1]

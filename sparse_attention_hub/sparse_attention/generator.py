@@ -17,4 +17,4 @@ class SparseAttentionGen(ABC):
     @abstractmethod
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Make the generator callable."""
-        pass 
+        pass

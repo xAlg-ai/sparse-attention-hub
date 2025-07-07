@@ -2,4 +2,4 @@
 
 from .base import EfficientAttention, EfficientAttentionConfig
 
-__all__ = ["EfficientAttention", "EfficientAttentionConfig"] 
+__all__ = ["EfficientAttention", "EfficientAttentionConfig"]

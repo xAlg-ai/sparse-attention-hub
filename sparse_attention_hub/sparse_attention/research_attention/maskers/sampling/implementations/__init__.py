@@ -4,8 +4,8 @@ from .magic_pig import MagicPig, MagicPigConfig
 from .random_sampling import RandomSamplingMasker, RandomSamplingMaskerConfig
 
 __all__ = [
-    "MagicPig", 
+    "MagicPig",
     "RandomSamplingMasker",
     "MagicPigConfig",
-    "RandomSamplingMaskerConfig"
-] 
+    "RandomSamplingMaskerConfig",
+]

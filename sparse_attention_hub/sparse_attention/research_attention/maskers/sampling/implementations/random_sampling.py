@@ -10,6 +10,7 @@ from ..base import SamplingMasker, SamplingMaskerConfig
 @dataclass
 class RandomSamplingMaskerConfig(SamplingMaskerConfig):
     """Configuration for RandomSamplingMasker."""
+
     pass
 
 
@@ -29,7 +30,7 @@ class RandomSamplingMasker(SamplingMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add random sampling mask."""
         # just return the same mask for now
@@ -50,6 +51,8 @@ class RandomSamplingMasker(SamplingMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: RandomSamplingMaskerConfig) -> "RandomSamplingMasker":
+    def create_from_config(
+        cls, config: RandomSamplingMaskerConfig
+    ) -> "RandomSamplingMasker":
         """Create RandomSamplingMasker instance from configuration."""
-        return cls(config) 
+        return cls(config)

@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Union, Any, List
+from typing import Any, List, Union
 
 from ..base import MaskerConfig, ResearchMasker
 
@@ -10,6 +10,7 @@ from ..base import MaskerConfig, ResearchMasker
 @dataclass
 class FixedMaskerConfig(MaskerConfig):
     """Base configuration for fixed pattern maskers."""
+
     pass
 
 
@@ -29,7 +30,7 @@ class FixedMasker(ResearchMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add fixed mask to attention computation."""
         pass
@@ -57,6 +58,7 @@ class FixedMasker(ResearchMasker):
 @dataclass
 class TopKMaskerConfig(FixedMaskerConfig):
     """Base configuration for top-K maskers."""
+
     heavy_size: Union[float, int]
 
 
@@ -76,7 +78,7 @@ class TopKMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add top-K mask to attention computation."""
         pass
@@ -90,6 +92,7 @@ class TopKMasker(FixedMasker):
 @dataclass
 class TopPMaskerConfig(FixedMaskerConfig):
     """Base configuration for top-P maskers."""
+
     pass
 
 
@@ -109,7 +112,7 @@ class TopPMasker(FixedMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add top-P mask to attention computation."""
         pass
@@ -117,4 +120,4 @@ class TopPMasker(FixedMasker):
     @classmethod
     def create_from_config(cls, config: TopPMaskerConfig) -> "TopPMasker":
         """Create top-P masker instance from configuration."""
-        return cls(config) 
+        return cls(config)

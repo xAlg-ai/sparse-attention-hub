@@ -10,6 +10,7 @@ from ..base import TopKMasker, TopKMaskerConfig
 @dataclass
 class PQCacheConfig(TopKMaskerConfig):
     """Configuration for PQCache masker."""
+
     pq_sub_dim: int
     pq_bits: int
 
@@ -32,7 +33,7 @@ class PQCache(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add PQ cache mask."""
         # just return the same mask for now
@@ -55,4 +56,4 @@ class PQCache(TopKMasker):
     @classmethod
     def create_from_config(cls, config: PQCacheConfig) -> "PQCache":
         """Create PQCache instance from configuration."""
-        return cls(config) 
+        return cls(config)

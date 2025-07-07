@@ -1,7 +1,10 @@
 """Integration tests for end-to-end sparse attention functionality."""
 
 import pytest
-from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import OracleTopKConfig
+
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
+    OracleTopKConfig,
+)
 
 
 @pytest.mark.integration
@@ -20,6 +23,7 @@ class TestEndToEndSparseAttention:
     def test_metrics_integration(self):
         pass
 
+
 # @pytest.mark.integration
 # class TestUserStory:
 #     """Test end-to-end sparse attention pipeline."""
@@ -37,5 +41,3 @@ class TestEndToEndSparseAttention:
 #         inputs = tokenizer(prompt, return_tensors="pt")
 #         outputs = model.generate(**inputs, max_new_tokens=10, do_sample=False, sparse_attention_meta_data=sparse_attention_meta_data)
 #         print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-
-    

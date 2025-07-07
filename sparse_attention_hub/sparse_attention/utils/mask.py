@@ -1,23 +1,24 @@
 """Mask class for representing attention masks in both dense and sparse formats."""
 
-import torch
+from typing import Optional, Tuple, Union
+
 import numpy as np
-from typing import Tuple, Optional, Union
+import torch
 
 
 class Mask:
     """
     Mask object represents a mask over a tensor of shape (..., n).
-    
+
     There are two representations of a Mask Object:
     1. mask: mask.shape == shape (dense representation)
     2. sparse matrix format: stores indices and ptr of mask (sparse representation)
-    
-    Both representations store floating point values. A value of zero means that the 
-    element is not active. A non-zero value represents the weight assigned to this 
+
+    Both representations store floating point values. A value of zero means that the
+    element is not active. A non-zero value represents the weight assigned to this
     element in tensor.
     """
-    
+
     def __init__(
         self,
         shape: Tuple[int, ...],
@@ -27,11 +28,11 @@ class Mask:
         ptr: Optional[torch.Tensor] = None,
         data: Optional[torch.Tensor] = None,
         from_dense_mask: bool = False,
-        from_index: bool = False
+        from_index: bool = False,
     ):
         """
         Initialize a Mask object.
-        
+
         Args:
             shape: Shape of the mask (*, n)
             dtype: Data type for the mask values
@@ -46,7 +47,7 @@ class Mask:
         self.dtype = dtype
         self.from_dense_mask = from_dense_mask
         self.from_index = from_index
-        
+
         if from_dense_mask and mask is not None:
             self.mask = mask.to(dtype)
             self.indices = None
@@ -58,8 +59,10 @@ class Mask:
             self.ptr = ptr
             self.data = data
         else:
-            raise ValueError("Must specify either from_dense_mask with mask or from_index with indices and ptr")
-    
+            raise ValueError(
+                "Must specify either from_dense_mask with mask or from_index with indices and ptr"
+            )
+
     @classmethod
     def create_mask_from_indices(
         cls,
@@ -67,67 +70,64 @@ class Mask:
         indices: torch.Tensor,
         ptr: torch.Tensor,
         data: Optional[torch.Tensor] = None,
-        dtype: torch.dtype = torch.float32
+        dtype: torch.dtype = torch.float32,
     ) -> "Mask":
         """
         Create a Mask from sparse indices and pointer representation.
-        
+
         Args:
             shape: Shape of the mask (*, n)
             indices: Indices for sparse representation
             ptr: Pointer array for sparse representation
             data: Data for sparse representation
             dtype: Data type for the mask values
-            
+
         Returns:
             Mask object with from_index=True
         """
         # For multi-dimensional tensors, ptr should have size equal to the product of all dimensions except the last one, plus 1
         expected_ptr_size = np.prod(shape[:-1]) + 1
         if ptr.numel() != expected_ptr_size:
-            raise ValueError(f"ptr.numel() must be {expected_ptr_size}, got {ptr.numel()}")
-        
+            raise ValueError(
+                f"ptr.numel() must be {expected_ptr_size}, got {ptr.numel()}"
+            )
+
         return cls(
             shape=shape,
             dtype=dtype,
             indices=indices,
             ptr=ptr,
             data=data,
-            from_index=True
+            from_index=True,
         )
-    
+
     @classmethod
     def create_mask_from_dense_mask(
         cls,
         shape: Tuple[int, ...],
         mask: torch.Tensor,
-        dtype: torch.dtype = torch.float32
+        dtype: torch.dtype = torch.float32,
     ) -> "Mask":
         """
         Create a Mask from dense mask tensor.
-        
+
         Args:
             shape: Shape of the mask (*, n)
             mask: Dense mask tensor of shape (*, n)
             dtype: Data type for the mask values
-            
+
         Returns:
             Mask object with from_dense_mask=True
         """
         if mask.shape != shape:
             raise ValueError(f"mask.shape must be {shape}, got {mask.shape}")
-        
-        return cls(
-            shape=shape,
-            dtype=dtype,
-            mask=mask,
-            from_dense_mask=True
-        )
-    
+
+        return cls(shape=shape, dtype=dtype, mask=mask, from_dense_mask=True)
+
     def get_index_mask(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Get the sparse index representation.
-        
+
         Returns:
             Tuple of (indices, ptr, data) for sparse representation
         """
@@ -136,26 +136,27 @@ class Mask:
         elif self.from_dense_mask:
             # Convert dense representation to sparse representation
             # Find non-zero indices
-            non_zero_indices = torch.nonzero(self.mask.view(-1), as_tuple=False).squeeze(-1)
+            non_zero_indices = torch.nonzero(
+                self.mask.view(-1), as_tuple=False
+            ).squeeze(-1)
             data = self.mask.view(-1)[non_zero_indices]
-            
+
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             ptr_size = np.prod(self.shape[:-1]) + 1
             # Vectorized version: count nonzero per row and cumsum
             counts = torch.count_nonzero(self.mask.view(-1, self.shape[-1]), dim=1)
-            ptr = torch.cat([
-                torch.zeros(1, dtype=torch.long),
-                torch.cumsum(counts, dim=0)
-            ])
-            
+            ptr = torch.cat(
+                [torch.zeros(1, dtype=torch.long), torch.cumsum(counts, dim=0)]
+            )
+
             return non_zero_indices, ptr, data
         else:
             raise RuntimeError("Mask object is in an invalid state")
-    
+
     def get_dense_mask(self) -> torch.Tensor:
         """
         Get the dense mask representation.
-        
+
         Returns:
             Dense mask tensor
         """
@@ -172,17 +173,17 @@ class Mask:
             return dense_mask
         else:
             raise RuntimeError("Mask object is in an invalid state")
-    
+
     def apply_mask(self, input_tensor: torch.Tensor) -> torch.Tensor:
         """
         Apply the mask to an input tensor.
-        
+
         Args:
             if mask is empty, return input_tensor # as if no mask is applied
             if mask is not empty, then 0=> inactive and >0 => active with the corresponding weight
 
             input_tensor: Input tensor with shape same as the mask
-            
+
         Returns:
             Output tensor after applying the mask
         """
@@ -190,8 +191,10 @@ class Mask:
             return input_tensor
 
         if input_tensor.shape != self.shape:
-            raise ValueError(f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}")
-        
+            raise ValueError(
+                f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}"
+            )
+
         if self.from_dense_mask:
             return input_tensor * self.mask
         elif self.from_index:
@@ -199,22 +202,22 @@ class Mask:
             return input_tensor * dense_mask
         else:
             raise RuntimeError("Mask object is in an invalid state")
-    
+
     @classmethod
     def create_empty_mask(
         cls,
         shape: Tuple[int, ...],
         dtype: torch.dtype = torch.float32,
-        mask_type: str = "dense"
+        mask_type: str = "dense",
     ) -> "Mask":
         """
         Create a mask object with all values set to zero.
-        
+
         Args:
             shape: Shape of the mask (*, n)
             dtype: Data type for the mask values
             mask_type: Type of representation ("dense" or "index")
-            
+
         Returns:
             Mask object with all zeros in the specified representation
         """
@@ -225,19 +228,19 @@ class Mask:
         elif mask_type == "index":
             # For an empty mask, we have no non-zero indices
             empty_indices = torch.empty(0, dtype=torch.long)
-            
+
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             # All rows have 0 non-zero elements, so ptr is just zeros
             ptr_size = np.prod(shape[:-1]) + 1
             ptr = torch.zeros(ptr_size, dtype=torch.long)
-            
+
             # No data since all values are zero
             data = torch.empty(0, dtype=dtype)
-            
+
             return cls.create_mask_from_indices(shape, empty_indices, ptr, data, dtype)
         else:
             raise ValueError(f"mask_type must be 'dense' or 'index', got {mask_type}")
-    
+
     def is_empty(self) -> bool:
         """
         Check if the mask is empty.

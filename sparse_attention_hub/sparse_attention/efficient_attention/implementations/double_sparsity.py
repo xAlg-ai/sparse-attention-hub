@@ -9,12 +9,14 @@ from ..base import EfficientAttention, EfficientAttentionConfig, SparseAttention
 @dataclass
 class ChannelConfig:
     """Configuration for channel statistics in double sparsity."""
+
     pass
 
 
 @dataclass
 class DoubleSparsityConfig(EfficientAttentionConfig):
     """Configuration for DoubleSparsity efficient attention mechanism."""
+
     heavy_size: Union[int, float]
     sink_size: int
     local_size: int
@@ -27,14 +29,14 @@ class DoubleSparsity(EfficientAttention):
     """Double sparsity attention mechanism."""
 
     def __init__(
-        self, 
+        self,
         sparse_attention_config: SparseAttentionConfig,
         group_factor: int,
         label_bits: int,
-        channel_config: ChannelConfig
+        channel_config: ChannelConfig,
     ) -> None:
         """Initialize double sparsity attention mechanism.
-        
+
         Args:
             sparse_attention_config: Configuration for the sparse attention mechanism.
             group_factor: Determines how many channels to use.
@@ -58,10 +60,10 @@ class DoubleSparsity(EfficientAttention):
     @classmethod
     def create_from_config(cls, config: DoubleSparsityConfig) -> "DoubleSparsity":
         """Create double sparsity instance from configuration.
-        
+
         Args:
             config: Configuration for the double sparsity attention mechanism.
-            
+
         Returns:
             Instance of the double sparsity attention mechanism.
         """
@@ -69,5 +71,5 @@ class DoubleSparsity(EfficientAttention):
             sparse_attention_config=config,
             group_factor=config.ds_group_factor,
             label_bits=config.ds_bits,
-            channel_config=config.ds_channel_config
-        ) 
+            channel_config=config.ds_channel_config,
+        )

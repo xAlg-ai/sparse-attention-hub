@@ -2,17 +2,17 @@
 
 from .base import SamplingMasker, SamplingMaskerConfig
 from .implementations import (
-    RandomSamplingMasker, 
     MagicPig,
+    MagicPigConfig,
+    RandomSamplingMasker,
     RandomSamplingMaskerConfig,
-    MagicPigConfig
 )
 
 __all__ = [
-    "SamplingMasker", 
-    "RandomSamplingMasker", 
+    "SamplingMasker",
+    "RandomSamplingMasker",
     "MagicPig",
     "SamplingMaskerConfig",
     "RandomSamplingMaskerConfig",
-    "MagicPigConfig"
-] 
+    "MagicPigConfig",
+]

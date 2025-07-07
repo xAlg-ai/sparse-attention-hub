@@ -16,10 +16,13 @@ class TestImports:
     def test_imports(self):
         """Test that all imports are working."""
         from sparse_attention_hub.sparse_attention import (
-            SparseAttention, SparseAttentionConfig
+            SparseAttention,
+            SparseAttentionConfig,
         )
+
         assert SparseAttention is not None
         assert SparseAttentionConfig is not None
+
 
 @pytest.mark.unit
 class TestSparseAttentionAndConfigCreation:
@@ -27,21 +30,27 @@ class TestSparseAttentionAndConfigCreation:
 
     def test_research_attention_creation(self):
         """Test that sparse attention can be created."""
+        from sparse_attention_hub.sparse_attention import (
+            SparseAttention,
+            SparseAttentionConfig,
+        )
         from sparse_attention_hub.sparse_attention.research_attention import (
-            ResearchAttention, ResearchAttentionConfig
+            ResearchAttention,
+            ResearchAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-            LocalMaskerConfig, LocalMasker,
-            SinkMaskerConfig, SinkMasker,
-            OracleTopKConfig, OracleTopK
+            LocalMasker,
+            LocalMaskerConfig,
+            OracleTopK,
+            OracleTopKConfig,
+            SinkMasker,
+            SinkMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
-            RandomSamplingMaskerConfig, RandomSamplingMasker
+            RandomSamplingMasker,
+            RandomSamplingMaskerConfig,
         )
-        from sparse_attention_hub.sparse_attention import (
-            SparseAttention, SparseAttentionConfig
-        )
-    
+
         masker_configs = [
             SinkMaskerConfig(sink_size=10),
             LocalMaskerConfig(window_size=10),
@@ -59,15 +68,17 @@ class TestSparseAttentionAndConfigCreation:
         assert isinstance(attention.maskers[2], OracleTopK)
         assert isinstance(attention.maskers[3], RandomSamplingMasker)
 
-
     def test_efficient_attention_creation(self):
         """Test that efficient attention can be created."""
-        from sparse_attention_hub.sparse_attention.efficient_attention.implementations.hash_attention import (
-            HashAttentionConfig, HashAttention
-        )
         from sparse_attention_hub.sparse_attention import (
-            SparseAttention, SparseAttentionConfig
+            SparseAttention,
+            SparseAttentionConfig,
         )
+        from sparse_attention_hub.sparse_attention.efficient_attention.implementations.hash_attention import (
+            HashAttention,
+            HashAttentionConfig,
+        )
+
         config = HashAttentionConfig(
             heavy_size=10,
             sink_size=10,

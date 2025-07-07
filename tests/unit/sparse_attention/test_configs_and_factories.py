@@ -1,8 +1,9 @@
 """Tests for sparse attention config classes and create_from_config methods."""
 
-import pytest
 from dataclasses import dataclass
 from typing import Dict
+
+import pytest
 
 
 @pytest.mark.unit
@@ -12,91 +13,109 @@ class TestSparseAttentionConfigsAndFactories:
     def test_sparse_attention_config_import(self):
         """Test that SparseAttentionConfig can be imported."""
         from sparse_attention_hub.sparse_attention import SparseAttentionConfig
+
         assert SparseAttentionConfig is not None
 
     def test_efficient_attention_config_import(self):
         """Test that EfficientAttentionConfig can be imported."""
         from sparse_attention_hub.sparse_attention import EfficientAttentionConfig
+
         assert EfficientAttentionConfig is not None
 
     def test_research_attention_config_import(self):
         """Test that ResearchAttentionConfig can be imported."""
         from sparse_attention_hub.sparse_attention import ResearchAttentionConfig
+
         assert ResearchAttentionConfig is not None
 
     def test_double_sparsity_config_import(self):
         """Test that DoubleSparsityConfig can be imported."""
-        from sparse_attention_hub.sparse_attention import DoubleSparsityConfig, ChannelConfig
+        from sparse_attention_hub.sparse_attention import (
+            ChannelConfig,
+            DoubleSparsityConfig,
+        )
+
         assert DoubleSparsityConfig is not None
         assert ChannelConfig is not None
 
     def test_hash_attention_config_import(self):
         """Test that HashAttentionConfig can be imported."""
         from sparse_attention_hub.sparse_attention import HashAttentionConfig
+
         assert HashAttentionConfig is not None
 
     def test_double_sparsity_top_k_masker_config_import(self):
         """Test that DoubleSparsityTopKMaskerConfig can be imported."""
         from sparse_attention_hub.sparse_attention import DoubleSparsityTopKMaskerConfig
+
         assert DoubleSparsityTopKMaskerConfig is not None
 
     def test_hash_attention_top_k_masker_config_import(self):
         """Test that HashAttentionTopKMaskerConfig can be imported."""
         from sparse_attention_hub.sparse_attention import HashAttentionTopKMaskerConfig
+
         assert HashAttentionTopKMaskerConfig is not None
 
     def test_sparse_attention_config_creation(self):
         """Test SparseAttentionConfig creation and usage."""
-        from sparse_attention_hub.sparse_attention import SparseAttentionConfig, SparseAttention
-        
+        from sparse_attention_hub.sparse_attention import (
+            SparseAttention,
+            SparseAttentionConfig,
+        )
+
         config = SparseAttentionConfig()
         assert config is not None
-        
+
         # Test that we can create a concrete subclass with this config
         class ConcreteSparseAttention(SparseAttention):
             def custom_attention(self):
                 return None, None
-        
+
         attention = ConcreteSparseAttention(config)
         assert attention.sparse_attention_config == config
 
     def test_efficient_attention_config_creation(self):
         """Test EfficientAttentionConfig creation and usage."""
-        from sparse_attention_hub.sparse_attention import EfficientAttentionConfig, EfficientAttention
-        
+        from sparse_attention_hub.sparse_attention import (
+            EfficientAttention,
+            EfficientAttentionConfig,
+        )
+
         config = EfficientAttentionConfig()
         assert config is not None
-        
+
         # Test that we can create a concrete subclass with this config
         class ConcreteEfficientAttention(EfficientAttention):
             def custom_attention(self):
                 return None, None
-        
+
         attention = ConcreteEfficientAttention(config)
         assert attention.sparse_attention_config == config
 
     def test_double_sparsity_config_and_creation(self):
         """Test DoubleSparsityConfig and create_from_config method."""
         from sparse_attention_hub.sparse_attention import (
-            DoubleSparsityConfig, ChannelConfig, DoubleSparsity
+            ChannelConfig,
+            DoubleSparsity,
+            DoubleSparsityConfig,
         )
-        
+
         config = DoubleSparsityConfig(
             heavy_size=0.3,
             sink_size=10,
             local_size=5,
             ds_channel_config="config_file.json",
             ds_bits=8,
-            ds_group_factor=4.0
+            ds_group_factor=4.0,
         )
-        
+
         assert config.heavy_size == 0.3
         assert config.sink_size == 10
         assert config.local_size == 5
         assert config.ds_channel_config == "config_file.json"
         assert config.ds_bits == 8
         assert config.ds_group_factor == 4.0
-        
+
         # Test create_from_config
         double_sparsity = DoubleSparsity.create_from_config(config)
         assert isinstance(double_sparsity, DoubleSparsity)
@@ -106,8 +125,11 @@ class TestSparseAttentionConfigsAndFactories:
 
     def test_hash_attention_config_and_creation(self):
         """Test HashAttentionConfig and create_from_config method."""
-        from sparse_attention_hub.sparse_attention import HashAttentionConfig, HashAttention
-        
+        from sparse_attention_hub.sparse_attention import (
+            HashAttention,
+            HashAttentionConfig,
+        )
+
         config = HashAttentionConfig(
             heavy_size=0.4,
             sink_size=10,
@@ -115,9 +137,9 @@ class TestSparseAttentionConfigsAndFactories:
             hat_weights="weights.pt",
             hat_bits=8,
             hat_mlp_layers=2,
-            hat_mlp_hidden_size=64
+            hat_mlp_hidden_size=64,
         )
-        
+
         assert config.heavy_size == 0.4
         assert config.sink_size == 10
         assert config.local_size == 5
@@ -125,7 +147,7 @@ class TestSparseAttentionConfigsAndFactories:
         assert config.hat_bits == 8
         assert config.hat_mlp_layers == 2
         assert config.hat_mlp_hidden_size == 64
-        
+
         # Test create_from_config
         hash_attention = HashAttention.create_from_config(config)
         assert isinstance(hash_attention, HashAttention)
@@ -136,21 +158,22 @@ class TestSparseAttentionConfigsAndFactories:
     def test_double_sparsity_top_k_masker_config_and_creation(self):
         """Test DoubleSparsityTopKMaskerConfig and create_from_config method."""
         from sparse_attention_hub.sparse_attention import (
-            DoubleSparsityTopKMaskerConfig, DoubleSparsityTopKMasker
+            DoubleSparsityTopKMasker,
+            DoubleSparsityTopKMaskerConfig,
         )
-        
+
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=0.3,
             group_factor=4,
             label_bits=8,
-            channel_config="channel_config.json"
+            channel_config="channel_config.json",
         )
-        
+
         assert config.heavy_size == 0.3
         assert config.group_factor == 4
         assert config.label_bits == 8
         assert config.channel_config == "channel_config.json"
-        
+
         # Test create_from_config
         double_sparsity = DoubleSparsityTopKMasker.create_from_config(config)
         assert isinstance(double_sparsity, DoubleSparsityTopKMasker)
@@ -160,20 +183,20 @@ class TestSparseAttentionConfigsAndFactories:
 
     def test_hash_attention_top_k_masker_config_and_creation(self):
         """Test HashAttentionTopKMaskerConfig and create_from_config method."""
-        from sparse_attention_hub.sparse_attention import HashAttentionTopKMaskerConfig, HashAttentionTopKMasker
-        
-        config = HashAttentionTopKMaskerConfig(
-            heavy_size=0.4,
-            hat_bits=8,
-            hat_mlp_layers=2,
-            hat_mlp_hidden_size=64
+        from sparse_attention_hub.sparse_attention import (
+            HashAttentionTopKMasker,
+            HashAttentionTopKMaskerConfig,
         )
-        
+
+        config = HashAttentionTopKMaskerConfig(
+            heavy_size=0.4, hat_bits=8, hat_mlp_layers=2, hat_mlp_hidden_size=64
+        )
+
         assert config.heavy_size == 0.4
         assert config.hat_bits == 8
         assert config.hat_mlp_layers == 2
         assert config.hat_mlp_hidden_size == 64
-        
+
         # Test create_from_config
         hash_attention = HashAttentionTopKMasker.create_from_config(config)
         assert isinstance(hash_attention, HashAttentionTopKMasker)
@@ -184,33 +207,36 @@ class TestSparseAttentionConfigsAndFactories:
     def test_research_attention_direct_instantiation(self):
         """Test that ResearchAttention can be instantiated directly since it's not abstract."""
         from sparse_attention_hub.sparse_attention import (
-            ResearchAttention, ResearchAttentionConfig, SparseAttentionConfig
+            ResearchAttention,
+            ResearchAttentionConfig,
+            SparseAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-            LocalMaskerConfig
+            LocalMaskerConfig,
         )
-        
+
         # Create a simple config
         sparse_config = SparseAttentionConfig()
         masker_configs = [LocalMaskerConfig(window_size=5)]
         config = ResearchAttentionConfig(masker_configs=masker_configs)
-        
+
         # Test direct instantiation
         research_attention = ResearchAttention(sparse_config, [])
         assert isinstance(research_attention, ResearchAttention)
         assert research_attention.sparse_attention_config == sparse_config
         assert research_attention.maskers == []
-        
+
         # Test that custom_attention method works
         import torch
+
         module = None  # Mock module
         queries = torch.randn(2, 4, 10, 64)  # (b, h, sk, d)
-        keys = torch.randn(2, 4, 12, 64)     # (b, h, sq, d)
-        values = torch.randn(2, 4, 12, 64)   # (b, h, sq, d)
+        keys = torch.randn(2, 4, 12, 64)  # (b, h, sq, d)
+        values = torch.randn(2, 4, 12, 64)  # (b, h, sq, d)
         attention_mask = None
         scaling = 1.0
         dropout = 0.1
-        
+
         result = research_attention.custom_attention(
             module=module,
             queries=queries,
@@ -218,29 +244,31 @@ class TestSparseAttentionConfigsAndFactories:
             values=values,
             attention_mask=attention_mask,
             scaling=scaling,
-            dropout=dropout
+            dropout=dropout,
         )
         assert result[0] is not None  # attention_output should not be None
-        assert result[1] is None      # attention_weights should be None
+        assert result[1] is None  # attention_weights should be None
 
     def test_research_attention_config_and_creation(self):
         """Test ResearchAttentionConfig and create_from_config method."""
         from sparse_attention_hub.sparse_attention import (
-            ResearchAttentionConfig, ResearchAttention
+            ResearchAttention,
+            ResearchAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
-            LocalMaskerConfig, OracleTopKConfig
+            LocalMaskerConfig,
+            OracleTopKConfig,
         )
-        
+
         # Create masker configs
         masker_configs = [
             LocalMaskerConfig(window_size=5),
-            OracleTopKConfig(heavy_size=10)
+            OracleTopKConfig(heavy_size=10),
         ]
-        
+
         config = ResearchAttentionConfig(masker_configs=masker_configs)
         assert config.masker_configs == masker_configs
-        
+
         # Test create_from_config - ResearchAttention is now concrete
         research_attention = ResearchAttention.create_from_config(config)
         assert isinstance(research_attention, ResearchAttention)
@@ -252,9 +280,13 @@ class TestSparseAttentionConfigsAndFactories:
     def test_efficient_attention_factory_method(self):
         """Test that EfficientAttention.create_from_config works with different configs."""
         from sparse_attention_hub.sparse_attention import (
-            EfficientAttention, DoubleSparsityConfig, HashAttentionConfig, DoubleSparsity, HashAttention
+            DoubleSparsity,
+            DoubleSparsityConfig,
+            EfficientAttention,
+            HashAttention,
+            HashAttentionConfig,
         )
-        
+
         # Test with DoubleSparsityConfig
         double_sparsity_config = DoubleSparsityConfig(
             heavy_size=0.3,
@@ -262,12 +294,12 @@ class TestSparseAttentionConfigsAndFactories:
             local_size=5,
             ds_channel_config="config_file.json",
             ds_bits=8,
-            ds_group_factor=4.0
+            ds_group_factor=4.0,
         )
-        
+
         double_sparsity = EfficientAttention.create_from_config(double_sparsity_config)
         assert isinstance(double_sparsity, DoubleSparsity)
-        
+
         # Test with HashAttentionConfig
         hash_attention_config = HashAttentionConfig(
             heavy_size=0.4,
@@ -276,24 +308,24 @@ class TestSparseAttentionConfigsAndFactories:
             hat_weights="weights.pt",
             hat_bits=8,
             hat_mlp_layers=2,
-            hat_mlp_hidden_size=64
+            hat_mlp_hidden_size=64,
         )
-        
+
         hash_attention = EfficientAttention.create_from_config(hash_attention_config)
         assert isinstance(hash_attention, HashAttention)
 
     def test_config_inheritance_hierarchy(self):
         """Test that config inheritance hierarchy is correct."""
         from sparse_attention_hub.sparse_attention import (
-            SparseAttentionConfig,
-            EfficientAttentionConfig,
-            ResearchAttentionConfig,
             DoubleSparsityConfig,
-            HashAttentionConfig
+            EfficientAttentionConfig,
+            HashAttentionConfig,
+            ResearchAttentionConfig,
+            SparseAttentionConfig,
         )
-        
+
         # Test inheritance hierarchy
         assert issubclass(EfficientAttentionConfig, SparseAttentionConfig)
         assert issubclass(ResearchAttentionConfig, SparseAttentionConfig)
         assert issubclass(DoubleSparsityConfig, EfficientAttentionConfig)
-        assert issubclass(HashAttentionConfig, EfficientAttentionConfig) 
+        assert issubclass(HashAttentionConfig, EfficientAttentionConfig)

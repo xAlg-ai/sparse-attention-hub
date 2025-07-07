@@ -8,6 +8,7 @@ from typing import Any, Optional, Tuple
 @dataclass
 class SparseAttentionConfig:
     """Configuration class for sparse attention mechanisms."""
+
     pass
 
 
@@ -16,7 +17,7 @@ class SparseAttention(ABC):
 
     def __init__(self, sparse_attention_config: SparseAttentionConfig) -> None:
         """Initialize sparse attention mechanism.
-        
+
         Args:
             sparse_attention_config: Configuration for the sparse attention mechanism.
         """
@@ -38,17 +39,17 @@ class SparseAttention(ABC):
     @classmethod
     def create_from_config(cls, config: SparseAttentionConfig) -> "SparseAttention":
         """Create sparse attention instance from configuration.
-        
+
         Args:
             config: Configuration for the sparse attention mechanism.
-            
+
         Returns:
             Instance of the sparse attention mechanism.
         """
         # Import here to avoid circular imports
-        from .research_attention import ResearchAttention, ResearchAttentionConfig
         from .efficient_attention import EfficientAttention, EfficientAttentionConfig
-        
+        from .research_attention import ResearchAttention, ResearchAttentionConfig
+
         # Check config type and route to appropriate create_from_config method
         if isinstance(config, ResearchAttentionConfig):
             return ResearchAttention.create_from_config(config)

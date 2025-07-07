@@ -10,6 +10,7 @@ from ..base import SamplingMasker, SamplingMaskerConfig
 @dataclass
 class MagicPigConfig(SamplingMaskerConfig):
     """Configuration for MagicPig masker."""
+
     lsh_l: int  # number of tables
     lsh_k: int  # number of bits per table
 
@@ -32,7 +33,7 @@ class MagicPig(SamplingMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Add Magic Pig mask."""
         # just return the same mask for now
@@ -55,4 +56,4 @@ class MagicPig(SamplingMasker):
     @classmethod
     def create_from_config(cls, config: MagicPigConfig) -> "MagicPig":
         """Create MagicPig instance from configuration."""
-        return cls(config) 
+        return cls(config)

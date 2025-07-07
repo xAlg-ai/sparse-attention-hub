@@ -1,8 +1,8 @@
 """Research attention maskers."""
 
-from .base import ResearchMasker, MaskerConfig
+from .base import MaskerConfig, ResearchMasker
 
 __all__ = [
     "ResearchMasker",
     "MaskerConfig",
-] 
+]

@@ -2,4 +2,4 @@
 
 from .hugging_face import SparseAttentionHF
 
-__all__ = ["SparseAttentionHF"] 
+__all__ = ["SparseAttentionHF"]
