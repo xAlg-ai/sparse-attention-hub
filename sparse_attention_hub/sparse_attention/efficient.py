@@ -20,7 +20,7 @@ class DoubleSparsity(EfficientAttention):
         super().__init__()
         self.sparsity_ratio = max(0.0, min(1.0, sparsity_ratio))
 
-    def custom_attention(
+    def custom_attention(  # pylint: disable=arguments-differ
         self,
         queries: Optional[torch.Tensor] = None,
         keys: Optional[torch.Tensor] = None,
@@ -38,9 +38,7 @@ class DoubleSparsity(EfficientAttention):
             return torch.tensor([]), None
 
         # Handle grouped query attention by expanding keys/values to match query heads
-        batch_size, num_heads, seq_len, head_dim = (
-            queries.shape
-        )  # pylint: disable=unused-variable
+        _, num_heads, seq_len, head_dim = queries.shape
         _, num_kv_heads, _, _ = keys.shape
 
         if num_heads != num_kv_heads:
@@ -87,7 +85,7 @@ class HashAttention(EfficientAttention):
         super().__init__()
         self.num_buckets = max(1, num_buckets)
 
-    def custom_attention(
+    def custom_attention(  # pylint: disable=arguments-differ
         self,
         queries: Optional[torch.Tensor] = None,
         keys: Optional[torch.Tensor] = None,
@@ -105,9 +103,7 @@ class HashAttention(EfficientAttention):
             return torch.tensor([]), None
 
         # Handle grouped query attention by expanding keys/values to match query heads
-        batch_size, num_heads, seq_len, head_dim = (
-            queries.shape
-        )  # pylint: disable=unused-variable
+        batch_size, num_heads, seq_len, head_dim = queries.shape
         _, num_kv_heads, _, _ = keys.shape
 
         if num_heads != num_kv_heads:

@@ -12,12 +12,12 @@ class SparseAttentionGen(ABC):
     @abstractmethod
     def get_custom_attention_function(self) -> Callable:
         """Get the custom attention function."""
-        # TODO: Implement custom attention function generation
+        # TODO: Implement custom attention function generation  # pylint: disable=fixme
 
     @abstractmethod
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Make the generator callable."""
-        # TODO: Implement callable interface
+        # TODO: Implement callable interface  # pylint: disable=fixme
 
 
 class SparseAttentionHF(SparseAttentionGen):
@@ -57,27 +57,19 @@ class SparseAttentionHF(SparseAttentionGen):
                     head_dim = embed_dim // num_heads
 
                     # Reshape to multi-head format: (batch, heads, seq_len, head_dim)
-                    q = query.view(
+                    q = query.view(  # pylint: disable=invalid-name
                         batch_size, seq_len, num_heads, head_dim
-                    ).transpose(  # pylint: disable=invalid-name
-                        1, 2
-                    )
-                    k = key.view(
+                    ).transpose(1, 2)
+                    k = key.view(  # pylint: disable=invalid-name
                         batch_size, seq_len, num_heads, head_dim
-                    ).transpose(  # pylint: disable=invalid-name
-                        1, 2
-                    )
-                    v = value.view(
+                    ).transpose(1, 2)
+                    v = value.view(  # pylint: disable=invalid-name
                         batch_size, seq_len, num_heads, head_dim
-                    ).transpose(  # pylint: disable=invalid-name
-                        1, 2
-                    )
+                    ).transpose(1, 2)
 
                     # Call sparse attention (ignore attention_mask for now to avoid dimension issues)
-                    output, weights = (
-                        self.sparse_attention.custom_attention(  # pylint: disable=unused-variable
-                            queries=q, keys=k, values=v
-                        )
+                    output, _ = self.sparse_attention.custom_attention(
+                        queries=q, keys=k, values=v
                     )
 
                     # Reshape back to original format
@@ -110,10 +102,8 @@ class SparseAttentionHF(SparseAttentionGen):
                 batch_size, seq_len, num_heads, head_dim
             ).transpose(1, 2)
 
-            output, weights = (
-                self.sparse_attention.custom_attention(  # pylint: disable=unused-variable
-                    queries=q, keys=k, values=v
-                )
+            output, _ = self.sparse_attention.custom_attention(
+                queries=q, keys=k, values=v
             )
 
             output = (
