@@ -18,7 +18,9 @@ class Mask:
 
     def is_empty(self) -> bool:
         """Check if mask is empty."""
-        return self.mask_tensor is None or torch.all(self.mask_tensor == 0)
+        if self.mask_tensor is None:
+            return True
+        return bool(torch.all(self.mask_tensor == 0))
 
     def apply_mask(self, tensor: torch.Tensor) -> torch.Tensor:
         """Apply mask to tensor."""
@@ -37,7 +39,7 @@ def get_masked_attention_output(
     dropout: float,
     sparse_attention_mask: Mask,
     return_attention_weights: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     """Compute masked attention output.
 

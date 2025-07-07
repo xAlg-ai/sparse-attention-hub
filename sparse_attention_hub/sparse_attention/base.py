@@ -12,8 +12,12 @@ class SparseAttention(ABC):
         pass
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(self, *args: Any, **kwargs: Any) -> Tuple[Any, Optional[Any]]:
         """Compute custom attention mechanism.
+
+        Args:
+            *args: Variable arguments for attention computation
+            **kwargs: Keyword arguments for attention computation
 
         Returns:
             Tuple of attention output and optional attention weights.
@@ -29,8 +33,12 @@ class EfficientAttention(SparseAttention):
     """Abstract base class for efficient attention mechanisms."""
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(self, *args: Any, **kwargs: Any) -> Tuple[Any, Optional[Any]]:
         """Compute efficient attention mechanism.
+
+        Args:
+            *args: Variable arguments for attention computation
+            **kwargs: Keyword arguments for attention computation
 
         Returns:
             Tuple of attention output and optional attention weights.
@@ -47,8 +55,12 @@ class ResearchAttention(SparseAttention):
         self.masks: list = []
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(self, *args: Any, **kwargs: Any) -> Tuple[Any, Optional[Any]]:
         """Compute research attention mechanism with masking.
+
+        Args:
+            *args: Variable arguments for attention computation
+            **kwargs: Keyword arguments for attention computation
 
         Returns:
             Tuple of attention output and optional attention weights.

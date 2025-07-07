@@ -26,7 +26,7 @@ class DoubleSparsity(EfficientAttention):
         keys: Optional[torch.Tensor] = None,
         values: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Tuple[Any, Optional[Any]]:
         """Compute double sparsity attention.
 
@@ -91,7 +91,7 @@ class HashAttention(EfficientAttention):
         keys: Optional[torch.Tensor] = None,
         values: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Tuple[Any, Optional[Any]]:
         """Compute hash-based attention.
 
