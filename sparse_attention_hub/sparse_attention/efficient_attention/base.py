@@ -4,6 +4,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+
 import torch
 
 from ..base import SparseAttention, SparseAttentionConfig
@@ -64,6 +65,7 @@ class EfficientAttention(SparseAttention):
 
         # Import here to avoid circular imports
         from typing import Type, cast
+
         from .implementations import (
             DoubleSparsity,
             DoubleSparsityConfig,

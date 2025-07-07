@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, Union
+
 import torch
+
 from ..base import EfficientAttention, EfficientAttentionConfig, SparseAttentionConfig
 
 

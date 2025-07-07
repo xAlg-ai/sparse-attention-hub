@@ -3,10 +3,11 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ..base import SamplingMasker, SamplingMaskerConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
 )
+
+from ..base import SamplingMasker, SamplingMaskerConfig
 
 
 @dataclass

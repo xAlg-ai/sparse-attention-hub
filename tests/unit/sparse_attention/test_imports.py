@@ -184,9 +184,6 @@ class TestSparseAttentionImports:
 
     def test_inheritance_hierarchy(self):
         """Test that the inheritance hierarchy is correct."""
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
-        )
         from sparse_attention_hub.sparse_attention import (
             EfficientAttention,
             EfficientAttentionConfig,
@@ -198,6 +195,9 @@ class TestSparseAttentionImports:
             SparseAttentionConfig,
             TopKMasker,
             TopPMasker,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
         )
 
         # Test inheritance hierarchy

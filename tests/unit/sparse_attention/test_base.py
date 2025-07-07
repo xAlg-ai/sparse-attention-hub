@@ -66,9 +66,7 @@ class TestSparseAttentionAndConfigCreation:
 
     def test_efficient_attention_creation(self):
         """Test that efficient attention can be created."""
-        from sparse_attention_hub.sparse_attention import (
-            SparseAttention,
-        )
+        from sparse_attention_hub.sparse_attention import SparseAttention
         from sparse_attention_hub.sparse_attention.efficient_attention.implementations.hash_attention import (
             HashAttention,
             HashAttentionConfig,

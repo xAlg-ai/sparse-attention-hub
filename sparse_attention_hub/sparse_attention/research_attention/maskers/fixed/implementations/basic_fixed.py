@@ -3,10 +3,11 @@
 from dataclasses import dataclass
 from typing import Any, Union
 
-from ..base import FixedMasker, FixedMaskerConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
 )
+
+from ..base import FixedMasker, FixedMaskerConfig
 
 
 @dataclass

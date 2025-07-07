@@ -101,12 +101,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_local_masker(self):
         """Test that LocalMasker can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             LocalMasker,
             LocalMaskerConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = LocalMaskerConfig(window_size=10)
@@ -116,12 +116,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_causal_masker(self):
         """Test that CausalMasker can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             CausalMasker,
             FixedMaskerConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = FixedMaskerConfig()
@@ -131,12 +131,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_sink_masker(self):
         """Test that SinkMasker can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             SinkMasker,
             SinkMaskerConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = SinkMaskerConfig(sink_size=5)
@@ -146,12 +146,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_oracle_top_k_masker(self):
         """Test that OracleTopK can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             OracleTopK,
             OracleTopKConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = OracleTopKConfig(heavy_size=100)
@@ -161,12 +161,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_pq_cache_masker(self):
         """Test that PQCache can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             PQCache,
             PQCacheConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = PQCacheConfig(heavy_size=100, pq_sub_dim=8, pq_bits=4)
@@ -176,12 +176,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_hash_attention_top_k_masker(self):
         """Test that HashAttentionTopKMasker can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = HashAttentionTopKMaskerConfig(
@@ -193,12 +193,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_double_sparsity_top_k_masker(self):
         """Test that DoubleSparsityTopKMasker can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             DoubleSparsityTopKMasker,
             DoubleSparsityTopKMaskerConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = DoubleSparsityTopKMaskerConfig(
@@ -210,12 +210,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_random_sampling_masker(self):
         """Test that RandomSamplingMasker can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
             RandomSamplingMasker,
             RandomSamplingMaskerConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = RandomSamplingMaskerConfig(sampling_rate=0.5)
@@ -225,12 +225,12 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_magic_pig_masker(self):
         """Test that MagicPig can be created from a config."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
+            ResearchMasker,
+        )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
             MagicPig,
             MagicPigConfig,
-        )
-        from sparse_attention_hub.sparse_attention.research_attention.maskers import (
-            ResearchMasker,
         )
 
         config = MagicPigConfig(sampling_rate=0.5, lsh_l=4, lsh_k=8)
