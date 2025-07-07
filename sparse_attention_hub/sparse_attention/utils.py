@@ -29,7 +29,7 @@ class Mask:
         return tensor * self.mask_tensor
 
 
-def get_masked_attention_output(  # pylint: disable=too-many-arguments
+def get_masked_attention_output(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     module: Any,  # pylint: disable=unused-argument
     queries: torch.Tensor,
     keys: torch.Tensor,

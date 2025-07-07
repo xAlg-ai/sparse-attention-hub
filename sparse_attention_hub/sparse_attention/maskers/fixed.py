@@ -1,4 +1,5 @@
 """Fixed pattern masker implementations."""
+# pylint: disable=too-many-positional-arguments
 
 from typing import Any, List
 
@@ -19,22 +20,21 @@ class RLocalMasker(FixedMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add local mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
 
 class RCausalMasker(FixedMasker):
@@ -51,22 +51,22 @@ class RCausalMasker(FixedMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add causal mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
 
 class RSinkMasker(FixedMasker):
@@ -83,19 +83,19 @@ class RSinkMasker(FixedMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add sink mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder

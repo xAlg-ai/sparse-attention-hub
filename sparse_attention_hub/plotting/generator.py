@@ -1,4 +1,5 @@
 """Plot generation for visualization."""
+# pylint: disable=duplicate-code
 
 import os
 from typing import Any, Dict, Optional
@@ -28,7 +29,7 @@ class PlotGenerator:
         self,
         granularity: Granularity,
         data: Optional[Dict[str, Any]] = None,
-        plot_type: str = "default",
+        plot_type: str = "default",  # pylint: disable=unused-argument
         **kwargs: Any,
     ) -> str:
         """Generate a plot with specified granularity.
@@ -48,8 +49,8 @@ class PlotGenerator:
             return self._generate_plot_2(granularity, data, **kwargs)
         if granularity == Granularity.PER_LAYER:
             return self._generate_plot_1(granularity, data, **kwargs)
-        else:
-            raise ValueError(f"Unsupported granularity: {granularity}")
+
+        raise ValueError(f"Unsupported granularity: {granularity}")
 
     def _generate_plot_1(  # pylint: disable=unused-argument
         self,
@@ -67,7 +68,7 @@ class PlotGenerator:
         Returns:
             Path to generated plot
         """
-        # TODO: Implement plot generation
+        # TODO: Implement plot generation  # pylint: disable=fixme
         _, axes = plt.subplots(figsize=(10, 6))
 
         if data is None:
@@ -76,19 +77,19 @@ class PlotGenerator:
 
             x = np.linspace(0, 10, 100)
             y = np.sin(x) + np.random.normal(0, 0.1, 100)
-            ax.plot(x, y, label=f"Sample {granularity.value} data")
+            axes.plot(x, y, label=f"Sample {granularity.value} data")
         else:
             # Plot actual data
             # Implementation depends on data structure
             pass
 
-        ax.set_title(
+        axes.set_title(
             f"Sparse Attention Analysis - {granularity.value.replace('_', ' ').title()}"
         )
-        ax.set_xlabel("Position")
-        ax.set_ylabel("Attention Weight")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        axes.set_xlabel("Position")
+        axes.set_ylabel("Attention Weight")
+        axes.legend()
+        axes.grid(True, alpha=0.3)
 
         # Save plot
         filename = f"plot_{granularity.value}_{hash(str(data))}.png"
@@ -114,7 +115,7 @@ class PlotGenerator:
         Returns:
             Path to generated plot
         """
-        # TODO: Implement heatmap generation
+        # TODO: Implement heatmap generation  # pylint: disable=fixme
         _, axes = plt.subplots(figsize=(8, 8))
 
         if data is None:
@@ -138,15 +139,15 @@ class PlotGenerator:
             annot=True,
             cmap="viridis",
             square=True,
-            ax=ax,
+            ax=axes,
             cbar_kws={"label": "Attention Weight"},
         )
 
-        ax.set_title(
+        axes.set_title(
             f"Attention Matrix - {granularity.value.replace('_', ' ').title()}"
         )
-        ax.set_xlabel("Key Position")
-        ax.set_ylabel("Query Position")
+        axes.set_xlabel("Key Position")
+        axes.set_ylabel("Query Position")
 
         # Save plot
         filename = f"heatmap_{granularity.value}_{hash(str(data))}.png"
@@ -175,9 +176,9 @@ class PlotGenerator:
             # Implementation depends on data structure
             pass
 
-        ax.set_title(f"Comparison - {granularity.value.replace('_', ' ').title()}")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        axes.set_title(f"Comparison - {granularity.value.replace('_', ' ').title()}")
+        axes.legend()
+        axes.grid(True, alpha=0.3)
 
         # Save plot
         filename = f"comparison_{granularity.value}_{hash(str(data_dict))}.png"

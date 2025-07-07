@@ -221,7 +221,7 @@ class Tester:
 
         # Discover integration tests
         if os.path.exists(self.integration_test_dir):
-            for root, dirs, files in os.walk(self.integration_test_dir):
+            for root, _, files in os.walk(self.integration_test_dir):
                 for file in files:
                     if file.startswith("test_") and file.endswith(".py"):
                         discovered["integration"].append(os.path.join(root, file))

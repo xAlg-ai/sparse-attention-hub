@@ -1,4 +1,5 @@
 """Base classes for research maskers."""
+# pylint: disable=too-many-positional-arguments
 
 from abc import ABC, abstractmethod
 from typing import Any, List
@@ -19,42 +20,42 @@ class ResearchMasker(ABC):
         maskers: List["ResearchMasker"],
     ) -> None:
         """Add mask to attention computation."""
-        pass
+        # Implementation placeholder
 
     @abstractmethod
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator with mask applied."""
-        pass
+        # Implementation placeholder
 
     @abstractmethod
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator with mask applied."""
-        pass
+        # Implementation placeholder
 
 
 class SamplingMasker(ResearchMasker):
     """Abstract base class for sampling-based maskers."""
 
-    pass
+    # Implementation placeholder
 
 
 class FixedMasker(ResearchMasker):
     """Abstract base class for fixed pattern maskers."""
 
-    pass
+    # Implementation placeholder
 
 
-class topKMasker(FixedMasker):
+class topKMasker(FixedMasker):  # pylint: disable=invalid-name
     """Abstract base class for top-K maskers."""
 
-    pass
+    # Implementation placeholder
 
 
-class topPMasker(FixedMasker):
+class topPMasker(FixedMasker):  # pylint: disable=invalid-name
     """Abstract base class for top-P maskers."""
 
-    pass
+    # Implementation placeholder

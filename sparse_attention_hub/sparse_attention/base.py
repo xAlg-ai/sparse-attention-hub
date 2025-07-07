@@ -9,7 +9,7 @@ class SparseAttention(ABC):
 
     def __init__(self) -> None:
         """Initialize sparse attention mechanism."""
-        pass
+        # Base class initialization - no specific setup required
 
     @abstractmethod
     def custom_attention(self, *args: Any, **kwargs: Any) -> Tuple[Any, Optional[Any]]:
@@ -22,11 +22,11 @@ class SparseAttention(ABC):
         Returns:
             Tuple of attention output and optional attention weights.
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     def pre_attention_hook_generator(self) -> None:
         """Generate pre-attention hooks for model integration."""
-        pass
+        # Default implementation - no hooks generated
 
 
 class EfficientAttention(SparseAttention):
@@ -43,7 +43,7 @@ class EfficientAttention(SparseAttention):
         Returns:
             Tuple of attention output and optional attention weights.
         """
-        pass
+        # Abstract method - implementation required in subclass
 
 
 class ResearchAttention(SparseAttention):
@@ -65,4 +65,4 @@ class ResearchAttention(SparseAttention):
         Returns:
             Tuple of attention output and optional attention weights.
         """
-        pass
+        # Abstract method - implementation required in subclass

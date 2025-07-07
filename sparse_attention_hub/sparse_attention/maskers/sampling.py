@@ -1,4 +1,5 @@
 """Sampling-based masker implementations."""
+# pylint: disable=too-many-positional-arguments
 
 from typing import Any, List
 
@@ -19,22 +20,22 @@ class RRandomSampling(SamplingMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add random sampling mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
 
 class RMagicPig(SamplingMasker):
@@ -51,19 +52,19 @@ class RMagicPig(SamplingMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add Magic Pig mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder

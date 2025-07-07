@@ -1,4 +1,5 @@
 """Top-K masker implementations."""
+# pylint: disable=too-many-positional-arguments
 
 from typing import Any, List
 
@@ -19,22 +20,22 @@ class RPQCache(topKMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add PQ cache mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
 
 class ROracletopK(topKMasker):
@@ -51,22 +52,22 @@ class ROracletopK(topKMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add oracle top-K mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
 
 class RHashAttention(topKMasker):
@@ -83,22 +84,22 @@ class RHashAttention(topKMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add hash attention mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
 
 class RDoubleSparsity(topKMasker):
@@ -115,19 +116,19 @@ class RDoubleSparsity(topKMasker):
         maskers: List[ResearchMasker],
     ) -> None:
         """Add double sparsity mask."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_numerator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention numerator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
 
     def get_attention_denominator(
         self, keys: Any, queries: Any, values: Any, mask: Any
     ) -> Any:
         """Get attention denominator."""
-        # Bare metal implementation - no functionality
-        pass
+        # Skeleton implementation - functionality to be added
+        # Implementation placeholder
