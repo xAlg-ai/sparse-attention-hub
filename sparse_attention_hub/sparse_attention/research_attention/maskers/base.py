@@ -52,7 +52,7 @@ class ResearchMasker(ABC):
 
     @classmethod
     @abstractmethod
-    def create_from_config(cls, config: MaskerConfig) -> "ResearchMasker":
+    def create_from_config(cls, config: Any) -> "ResearchMasker":
         """Create masker instance from configuration."""
         pass
 

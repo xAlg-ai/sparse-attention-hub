@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..base import SamplingMasker, SamplingMaskerConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    MaskerConfig,
+)
 
 
 @dataclass
@@ -51,7 +54,9 @@ class RandomSamplingMasker(SamplingMasker):
 
     @classmethod
     def create_from_config(
-        cls, config: RandomSamplingMaskerConfig
+        cls, config: MaskerConfig
     ) -> "RandomSamplingMasker":
         """Create RandomSamplingMasker instance from configuration."""
+        if not isinstance(config, RandomSamplingMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)

@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Union
 
 from ..base import FixedMasker, FixedMaskerConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    MaskerConfig,
+)
 
 
 @dataclass
@@ -50,8 +53,10 @@ class LocalMasker(FixedMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: LocalMaskerConfig) -> "LocalMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "LocalMasker":
         """Create LocalMasker instance from configuration."""
+        if not isinstance(config, LocalMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
 
 
@@ -140,6 +145,8 @@ class SinkMasker(FixedMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: SinkMaskerConfig) -> "SinkMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "SinkMasker":
         """Create SinkMasker instance from configuration."""
+        if not isinstance(config, SinkMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)

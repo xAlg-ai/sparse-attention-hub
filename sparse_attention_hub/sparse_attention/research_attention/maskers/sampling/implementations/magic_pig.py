@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..base import SamplingMasker, SamplingMaskerConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    MaskerConfig,
+)
 
 
 @dataclass
@@ -53,6 +56,8 @@ class MagicPig(SamplingMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: MagicPigConfig) -> "MagicPig":
+    def create_from_config(cls, config: MaskerConfig) -> "MagicPig":
         """Create MagicPig instance from configuration."""
+        if not isinstance(config, MagicPigConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)

@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..base import TopKMasker, TopKMaskerConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    MaskerConfig,
+)
 
 
 @dataclass
@@ -56,7 +59,9 @@ class DoubleSparsityTopKMasker(TopKMasker):
 
     @classmethod
     def create_from_config(
-        cls, config: DoubleSparsityTopKMaskerConfig
+        cls, config: MaskerConfig
     ) -> "DoubleSparsityTopKMasker":
         """Create DoubleSparsityTopKMasker instance from configuration."""
+        if not isinstance(config, DoubleSparsityTopKMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)

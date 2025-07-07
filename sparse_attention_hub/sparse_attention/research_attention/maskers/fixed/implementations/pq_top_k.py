@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..base import TopKMasker, TopKMaskerConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    MaskerConfig,
+)
 
 
 @dataclass
@@ -32,7 +35,7 @@ class PQCache(TopKMasker):
         attention_mask: Any,
         sparse_meta_data: Any,
         previous_mask: Any,
-        **kwargs,
+        **kwargs : Any,
     ) -> Any:
         """Add PQ cache mask."""
         # just return the same mask for now
@@ -53,6 +56,8 @@ class PQCache(TopKMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: PQCacheConfig) -> "PQCache":
+    def create_from_config(cls, config: MaskerConfig) -> "PQCache":
         """Create PQCache instance from configuration."""
+        if not isinstance(config, PQCacheConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)

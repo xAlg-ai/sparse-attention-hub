@@ -84,8 +84,10 @@ class TopKMasker(FixedMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: TopKMaskerConfig) -> "TopKMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "TopKMasker":
         """Create top-K masker instance from configuration."""
+        if not isinstance(config, TopKMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
 
 
@@ -118,6 +120,8 @@ class TopPMasker(FixedMasker):
         pass
 
     @classmethod
-    def create_from_config(cls, config: TopPMaskerConfig) -> "TopPMasker":
+    def create_from_config(cls, config: MaskerConfig) -> "TopPMasker":
         """Create top-P masker instance from configuration."""
+        if not isinstance(config, TopPMaskerConfig):
+            raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
