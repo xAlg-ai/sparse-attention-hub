@@ -67,7 +67,8 @@ class SparseAttentionHF(SparseAttentionGen):
                         batch_size, seq_len, num_heads, head_dim
                     ).transpose(1, 2)
 
-                    # Call sparse attention (ignore attention_mask for now to avoid dimension issues)
+                    # Call sparse attention (ignore attention_mask for now to avoid
+                    # dimension issues)
                     output, _ = self.sparse_attention.custom_attention(
                         queries=q, keys=k, values=v
                     )

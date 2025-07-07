@@ -25,7 +25,8 @@ class ModelHubHF(ModelHub):
             hook_name: Name identifier for the hook
 
         Raises:
-            ValueError: If model has no named_modules method or no attention modules found
+            ValueError: If model has no named_modules method or no attention
+                modules found
             RuntimeError: If hook registration fails
         """
         if not hasattr(model, "named_modules"):
@@ -88,7 +89,8 @@ class ModelHubHF(ModelHub):
             attention_interface_name: Name identifier for the interface
 
         Raises:
-            ValueError: If model has no named_modules method or no attention modules found
+            ValueError: If model has no named_modules method or no attention
+                modules found
             AttributeError: If attention modules don't have forward method
         """
         if not hasattr(model, "named_modules"):
@@ -124,7 +126,8 @@ class ModelHubHF(ModelHub):
 
         if attention_modules_found == 0:
             raise ValueError(
-                "No attention modules found in model. Expected modules with 'attention' in name and 'forward' method."
+                "No attention modules found in model. Expected modules with "
+                "'attention' in name and 'forward' method."
             )
 
     def _is_attention_module(self, name: str, module: Any) -> bool:
@@ -180,7 +183,8 @@ class ModelHubHF(ModelHub):
                 attention_interface_name
             ].items():
                 # Note: We can't easily restore without the model reference
-                # This is a limitation - in practice, the model would need to be reloaded
+                # This is a limitation - in practice, the model would need to be
+                # reloaded
                 pass
             # Remove the failed replacement record
             del self._original_attention_interfaces[attention_interface_name]
@@ -230,14 +234,18 @@ class ModelHubHF(ModelHub):
                             )
                     else:
                         errors.append(
-                            f"Module '{module_name}' not found in model during reversion"
+                            f"Module '{module_name}' not found in model during "
+                            "reversion"
                         )
 
             # Clear the stored interfaces after successful reversion
             self._original_attention_interfaces.clear()
 
             if errors:
-                error_msg = f"Reverted {reverted_count} modules but encountered errors: {'; '.join(errors)}"
+                error_msg = (
+                    f"Reverted {reverted_count} modules but encountered errors: "
+                    f"{'; '.join(errors)}"
+                )
                 raise RuntimeError(error_msg)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught

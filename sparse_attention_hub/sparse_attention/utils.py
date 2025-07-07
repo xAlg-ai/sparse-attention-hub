@@ -29,7 +29,8 @@ class Mask:
         return tensor * self.mask_tensor
 
 
-def get_masked_attention_output(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def get_masked_attention_output(  # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     module: Any,  # pylint: disable=unused-argument
     queries: torch.Tensor,
     keys: torch.Tensor,
@@ -46,8 +47,10 @@ def get_masked_attention_output(  # pylint: disable=too-many-arguments,too-many-
     Args:
         module: The attention module
         queries: Query tensor of shape (b, h, sq, d)
-        keys: Key tensor of shape (b, h, sk, d) - should already be expanded to match query heads
-        values: Value tensor of shape (b, h, sk, d) - should already be expanded to match query heads
+        keys: Key tensor of shape (b, h, sk, d) - should already be expanded to
+            match query heads
+        values: Value tensor of shape (b, h, sk, d) - should already be expanded
+            to match query heads
         attention_mask: Optional attention mask
         scaling: Scaling factor for attention weights
         dropout: Dropout probability
@@ -65,12 +68,14 @@ def get_masked_attention_output(  # pylint: disable=too-many-arguments,too-many-
     if attention_mask is not None:
         # Handle different attention mask shapes
         if attention_mask.dim() == 2:
-            # Shape: (seq_len, seq_len) -> expand to (batch, heads, seq_len, seq_len)
+            # Shape: (seq_len, seq_len) -> expand to (batch, heads, seq_len,
+            # seq_len)
             attention_mask = (
                 attention_mask.unsqueeze(0).unsqueeze(0).expand(scores.shape)
             )
         elif attention_mask.dim() == 3:
-            # Shape: (batch, seq_len, seq_len) -> expand to (batch, heads, seq_len, seq_len)
+            # Shape: (batch, seq_len, seq_len) -> expand to (batch, heads,
+            # seq_len, seq_len)
             attention_mask = attention_mask.unsqueeze(1).expand(scores.shape)
         elif attention_mask.dim() == 4:
             # Already correct shape: (batch, heads, seq_len, seq_len)
