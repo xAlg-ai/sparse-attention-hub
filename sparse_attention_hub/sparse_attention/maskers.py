@@ -1,7 +1,13 @@
 """Research maskers for attention mechanisms (bare metal)."""
 
 # Import all masker classes from the maskers package
-from .maskers.base import FixedMasker, ResearchMasker, SamplingMasker, topKMasker, topPMasker
+from .maskers.base import (
+    FixedMasker,
+    ResearchMasker,
+    SamplingMasker,
+    topKMasker,
+    topPMasker,
+)
 from .maskers.fixed import RCausalMasker, RLocalMasker, RSinkMasker
 from .maskers.sampling import RMagicPig, RRandomSampling
 from .maskers.topk import RDoubleSparsity, RHashAttention, ROracletopK, RPQCache

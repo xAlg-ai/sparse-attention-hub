@@ -1,4 +1,5 @@
 """Research maskers for attention mechanisms (bare metal)."""
+
 # pylint: disable=duplicate-code
 
 from .base import FixedMasker, ResearchMasker, SamplingMasker, topKMasker, topPMasker

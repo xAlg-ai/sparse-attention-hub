@@ -1,4 +1,5 @@
 """Fixed pattern masker implementations."""
+
 # pylint: disable=too-many-positional-arguments
 
 from typing import Any, List

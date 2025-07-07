@@ -1,4 +1,5 @@
 """Sparse attention implementations and interfaces."""
+
 # pylint: disable=duplicate-code
 
 from .base import EfficientAttention, ResearchAttention, SparseAttention

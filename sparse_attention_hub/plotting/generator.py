@@ -1,4 +1,5 @@
 """Plot generation for visualization."""
+
 # pylint: disable=duplicate-code
 
 import os

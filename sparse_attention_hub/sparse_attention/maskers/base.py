@@ -1,4 +1,5 @@
 """Base classes for research maskers."""
+
 # pylint: disable=too-many-positional-arguments
 
 from abc import ABC, abstractmethod
