@@ -12,7 +12,7 @@ class ModelHub(ABC):
         self.api_token = api_token
 
     @abstractmethod
-    def addPreAttentionHooks(
+    def addPreAttentionHooks(  # pylint: disable=invalid-name
         self, model: Any, hook_generator: Callable, hook_name: str
     ) -> None:
         """Add pre-attention hooks to the model.
@@ -22,20 +22,22 @@ class ModelHub(ABC):
             hook_generator: Function that generates the hook
             hook_name: Name identifier for the hook
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
-    def removePreAttentionHooks(self, model: Any, hook_name: str) -> None:
+    def removePreAttentionHooks(  # pylint: disable=invalid-name
+        self, model: Any, hook_name: str
+    ) -> None:
         """Remove pre-attention hooks from the model.
 
         Args:
             model: The model to remove hooks from
             hook_name: Name identifier for the hook to remove
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
-    def replaceAttentionInterface(
+    def replaceAttentionInterface(  # pylint: disable=invalid-name
         self,
         model: Any,
         attention_interface_callable: Callable,
@@ -48,13 +50,15 @@ class ModelHub(ABC):
             attention_interface_callable: New attention interface function
             attention_interface_name: Name identifier for the interface
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
-    def revertAttentionInterface(self, model: Any) -> None:
+    def revertAttentionInterface(  # pylint: disable=invalid-name
+        self, model: Any
+    ) -> None:
         """Revert the attention interface to original.
 
         Args:
             model: The model to revert
         """
-        pass
+        # Abstract method - implementation required in subclass

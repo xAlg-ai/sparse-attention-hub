@@ -1,4 +1,5 @@
 """HuggingFace pipeline implementation."""
+# pylint: disable=fixme
 
 from typing import Any, Optional
 

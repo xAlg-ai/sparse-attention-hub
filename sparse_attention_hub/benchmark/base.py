@@ -18,7 +18,7 @@ class Benchmark(ABC):
         Returns:
             HuggingFace dataset instance
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
     def run_benchmark(self, model: Any, **kwargs: Any) -> Dict[str, Any]:
@@ -31,7 +31,7 @@ class Benchmark(ABC):
         Returns:
             Benchmark results
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
     def calculate_metrics(
@@ -46,7 +46,7 @@ class Benchmark(ABC):
         Returns:
             Dictionary of metric names to values
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     def get_subsets(self) -> List[str]:
         """Get available benchmark subsets.

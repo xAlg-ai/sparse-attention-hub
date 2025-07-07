@@ -101,5 +101,5 @@ class BenchmarkExecutor:
         Returns:
             Comparison analysis
         """
-        # TODO: Implement result comparison
+        # TODO: Implement result comparison  # pylint: disable=fixme
         raise NotImplementedError("Result comparison not yet implemented")
