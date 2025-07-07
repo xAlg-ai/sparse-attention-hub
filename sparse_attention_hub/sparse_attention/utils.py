@@ -1,6 +1,7 @@
 """Utility functions for sparse attention mechanisms."""
 
 from typing import Any, Optional, Tuple, Union
+
 import torch
 
 

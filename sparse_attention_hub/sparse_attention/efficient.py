@@ -1,10 +1,11 @@
 """Efficient attention implementations."""
 
 from typing import Any, Optional, Tuple
+
 import torch
 
 from .base import EfficientAttention
-from .utils import get_masked_attention_output, Mask
+from .utils import Mask, get_masked_attention_output
 
 
 class DoubleSparsity(EfficientAttention):

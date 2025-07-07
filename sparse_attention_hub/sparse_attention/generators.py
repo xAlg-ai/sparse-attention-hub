@@ -2,10 +2,11 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional, Tuple, Union
+
 import torch
 
 from .base import SparseAttention
-from .utils import get_masked_attention_output, Mask
+from .utils import Mask, get_masked_attention_output
 
 
 class SparseAttentionGen(ABC):
