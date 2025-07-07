@@ -38,7 +38,9 @@ class DoubleSparsity(EfficientAttention):
             return torch.tensor([]), None
 
         # Handle grouped query attention by expanding keys/values to match query heads
-        batch_size, num_heads, seq_len, head_dim = queries.shape
+        batch_size, num_heads, seq_len, head_dim = (
+            queries.shape
+        )  # pylint: disable=unused-variable
         _, num_kv_heads, _, _ = keys.shape
 
         if num_heads != num_kv_heads:
@@ -103,7 +105,9 @@ class HashAttention(EfficientAttention):
             return torch.tensor([]), None
 
         # Handle grouped query attention by expanding keys/values to match query heads
-        batch_size, num_heads, seq_len, head_dim = queries.shape
+        batch_size, num_heads, seq_len, head_dim = (
+            queries.shape
+        )  # pylint: disable=unused-variable
         _, num_kv_heads, _, _ = keys.shape
 
         if num_heads != num_kv_heads:

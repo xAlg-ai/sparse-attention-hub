@@ -30,7 +30,7 @@ class Mask:
 
 
 def get_masked_attention_output(
-    module: Any,
+    module: Any,  # pylint: disable=unused-argument
     queries: torch.Tensor,
     keys: torch.Tensor,
     values: torch.Tensor,
@@ -39,7 +39,7 @@ def get_masked_attention_output(
     dropout: float,
     sparse_attention_mask: Mask,
     return_attention_weights: bool = False,
-    **kwargs: Any,
+    **kwargs: Any,  # pylint: disable=unused-argument
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     """Compute masked attention output.
 

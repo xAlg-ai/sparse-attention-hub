@@ -48,14 +48,14 @@ class ModelHubHF(ModelHub):
                     hook = module.register_forward_pre_hook(hook_generator())
                     hooks.append((module, hook))
                     hooks_added += 1
-        except Exception as e:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             # Cleanup any hooks that were successfully registered
             for module, hook in hooks:
                 try:
                     hook.remove()
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     pass  # Ignore cleanup errors
-            raise RuntimeError(f"Failed to add pre-attention hooks: {e}") from e
+            raise RuntimeError(f"Failed to add pre-attention hooks: {exc}") from exc
 
         if hooks_added == 0:
             raise ValueError("No attention modules found for hook registration")
@@ -70,7 +70,7 @@ class ModelHubHF(ModelHub):
             hook_name: Name identifier for the hook to remove
         """
         if hook_name in self._registered_hooks:
-            for module, hook in self._registered_hooks[hook_name]:
+            for _, hook in self._registered_hooks[hook_name]:
                 hook.remove()
             del self._registered_hooks[hook_name]
 
@@ -117,10 +117,10 @@ class ModelHubHF(ModelHub):
                     # Replace with custom attention
                     module.forward = attention_interface_callable
                     attention_modules_found += 1
-        except Exception as e:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             # Cleanup partial replacements on error
             self._cleanup_partial_replacement(attention_interface_name)
-            raise RuntimeError(f"Failed to replace attention interface: {e}") from e
+            raise RuntimeError(f"Failed to replace attention interface: {exc}") from exc
 
         if attention_modules_found == 0:
             raise ValueError(
@@ -173,7 +173,10 @@ class ModelHubHF(ModelHub):
         """
         if attention_interface_name in self._original_attention_interfaces:
             # Restore any modules that were already replaced
-            for name, original_forward in self._original_attention_interfaces[
+            for (
+                _,
+                _,
+            ) in self._original_attention_interfaces[  # pylint: disable=unused-variable
                 attention_interface_name
             ].items():
                 # Note: We can't easily restore without the model reference
@@ -206,17 +209,26 @@ class ModelHubHF(ModelHub):
 
         try:
             # Create a mapping of module names to modules for efficient lookup
-            module_dict = {name: module for name, module in model.named_modules()}
+            module_dict = dict(
+                model.named_modules()
+            )  # pylint: disable=unnecessary-comprehension
 
-            for interface_name, modules in self._original_attention_interfaces.items():
+            for (
+                _,
+                modules,
+            ) in (
+                self._original_attention_interfaces.items()
+            ):
                 for module_name, original_forward in modules.items():
                     if module_name in module_dict:
                         try:
                             module_dict[module_name].forward = original_forward
                             reverted_count += 1
-                        except Exception as e:
+                        except (
+                            Exception
+                        ) as exc:  # pylint: disable=broad-exception-caught
                             errors.append(
-                                f"Failed to revert module '{module_name}': {e}"
+                                f"Failed to revert module '{module_name}': {exc}"
                             )
                     else:
                         errors.append(
@@ -230,7 +242,9 @@ class ModelHubHF(ModelHub):
                 error_msg = f"Reverted {reverted_count} modules but encountered errors: {'; '.join(errors)}"
                 raise RuntimeError(error_msg)
 
-        except Exception as e:
-            if not isinstance(e, RuntimeError):
-                raise RuntimeError(f"Failed to revert attention interfaces: {e}") from e
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if not isinstance(exc, RuntimeError):
+                raise RuntimeError(
+                    f"Failed to revert attention interfaces: {exc}"
+                ) from exc
             raise
