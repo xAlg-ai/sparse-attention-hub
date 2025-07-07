@@ -216,9 +216,7 @@ class ModelHubHF(ModelHub):
             for (
                 _,
                 modules,
-            ) in (
-                self._original_attention_interfaces.items()
-            ):
+            ) in self._original_attention_interfaces.items():
                 for module_name, original_forward in modules.items():
                     if module_name in module_dict:
                         try:
