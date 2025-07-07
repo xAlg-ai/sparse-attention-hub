@@ -22,7 +22,7 @@ class Pipeline(ABC):
         Returns:
             Pipeline output
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
     def preprocess(self, inputs: Any) -> Any:
@@ -34,7 +34,7 @@ class Pipeline(ABC):
         Returns:
             Preprocessed inputs
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     @abstractmethod
     def postprocess(self, outputs: Any) -> Any:
@@ -46,4 +46,4 @@ class Pipeline(ABC):
         Returns:
             Processed outputs
         """
-        pass
+        # Abstract method - implementation required in subclass

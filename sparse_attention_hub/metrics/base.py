@@ -21,7 +21,7 @@ class MicroMetric(ABC):
         Returns:
             Computed metric value
         """
-        pass
+        # Abstract method - implementation required in subclass
 
     def __str__(self) -> str:
         """String representation of the metric."""

@@ -15,7 +15,7 @@ class TopkRecall(MicroMetric):
         super().__init__(f"topk_recall_k{k}")
         self.k = k
 
-    def compute(
+    def compute(  # pylint: disable=arguments-differ
         self,
         predictions: Union[List, torch.Tensor, np.ndarray],
         ground_truth: Union[List, torch.Tensor, np.ndarray],
@@ -31,7 +31,7 @@ class TopkRecall(MicroMetric):
         Returns:
             Top-k recall score
         """
-        # TODO: Implement top-k recall computation
+        # TODO: Implement top-k recall computation  # pylint: disable=fixme
         # Convert inputs to appropriate format
         if isinstance(predictions, torch.Tensor):
             predictions = predictions.cpu().numpy()
@@ -48,7 +48,7 @@ class LocalError(MicroMetric):
     def __init__(self) -> None:
         super().__init__("local_error")
 
-    def compute(
+    def compute(  # pylint: disable=arguments-differ
         self,
         predicted_attention: Union[torch.Tensor, np.ndarray],
         true_attention: Union[torch.Tensor, np.ndarray],
@@ -64,7 +64,7 @@ class LocalError(MicroMetric):
         Returns:
             Local error score
         """
-        # TODO: Implement local error computation
+        # TODO: Implement local error computation  # pylint: disable=fixme
         # Convert inputs to appropriate format
         if isinstance(predicted_attention, torch.Tensor):
             predicted_attention = predicted_attention.cpu().numpy()
@@ -81,7 +81,7 @@ class SampleVariance(MicroMetric):
     def __init__(self) -> None:
         super().__init__("sample_variance")
 
-    def compute(
+    def compute(  # pylint: disable=arguments-differ
         self, samples: Union[List, torch.Tensor, np.ndarray], **kwargs: Any
     ) -> float:
         """Compute sample variance.
