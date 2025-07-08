@@ -149,7 +149,7 @@ class TestMaskExpWts:
         expected_exp_weights = torch.exp(expected_raw_weights - expected_max)
         assert torch.allclose(
             result[unmasked_positions],
-            expected_exp_weights[unmasked_positions] * dense_mask[unmasked_positions],
+            expected_exp_weights[unmasked_positions] * (1.0 / dense_mask[unmasked_positions]),
         )
 
     def test_compute_masked_attention_weights_with_both_masks(self):
@@ -210,7 +210,7 @@ class TestMaskExpWts:
         expected_exp_weights = torch.exp(expected_raw_weights - expected_max)
         assert torch.allclose(
             result[active_positions],
-            expected_exp_weights[active_positions] * dense_mask[active_positions],
+            expected_exp_weights[active_positions] * (1.0 / dense_mask[active_positions]),
         )
 
     def test_compute_masked_attention_weights_different_scaling(self):
