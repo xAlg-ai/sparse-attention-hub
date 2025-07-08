@@ -303,3 +303,298 @@ class TestMask:
         
         mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, type="dense")
         assert mask.get_dense_mask().device == row_wise_idx.device
+
+    def test_merge_mask_basic(self):
+        """Test basic merge functionality."""
+        shape = (2, 5)
+        
+        # Create first mask
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [1.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.8, 0.0, 0.0, 0.3]
+            ])
+        )
+        
+        # Create second mask
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [0.0, 0.2, 0.5, 0.0, 0.4],
+                [0.1, 0.0, 0.0, 0.6, 0.0]
+            ])
+        )
+        
+        # Merge masks
+        merged = mask1.merge_mask(mask2, min_val=0.0, max_val=2.0, inplace=False)
+        
+        # Expected result: union of indices with data addition
+        expected_dense = torch.tensor([
+            [1.0, 0.2, 1.0, 0.0, 0.4],  # 0.5 + 0.5 = 1.0
+            [0.1, 0.8, 0.0, 0.6, 0.3]
+        ])
+        
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+        assert merged.from_index
+        assert not merged.from_dense_mask
+
+    def test_merge_mask_with_capping(self):
+        """Test merge with min/max capping."""
+        shape = (2, 5)
+        
+        # Create first mask
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [1.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.8, 0.0, 0.0, 0.3]
+            ])
+        )
+        
+        # Create second mask
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [0.0, 0.2, 0.8, 0.0, 0.4],
+                [0.1, 0.0, 0.0, 0.6, 0.0]
+            ])
+        )
+        
+        # Merge masks with capping
+        merged = mask1.merge_mask(mask2, min_val=0.1, max_val=1.0, inplace=False)
+        
+        # Expected result with capping
+        expected_dense = torch.tensor([
+            [1.0, 0.2, 1.0, 0.0, 0.4],  # 0.5 + 0.8 = 1.3 -> capped to 1.0
+            [0.1, 0.8, 0.0, 0.6, 0.3]
+        ])
+        
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_inplace(self):
+        """Test in-place merge."""
+        shape = (2, 5)
+        
+        # Create first mask
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [1.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.8, 0.0, 0.0, 0.3]
+            ])
+        )
+        
+        # Create second mask
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [0.0, 0.2, 0.5, 0.0, 0.4],
+                [0.1, 0.0, 0.0, 0.6, 0.0]
+            ])
+        )
+        
+        # Merge masks in-place
+        original_id = id(mask1)
+        result = mask1.merge_mask(mask2, min_val=0.0, max_val=2.0, inplace=True)
+        
+        # Check that the same object is returned
+        assert id(result) == original_id
+        assert result is mask1
+        
+        # Check that mask1 is updated
+        assert mask1.from_index
+        assert not mask1.from_dense_mask
+        
+        # Expected result
+        expected_dense = torch.tensor([
+            [1.0, 0.2, 1.0, 0.0, 0.4],
+            [0.1, 0.8, 0.0, 0.6, 0.3]
+        ])
+        
+        assert torch.allclose(mask1.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_empty_masks(self):
+        """Test merging with empty masks."""
+        shape = (2, 3)
+        
+        # Create empty mask
+        empty_mask = Mask.create_empty_mask(shape, mask_type="index")
+        
+        # Create non-empty mask
+        non_empty_mask = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [1.0, 0.0, 0.5],
+                [0.0, 0.8, 0.0]
+            ])
+        )
+        
+        # Merge empty with non-empty
+        merged1 = empty_mask.merge_mask(non_empty_mask, min_val=0.0, max_val=2.0, inplace=False)
+        merged2 = non_empty_mask.merge_mask(empty_mask, min_val=0.0, max_val=2.0, inplace=False)
+        
+        # Both should be equal to the non-empty mask
+        assert torch.allclose(merged1.get_dense_mask(), non_empty_mask.get_dense_mask())
+        assert torch.allclose(merged2.get_dense_mask(), non_empty_mask.get_dense_mask())
+        
+        # Merge two empty masks
+        merged_empty = empty_mask.merge_mask(Mask.create_empty_mask(shape, mask_type="index"), min_val=0.0, max_val=2.0, inplace=False)
+        assert merged_empty.is_empty()
+
+    def test_merge_mask_multidimensional(self):
+        """Test merge with multi-dimensional masks."""
+        shape = (2, 3, 4)
+        
+        # Create masks with known patterns
+        mask1_dense = torch.tensor([
+            [[1.0, 0.0, 0.5, 0.0], [0.0, 0.8, 0.0, 0.3], [0.2, 0.0, 0.0, 0.0]],
+            [[0.0, 0.4, 0.0, 0.0], [0.6, 0.0, 0.0, 0.0], [0.0, 0.0, 0.9, 0.0]]
+        ])
+        
+        mask2_dense = torch.tensor([
+            [[0.0, 0.2, 0.5, 0.0], [0.1, 0.0, 0.0, 0.3], [0.0, 0.0, 0.4, 0.0]],
+            [[0.3, 0.0, 0.0, 0.7], [0.0, 0.0, 0.5, 0.0], [0.0, 0.8, 0.0, 0.0]]
+        ])
+        
+        mask1 = Mask.create_mask_from_dense_mask(shape, mask1_dense)
+        mask2 = Mask.create_mask_from_dense_mask(shape, mask2_dense)
+        
+        # Merge
+        merged = mask1.merge_mask(mask2, min_val=0.0, max_val=2.0, inplace=False)
+        
+        # Expected: element-wise addition
+        expected_dense = mask1_dense + mask2_dense
+        
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_sparse_representations(self):
+        """Test merge with sparse representations."""
+        shape = (2, 5)
+        
+        # Create sparse mask 1
+        indices1 = torch.tensor([0, 2, 6, 8])
+        ptr1 = torch.tensor([0, 2, 4])
+        data1 = torch.tensor([1.0, 0.5, 0.8, 0.3])
+        mask1 = Mask.create_mask_from_indices(shape, indices1, ptr1, data1)
+        
+        # Create sparse mask 2
+        indices2 = torch.tensor([1, 2, 5, 7])
+        ptr2 = torch.tensor([0, 2, 4])
+        data2 = torch.tensor([0.2, 0.5, 0.1, 0.6])
+        mask2 = Mask.create_mask_from_indices(shape, indices2, ptr2, data2)
+        
+        # Merge
+        merged = mask1.merge_mask(mask2, min_val=0.0, max_val=2.0, inplace=False)
+        
+        # Expected dense representation
+        expected_dense = torch.clamp(mask1.get_dense_mask() + mask2.get_dense_mask(), min=0.0, max=2.0)
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_shape_mismatch(self):
+        """Test error handling for shape mismatch."""
+        shape1 = (2, 5)
+        shape2 = (3, 5)
+        
+        mask1 = Mask.create_empty_mask(shape1, mask_type="index")
+        mask2 = Mask.create_empty_mask(shape2, mask_type="index")
+        
+        with pytest.raises(ValueError, match="Cannot merge masks with different shapes"):
+            mask1.merge_mask(mask2, min_val=0.0, max_val=1.0, inplace=False)
+
+    def test_merge_mask_negative_capping(self):
+        """Test merge with negative values and capping."""
+        shape = (2, 3)
+        
+        # Create masks with negative values
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [1.0, -0.5, 0.0],
+                [0.0, 0.8, -0.3]
+            ])
+        )
+        
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [0.0, 0.2, -0.4],
+                [-0.1, 0.0, 0.6]
+            ])
+        )
+        
+        # Merge with capping
+        merged = mask1.merge_mask(mask2, min_val=-0.5, max_val=1.0, inplace=False)
+        
+        # Expected result
+        expected_dense = torch.clamp(mask1.get_dense_mask() + mask2.get_dense_mask(), min=-0.5, max=1.0)
+        
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_extreme_capping(self):
+        """Test merge with extreme capping values."""
+        shape = (2, 3)
+        
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [1.0, 2.0, 3.0],
+                [4.0, 5.0, 6.0]
+            ])
+        )
+        
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([
+                [0.5, 1.5, 2.5],
+                [3.5, 4.5, 5.5]
+            ])
+        )
+        
+        # Test with very restrictive capping
+        merged = mask1.merge_mask(mask2, min_val=2.0, max_val=4.0, inplace=False)
+        
+        # Expected: all values clamped to [2.0, 4.0]
+        expected_dense = torch.clamp(mask1.get_dense_mask() + mask2.get_dense_mask(), min=2.0, max=4.0)
+        
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_single_element(self):
+        """Test merge with single element masks."""
+        shape = (1, 1)
+        
+        mask1 = Mask.create_mask_from_dense_mask(shape, torch.tensor([[0.5]]))
+        mask2 = Mask.create_mask_from_dense_mask(shape, torch.tensor([[0.3]]))
+        
+        merged = mask1.merge_mask(mask2, min_val=0.0, max_val=1.0, inplace=False)
+        
+        expected_dense = torch.tensor([[0.8]])  # 0.5 + 0.3 = 0.8
+        assert torch.allclose(merged.get_dense_mask(), expected_dense)
+
+    def test_merge_mask_device_consistency(self):
+        """Test that merged masks maintain device consistency."""
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
+        
+        shape = (2, 3)
+        
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], device=device)
+        )
+        true_device = mask1.get_dense_mask().device
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape,
+            torch.tensor([[0.0, 0.2, 0.5], [0.1, 0.0, 0.6]], device=device)
+        )
+    
+        
+        merged = mask1.merge_mask(mask2, min_val=0.0, max_val=2.0, inplace=False)
+        
+        assert merged.get_dense_mask().device == true_device
+        indices, ptr, data = merged.get_index_mask()
+        assert indices.device == true_device
+        assert ptr.device == true_device
+        assert data.device == true_device

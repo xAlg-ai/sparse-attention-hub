@@ -224,7 +224,7 @@ class Mask:
             # Vectorized version: count nonzero per row and cumsum
             counts = torch.count_nonzero(self.mask.view(-1, self.shape[-1]), dim=1)
             ptr = torch.cat(
-                [torch.zeros(1, dtype=torch.long), torch.cumsum(counts, dim=0)]
+                [torch.zeros(1, dtype=torch.long, device=self.mask.device), torch.cumsum(counts, dim=0)]
             )
 
             return non_zero_indices, ptr, data
@@ -335,3 +335,89 @@ class Mask:
     def __repr__(self) -> str:
         """String representation of the Mask object."""
         return f"Mask(shape={self.shape}, dtype={self.dtype}, from_dense_mask={self.from_dense_mask}, from_index={self.from_index})"
+
+    def merge_mask(
+        self,
+        other_mask: "Mask",
+        min_val: float,
+        max_val: float,
+        inplace: bool = False,
+    ) -> "Mask":
+        """
+        Merge this mask with another mask in sparse format.
+
+        Args:
+            other_mask: The other mask to merge with
+            min_val: Minimum value for capping after addition
+            max_val: Maximum value for capping after addition
+            inplace: Whether to update the current mask in place
+
+        Returns:
+            Merged mask (new instance if inplace=False, self if inplace=True)
+        """
+        if self.shape != other_mask.shape:
+            raise ValueError(
+                f"Cannot merge masks with different shapes: {self.shape} vs {other_mask.shape}"
+            )
+
+        self_indices, self_ptr, self_data = self.get_index_mask()
+        other_indices, other_ptr, other_data = other_mask.get_index_mask()
+
+        device = self_indices.device if self_indices.numel() > 0 else (
+            other_indices.device if other_indices.numel() > 0 else torch.device('cpu')
+        )
+        
+        if self_indices.numel() == 0 and other_indices.numel() == 0:
+            final_indices = torch.empty(0, dtype=torch.long, device=device)
+            final_data = torch.empty(0, dtype=self.dtype, device=device)
+            num_rows = int(np.prod(self.shape[:-1]))
+            final_ptr = torch.zeros(num_rows + 1, dtype=torch.long, device=device)
+        elif self_indices.numel() == 0:
+            final_indices = other_indices
+            final_data = torch.clamp(other_data, min_val, max_val)
+            final_ptr = other_ptr
+        elif other_indices.numel() == 0:
+            final_indices = self_indices
+            final_data = torch.clamp(self_data, min_val, max_val)
+            final_ptr = self_ptr
+        else:
+            all_indices = torch.cat([self_indices, other_indices])
+            all_data = torch.cat([self_data, other_data])
+            
+            sorted_indices, sort_order = torch.sort(all_indices)
+            sorted_data = all_data[sort_order]
+            
+            unique_indices, inverse_indices = torch.unique_consecutive(sorted_indices, return_inverse=True)
+            
+            summed_data = torch.zeros(unique_indices.numel(), dtype=self.dtype, device=device)
+            summed_data.scatter_add_(0, inverse_indices, sorted_data)
+            
+            final_data = torch.clamp(summed_data, min_val, max_val)
+            final_indices = unique_indices
+            
+            # Reconstruct ptr array by counting elements per row
+            num_rows = int(np.prod(self.shape[:-1]))
+            n_cols = self.shape[-1]
+            row_indices = final_indices // n_cols
+            row_counts = torch.bincount(row_indices, minlength=num_rows)
+            final_ptr = torch.cat([
+                torch.zeros(1, dtype=torch.long, device=device),
+                torch.cumsum(row_counts, dim=0)
+            ])
+
+        if inplace:
+            self.indices = final_indices
+            self.ptr = final_ptr
+            self.data = final_data
+            self.from_index = True
+            self.from_dense_mask = False
+            self.mask = None
+            return self
+        else:
+            return Mask.create_mask_from_indices(
+                shape=self.shape,
+                indices=final_indices,
+                ptr=final_ptr,
+                data=final_data,
+                dtype=self.dtype,
+            )
