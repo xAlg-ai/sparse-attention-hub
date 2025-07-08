@@ -339,8 +339,6 @@ class Mask:
     def merge_mask(
         self,
         other_mask: "Mask",
-        min_val: float,
-        max_val: float,
         inplace: bool = False,
     ) -> "Mask":
         """
@@ -348,13 +346,12 @@ class Mask:
 
         Args:
             other_mask: The other mask to merge with
-            min_val: Minimum value for capping after addition
-            max_val: Maximum value for capping after addition
             inplace: Whether to update the current mask in place
 
         Returns:
             Merged mask (new instance if inplace=False, self if inplace=True)
         """
+                
         if self.shape != other_mask.shape:
             raise ValueError(
                 f"Cannot merge masks with different shapes: {self.shape} vs {other_mask.shape}"
@@ -374,11 +371,11 @@ class Mask:
             final_ptr = torch.zeros(num_rows + 1, dtype=torch.long, device=device)
         elif self_indices.numel() == 0:
             final_indices = other_indices
-            final_data = torch.clamp(other_data, min_val, max_val)
+            final_data = torch.clamp(other_data, 0.0, 1.0)
             final_ptr = other_ptr
         elif other_indices.numel() == 0:
             final_indices = self_indices
-            final_data = torch.clamp(self_data, min_val, max_val)
+            final_data = torch.clamp(self_data, 0.0, 1.0)
             final_ptr = self_ptr
         else:
             all_indices = torch.cat([self_indices, other_indices])
@@ -392,7 +389,7 @@ class Mask:
             summed_data = torch.zeros(unique_indices.numel(), dtype=self.dtype, device=device)
             summed_data.scatter_add_(0, inverse_indices, sorted_data)
             
-            final_data = torch.clamp(summed_data, min_val, max_val)
+            final_data = torch.clamp(summed_data, 0.0, 1.0)
             final_indices = unique_indices
             
             # Reconstruct ptr array by counting elements per row
