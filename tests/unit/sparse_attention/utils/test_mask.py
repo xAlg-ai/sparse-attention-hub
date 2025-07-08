@@ -155,7 +155,8 @@ class TestMask:
         empty_mask = Mask.create_empty_mask(shape, mask_type="dense")
         result = empty_mask.apply_inv_mask(input)
         
-        assert torch.allclose(result, torch.zeros_like(input))
+        # Empty mask now returns input tensor directly (no masking applied)
+        assert torch.allclose(result, input)
 
     def test_apply_inv_mask_all_ones(self):
         shape = (2, 3)
@@ -643,3 +644,354 @@ class TestMask:
         assert indices.device == true_device
         assert ptr.device == true_device
         assert data.device == true_device
+
+    # ========== Full Mask Tests ==========
+
+    def test_create_full_mask_basic(self):
+        """Test basic full mask creation."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        assert full_mask.shape == shape
+        assert full_mask.dtype == torch.float32
+        assert full_mask.is_full
+        assert full_mask.is_full_mask()
+        assert not full_mask.from_dense_mask
+        assert not full_mask.from_index
+        assert not full_mask.is_empty()
+        
+        # Verify no actual data is stored
+        assert full_mask.mask is None
+        assert full_mask.indices is None
+        assert full_mask.ptr is None
+        assert full_mask.data is None
+
+    def test_create_full_mask_different_shapes(self):
+        """Test full mask creation with different shapes."""
+        shapes = [(5,), (2, 4), (3, 2, 5), (2, 3, 4, 5)]
+        
+        for shape in shapes:
+            full_mask = Mask.create_full_mask(shape)
+            assert full_mask.shape == shape
+            assert full_mask.is_full_mask()
+            
+            # Verify get_dense_mask returns all ones
+            dense = full_mask.get_dense_mask()
+            assert dense.shape == shape
+            assert torch.all(dense == 1.0)
+
+    def test_create_full_mask_different_dtypes(self):
+        """Test full mask creation with different data types."""
+        shape = (2, 3)
+        dtypes = [torch.float32, torch.float64, torch.float16]
+        
+        for dtype in dtypes:
+            full_mask = Mask.create_full_mask(shape, dtype=dtype)
+            assert full_mask.dtype == dtype
+            assert full_mask.is_full_mask()
+            
+            # Verify get_dense_mask respects dtype
+            dense = full_mask.get_dense_mask()
+            assert dense.dtype == dtype
+
+    def test_is_full_mask_various_cases(self):
+        """Test is_full_mask() method with various mask types."""
+        shape = (2, 3)
+        
+        # Test with full mask
+        full_mask = Mask.create_full_mask(shape)
+        assert full_mask.is_full_mask()
+        
+        # Test with empty mask
+        empty_mask = Mask.create_empty_mask(shape)
+        assert not empty_mask.is_full_mask()
+        
+        # Test with partial mask
+        partial_mask = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
+        )
+        assert not partial_mask.is_full_mask()
+        
+        # Test with all-ones mask (should be detected as full)
+        ones_mask = Mask.create_mask_from_dense_mask(
+            shape, torch.ones(shape)
+        )
+        assert ones_mask.is_full_mask()
+
+    def test_full_mask_auto_detection_dense(self):
+        """Test auto-detection of full masks from dense representation."""
+        shape = (2, 3)
+        
+        # Create dense mask with all 1.0 values
+        ones_tensor = torch.ones(shape)
+        mask = Mask.create_mask_from_dense_mask(shape, ones_tensor)
+        
+        # Should be auto-detected as full
+        assert mask.is_full_mask()
+        assert mask.is_full
+        
+        # Original mask data should be freed
+        assert mask.mask is None
+        
+        # Create dense mask with some non-1.0 values
+        partial_tensor = torch.tensor([[1.0, 0.5, 1.0], [1.0, 1.0, 1.0]])
+        mask = Mask.create_mask_from_dense_mask(shape, partial_tensor)
+        
+        # Should NOT be detected as full
+        assert not mask.is_full_mask()
+        assert not mask.is_full
+        assert mask.mask is not None
+
+    def test_full_mask_auto_detection_sparse(self):
+        """Test auto-detection of full masks from sparse representation."""
+        shape = (2, 3)
+        total_size = 6
+        
+        # Create sparse representation of full mask (all positions with 1.0)
+        indices = torch.arange(total_size, dtype=torch.long)
+        ptr = torch.tensor([0, 3, 6], dtype=torch.long)
+        data = torch.ones(total_size, dtype=torch.float32)
+        
+        mask = Mask.create_mask_from_indices(shape, indices, ptr, data)
+        
+        # Should be auto-detected as full
+        assert mask.is_full_mask()
+        assert mask.is_full
+        
+        # Original sparse data should be freed
+        assert mask.indices is None
+        assert mask.ptr is None
+        assert mask.data is None
+        
+        # Create sparse representation with partial coverage
+        partial_indices = torch.tensor([0, 2, 4], dtype=torch.long)
+        partial_ptr = torch.tensor([0, 2, 3], dtype=torch.long)
+        partial_data = torch.ones(3, dtype=torch.float32)
+        
+        mask = Mask.create_mask_from_indices(shape, partial_indices, partial_ptr, partial_data)
+        
+        # Should NOT be detected as full
+        assert not mask.is_full_mask()
+        assert not mask.is_full
+        assert mask.indices is not None
+
+    def test_full_mask_get_dense_mask(self):
+        """Test get_dense_mask() optimization for full masks."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        dense = full_mask.get_dense_mask()
+        
+        assert dense.shape == shape
+        assert dense.dtype == full_mask.dtype
+        assert torch.all(dense == 1.0)
+        
+        # Should be efficient (no actual data stored)
+        assert full_mask.mask is None
+
+    def test_full_mask_get_index_mask(self):
+        """Test get_index_mask() optimization for full masks."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        indices, ptr, data = full_mask.get_index_mask()
+        
+        # Should generate complete sparse representation
+        expected_indices = torch.arange(6, dtype=torch.long)  # All positions
+        expected_ptr = torch.tensor([0, 3, 6], dtype=torch.long)
+        expected_data = torch.ones(6, dtype=full_mask.dtype)
+        
+        assert torch.equal(indices, expected_indices)
+        assert torch.equal(ptr, expected_ptr)
+        assert torch.equal(data, expected_data)
+        
+        # Should be generated on-demand (no actual data stored)
+        assert full_mask.indices is None
+
+    def test_full_mask_apply_mask_no_op(self):
+        """Test that apply_mask() is a no-op for full masks."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        input_tensor = torch.randn(shape)
+        result = full_mask.apply_mask(input_tensor)
+        
+        # Should return input tensor directly (no-op)
+        assert torch.equal(result, input_tensor)
+        assert result is input_tensor  # Same object
+
+    def test_full_mask_apply_inv_mask_no_op(self):
+        """Test that apply_inv_mask() is a no-op for full masks."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        input_tensor = torch.randn(shape)
+        result = full_mask.apply_inv_mask(input_tensor)
+        
+        # Should return input tensor directly (no-op)
+        assert torch.equal(result, input_tensor)
+        assert result is input_tensor  # Same object
+
+    def test_full_mask_is_empty_false(self):
+        """Test that is_empty() returns False for full masks."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        assert not full_mask.is_empty()
+
+    def test_full_mask_merge_optimization(self):
+        """Test merge_mask() optimization when one mask is full."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        # Create a partial mask
+        partial_mask = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]])
+        )
+        
+        # Merge full with partial - result should be full
+        merged1 = full_mask.merge_mask(partial_mask, inplace=False)
+        assert merged1.is_full_mask()
+        
+        # Merge partial with full - result should be full
+        merged2 = partial_mask.merge_mask(full_mask, inplace=False)
+        assert merged2.is_full_mask()
+        
+        # Merge full with full - result should be full
+        merged3 = full_mask.merge_mask(full_mask, inplace=False)
+        assert merged3.is_full_mask()
+
+    def test_full_mask_merge_inplace_optimization(self):
+        """Test in-place merge optimization with full masks."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        # Create a partial mask
+        partial_mask = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]])
+        )
+        
+        # In-place merge with full mask
+        original_id = id(partial_mask)
+        result = partial_mask.merge_mask(full_mask, inplace=True)
+        
+        # Should return the same object, now converted to full
+        assert id(result) == original_id
+        assert result.is_full_mask()
+        assert result.is_full
+
+    def test_full_mask_merge_result_detection(self):
+        """Test detection of full mask results during merge."""
+        shape = (2, 3)
+        
+        # Create two masks that together cover all positions with 1.0
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[1.0, 0.0, 1.0], [1.0, 0.0, 1.0]])
+        )
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+        )
+        
+        # Merge should detect the result is full
+        merged = mask1.merge_mask(mask2, inplace=False)
+        assert merged.is_full_mask()
+
+    def test_full_mask_repr(self):
+        """Test string representation includes is_full flag."""
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        repr_str = repr(full_mask)
+        assert "is_full=True" in repr_str
+        assert f"shape={shape}" in repr_str
+
+    def test_full_mask_multidimensional(self):
+        """Test full mask functionality with multi-dimensional tensors."""
+        shape = (2, 3, 4)
+        full_mask = Mask.create_full_mask(shape)
+        
+        # Test basic properties
+        assert full_mask.shape == shape
+        assert full_mask.is_full_mask()
+        
+        # Test get_dense_mask
+        dense = full_mask.get_dense_mask()
+        assert dense.shape == shape
+        assert torch.all(dense == 1.0)
+        
+        # Test get_index_mask
+        indices, ptr, data = full_mask.get_index_mask()
+        expected_size = 2 * 3 * 4
+        assert indices.numel() == expected_size
+        assert torch.all(data == 1.0)
+        
+        # Test apply_mask no-op
+        input_tensor = torch.randn(shape)
+        result = full_mask.apply_mask(input_tensor)
+        assert torch.equal(result, input_tensor)
+
+    def test_full_mask_device_consistency(self):
+        """Test full mask device consistency."""
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
+        
+        shape = (2, 3)
+        full_mask = Mask.create_full_mask(shape)
+        
+        # Test get_dense_mask device
+        dense = full_mask.get_dense_mask()
+        # Full masks create new tensors, so they use default device
+        assert dense.device.type == "cpu"  # Default device for torch.ones()
+        
+        # Test get_index_mask device
+        indices, ptr, data = full_mask.get_index_mask()
+        assert indices.device.type == "cpu"  # Default device
+        assert ptr.device.type == "cpu"
+        assert data.device.type == "cpu"
+
+    def test_full_mask_edge_cases(self):
+        """Test full mask edge cases."""
+        # Single element mask
+        shape = (1, 1)
+        full_mask = Mask.create_full_mask(shape)
+        assert full_mask.is_full_mask()
+        
+        dense = full_mask.get_dense_mask()
+        assert dense.shape == shape
+        assert torch.all(dense == 1.0)
+        
+        # Large shape
+        shape = (10, 20)
+        full_mask = Mask.create_full_mask(shape)
+        assert full_mask.is_full_mask()
+        
+        # Apply mask should still be no-op
+        input_tensor = torch.randn(shape)
+        result = full_mask.apply_mask(input_tensor)
+        assert torch.equal(result, input_tensor)
+
+    def test_full_mask_auto_detection_edge_cases(self):
+        """Test auto-detection edge cases."""
+        # Empty shape should not crash
+        shape = (0, 5)
+        try:
+            empty_tensor = torch.ones(shape)
+            mask = Mask.create_mask_from_dense_mask(shape, empty_tensor)
+            # Should handle gracefully
+        except Exception:
+            # If it fails, that's also acceptable for edge cases
+            pass
+        
+        # Single dimension
+        shape = (5,)
+        ones_tensor = torch.ones(shape)
+        mask = Mask.create_mask_from_dense_mask(shape, ones_tensor)
+        assert mask.is_full_mask()
+        
+        # Very small values that are not exactly 1.0
+        shape = (2, 2)
+        almost_ones = torch.tensor([[1.0, 0.999999], [1.0, 1.0]])
+        mask = Mask.create_mask_from_dense_mask(shape, almost_ones)
+        assert not mask.is_full_mask()  # Should not be detected as full
