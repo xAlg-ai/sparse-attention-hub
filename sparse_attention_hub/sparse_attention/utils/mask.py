@@ -246,8 +246,8 @@ class Mask:
         batch_size = int(np.prod(batch_dims))
         k = row_wise_idx.shape[-1]
         
-        flat_row_wise_idx = row_wise_idx.view(batch_size, k)
-        flat_data = data.view(batch_size, k)
+        flat_row_wise_idx = row_wise_idx.reshape(batch_size, k)
+        flat_data = data.reshape(batch_size, k)
         
         row_offsets = torch.arange(batch_size, device=flat_row_wise_idx.device).unsqueeze(1) * n
         flat_indices_with_offset = flat_row_wise_idx + row_offsets
