@@ -82,3 +82,107 @@ class TestInheritance:
 
         assert issubclass(ResearchAttention, SparseAttention)
         assert issubclass(ResearchAttentionConfig, SparseAttentionConfig)
+
+
+@pytest.mark.unit
+class TestSamplingMaskerValidation:
+    """Test class for sampling masker validation."""
+
+    def test_single_sampling_masker_allowed(self):
+        """Test that a single sampling masker is allowed."""
+        from sparse_attention_hub.sparse_attention import SparseAttentionConfig
+        from sparse_attention_hub.sparse_attention.research_attention import (
+            ResearchAttention,
+            ResearchAttentionConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
+            LocalMasker,
+            LocalMaskerConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
+            RandomSamplingMasker,
+            RandomSamplingMaskerConfig,
+        )
+
+        # Create maskers: one fixed, one sampling
+        local_masker = LocalMasker.create_from_config(LocalMaskerConfig(window_size=10))
+        sampling_masker = RandomSamplingMasker.create_from_config(
+            RandomSamplingMaskerConfig(sampling_rate=0.5)
+        )
+
+        # This should not raise an error
+        config = SparseAttentionConfig()
+        attention = ResearchAttention(config, [local_masker, sampling_masker])
+        assert attention is not None
+        assert len(attention.maskers) == 2
+
+    def test_multiple_sampling_maskers_rejected(self):
+        """Test that multiple sampling maskers are rejected."""
+        from sparse_attention_hub.sparse_attention import SparseAttentionConfig
+        from sparse_attention_hub.sparse_attention.research_attention import (
+            ResearchAttention,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
+            RandomSamplingMasker,
+            RandomSamplingMaskerConfig,
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        # Create two sampling maskers
+        random_masker = RandomSamplingMasker.create_from_config(
+            RandomSamplingMaskerConfig(sampling_rate=0.5)
+        )
+        magic_pig_masker = MagicPig.create_from_config(
+            MagicPigConfig(sampling_rate=0.3, lsh_l=4, lsh_k=16)
+        )
+
+        # This should raise an error
+        config = SparseAttentionConfig()
+        with pytest.raises(ValueError, match="Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker"):
+            ResearchAttention(config, [random_masker, magic_pig_masker])
+
+    def test_multiple_sampling_maskers_via_config(self):
+        """Test that multiple sampling maskers are rejected when created via config."""
+        from sparse_attention_hub.sparse_attention.research_attention import (
+            ResearchAttention,
+            ResearchAttentionConfig,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
+            RandomSamplingMaskerConfig,
+            MagicPigConfig,
+        )
+
+        # Create config with two sampling maskers
+        masker_configs = [
+            RandomSamplingMaskerConfig(sampling_rate=0.5),
+            MagicPigConfig(sampling_rate=0.3, lsh_l=4, lsh_k=16),
+        ]
+        config = ResearchAttentionConfig(masker_configs=masker_configs)
+
+        # This should raise an error
+        with pytest.raises(ValueError, match="Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker"):
+            ResearchAttention.create_from_config(config)
+
+    def test_no_sampling_maskers_allowed(self):
+        """Test that no sampling maskers is allowed."""
+        from sparse_attention_hub.sparse_attention import SparseAttentionConfig
+        from sparse_attention_hub.sparse_attention.research_attention import (
+            ResearchAttention,
+        )
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
+            LocalMasker,
+            LocalMaskerConfig,
+            SinkMasker,
+            SinkMaskerConfig,
+        )
+
+        # Create only fixed maskers
+        local_masker = LocalMasker.create_from_config(LocalMaskerConfig(window_size=10))
+        sink_masker = SinkMasker.create_from_config(SinkMaskerConfig(sink_size=5))
+
+        # This should not raise an error
+        config = SparseAttentionConfig()
+        attention = ResearchAttention(config, [local_masker, sink_masker])
+        assert attention is not None
+        assert len(attention.maskers) == 2

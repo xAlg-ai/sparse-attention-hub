@@ -283,6 +283,42 @@ class Mask:
         else:
             raise RuntimeError("Mask object is in an invalid state")
 
+    def apply_inv_mask(self, input_tensor: torch.Tensor) -> torch.Tensor:
+        """
+        Apply the inverse mask to an input tensor.
+
+        Args:
+            input_tensor: Input tensor with shape same as the mask
+
+        Returns:
+            Output tensor after applying the inverse mask:
+            - output[IDX] = 0 if mask[IDX] == 0
+            - output[IDX] = input[IDX] * 1.0 / mask[IDX] if mask[IDX] != 0
+        """
+        if self.is_empty():
+            return torch.zeros_like(input_tensor)
+
+        if input_tensor.shape != self.shape:
+            raise ValueError(
+                f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}"
+            )
+
+        if self.from_dense_mask:
+            mask = self.mask
+        elif self.from_index:
+            mask = self.get_dense_mask()
+        else:
+            raise RuntimeError("Mask object is in an invalid state")
+
+        # Create output tensor
+        output = torch.zeros_like(input_tensor)
+        
+        # Apply inverse mask logic
+        non_zero_mask = mask != 0
+        output[non_zero_mask] = input_tensor[non_zero_mask] * (1.0 / mask[non_zero_mask])
+        
+        return output
+
     @classmethod
     def create_empty_mask(
         cls,

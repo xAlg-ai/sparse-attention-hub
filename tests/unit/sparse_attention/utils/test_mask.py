@@ -123,6 +123,51 @@ class TestMask:
         assert torch.allclose(dense_masked_data, true_answer)
         assert torch.allclose(index_masked_data, true_answer)
 
+    def test_apply_inv_mask(self):
+        shape = (3, 5, 7)
+        input = torch.rand(shape)
+        # Create a mask with non-zero values to test inverse operation
+        dense_mask = torch.rand(shape) * 0.5 + 0.5  # Values in [0.5, 1.0]
+        
+        # Set some values to zero to test zero handling
+        zero_mask = (torch.rand(shape) > 0.3).float()
+        dense_mask = dense_mask * zero_mask
+
+        # Calculate expected result
+        true_answer = torch.zeros_like(input)
+        non_zero_mask = dense_mask != 0
+        true_answer[non_zero_mask] = input[non_zero_mask] * (1.0 / dense_mask[non_zero_mask])
+
+        dense_mask_object = Mask.create_mask_from_dense_mask(shape, dense_mask)
+        indices, ptr, data = dense_mask_object.get_index_mask()
+        index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data)
+
+        dense_inv_masked_data = dense_mask_object.apply_inv_mask(input)
+        index_inv_masked_data = index_mask_object.apply_inv_mask(input)
+
+        assert torch.allclose(dense_inv_masked_data, true_answer)
+        assert torch.allclose(index_inv_masked_data, true_answer)
+
+    def test_apply_inv_mask_empty(self):
+        shape = (2, 3)
+        input = torch.rand(shape)
+        
+        empty_mask = Mask.create_empty_mask(shape, mask_type="dense")
+        result = empty_mask.apply_inv_mask(input)
+        
+        assert torch.allclose(result, torch.zeros_like(input))
+
+    def test_apply_inv_mask_all_ones(self):
+        shape = (2, 3)
+        input = torch.rand(shape)
+        
+        ones_mask = torch.ones(shape)
+        mask_object = Mask.create_mask_from_dense_mask(shape, ones_mask)
+        result = mask_object.apply_inv_mask(input)
+        
+        # When mask is all ones, inverse should be the same as input
+        assert torch.allclose(result, input)
+
     def test_create_from_row_wise_idx_basic_dense(self):
         """Test basic functionality for dense mode."""
         shape = (2, 5)

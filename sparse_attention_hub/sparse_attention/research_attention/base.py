@@ -9,6 +9,7 @@ from ..base import SparseAttention, SparseAttentionConfig
 from ..utils.mask import Mask
 from ..utils.mask_attention_utils import get_masked_attention_output
 from .maskers.base import MaskerConfig, ResearchMasker
+from .maskers.sampling.base import SamplingMasker
 
 
 @dataclass
@@ -31,8 +32,17 @@ class ResearchAttention(SparseAttention):
         Args:
             sparse_attention_config: Configuration for the sparse attention mechanism.
             maskers: List of research maskers to apply.
+        
+        Raises:
+            ValueError: If more than one sampling masker is provided.
         """
         super().__init__(sparse_attention_config)
+        
+        # Validate that there's at most one sampling masker
+        sampling_masker_count = sum(1 for masker in maskers if isinstance(masker, SamplingMasker))
+        if sampling_masker_count > 1:
+            raise ValueError("Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker")
+        
         self.maskers = maskers
 
     def custom_attention(
