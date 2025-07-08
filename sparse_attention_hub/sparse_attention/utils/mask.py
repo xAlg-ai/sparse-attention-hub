@@ -124,6 +124,85 @@ class Mask:
 
         return cls(shape=shape, dtype=dtype, mask=mask, from_dense_mask=True)
 
+    @classmethod
+    def create_from_row_wise_idx(
+        cls,
+        shape: Tuple[int, ...],
+        row_wise_idx: torch.Tensor,
+        data: torch.Tensor,
+        type: str = "index",
+        dtype: torch.dtype = torch.float32,
+    ) -> "Mask":
+        """
+        Create a Mask from row-wise indices.
+
+        Args:
+            shape: Shape of the mask (*, n)
+            row_wise_idx: Row-wise indices tensor of shape (*, k) -ve values are padding
+            data: Data tensor of shape (*, k) corresponding to the indices
+            type: Type of representation ("index" or "dense")
+            dtype: Data type for the mask values
+
+        Returns:
+            Mask object with the specified representation
+        """
+        if len(shape) < 1:
+            raise ValueError("shape must have at least one dimension")
+        
+        # Validate input shapes
+        expected_row_wise_shape = shape[:-1] + (row_wise_idx.shape[-1],)
+        if row_wise_idx.shape != expected_row_wise_shape:
+            raise ValueError(
+                f"row_wise_idx.shape must be {expected_row_wise_shape}, got {row_wise_idx.shape}"
+            )
+        
+        if data.shape != row_wise_idx.shape:
+            raise ValueError(
+                f"data.shape must match row_wise_idx.shape {row_wise_idx.shape}, got {data.shape}"
+            )
+        
+        # Validate indices are within bounds (allow -1 as padding)
+        n = shape[-1]
+        valid_indices_mask = row_wise_idx >= 0
+        if torch.any((row_wise_idx >= n) & valid_indices_mask):
+            raise ValueError(
+                f"All valid indices in row_wise_idx must be in range [0, {n-1}]"
+            )
+        
+        # Always compute sparse representation first
+        batch_dims = shape[:-1]
+        batch_size = int(np.prod(batch_dims))
+        k = row_wise_idx.shape[-1]
+        
+        flat_row_wise_idx = row_wise_idx.view(batch_size, k)
+        flat_data = data.view(batch_size, k)
+        
+        row_offsets = torch.arange(batch_size, device=flat_row_wise_idx.device).unsqueeze(1) * n
+        flat_indices_with_offset = flat_row_wise_idx + row_offsets
+        
+        # Filter out invalid indices (e.g., -1 padding)
+        valid_mask = flat_row_wise_idx >= 0
+        valid_flat_indices = flat_indices_with_offset[valid_mask]
+        valid_values = flat_data[valid_mask]
+        
+        valid_counts_per_row = valid_mask.sum(dim=1)
+        ptr = torch.cat([
+            torch.zeros(1, dtype=torch.long, device=flat_row_wise_idx.device),
+            torch.cumsum(valid_counts_per_row, dim=0)
+        ])
+        
+        # Create sparse mask
+        sparse_mask = cls.create_mask_from_indices(shape, valid_flat_indices, ptr, valid_values, dtype)
+        
+        if type == "dense":
+            # Convert to dense representation
+            dense_mask = sparse_mask.get_dense_mask()
+            return cls.create_mask_from_dense_mask(shape, dense_mask, dtype)
+        elif type == "index":
+            return sparse_mask
+        else:
+            raise ValueError(f"type must be 'index' or 'dense', got {type}")
+
     def get_index_mask(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Get the sparse index representation.
@@ -163,7 +242,9 @@ class Mask:
             return self.mask
         elif self.from_index:
             # Convert sparse representation to dense mask
-            dense_mask = torch.zeros(self.shape, dtype=self.dtype)
+            # Ensure dense mask is on the same device as indices/data
+            device = self.indices.device if self.indices is not None else torch.device('cpu')
+            dense_mask = torch.zeros(self.shape, dtype=self.dtype, device=device)
             if self.indices is not None and len(self.indices) > 0:
                 if self.data is not None:
                     dense_mask.view(-1)[self.indices] = self.data
