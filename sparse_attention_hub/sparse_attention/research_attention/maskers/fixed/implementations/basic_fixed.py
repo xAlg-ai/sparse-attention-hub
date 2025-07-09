@@ -54,7 +54,7 @@ class LocalMasker(FixedMasker):
 
         if seq_len_keys <= window_size + seq_len_queries:
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-            return Mask.create_full_mask(mask_shape)
+            return Mask.create_full_mask(mask_shape, dtype=previous_mask.dtype)
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         device = keys.device
@@ -78,12 +78,12 @@ class LocalMasker(FixedMasker):
 
         data = torch.ones(
             (batch_size, num_heads, seq_len_queries, window_size),
-            dtype=torch.float32,
+            dtype=previous_mask.dtype,
             device=device,
         )
 
         local_mask = Mask.create_from_row_wise_idx(
-            shape=mask_shape, row_wise_idx=row_wise_idx, data=data, type="index"
+            shape=mask_shape, row_wise_idx=row_wise_idx, data=data, type="index", dtype=previous_mask.dtype
         )
 
         return previous_mask.merge_mask(local_mask, inplace=False)
@@ -167,7 +167,7 @@ class SinkMasker(FixedMasker):
         # 2. Check if # keys is smaller than sink_size, if so, then return a full mask
         if seq_len_keys <= sink_size:
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-            return Mask.create_full_mask(mask_shape)
+            return Mask.create_full_mask(mask_shape, dtype=previous_mask.dtype)
 
         # 3. Compute row_wise_idx: b,h,sq,sink_size with row_wise_idx[i,j,k,:] = arrange(0,sink_size)
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
@@ -186,12 +186,12 @@ class SinkMasker(FixedMasker):
         data = torch.ones(
             (batch_size, num_heads, seq_len_queries, sink_size),
             device=keys.device,
-            dtype=torch.float32,
+            dtype=previous_mask.dtype,
         )
 
         # 4. Call Mask.create_from_row_wise_idx() to get the mask
         sink_mask = Mask.create_from_row_wise_idx(
-            shape=mask_shape, row_wise_idx=row_wise_idx, data=data, type="index"
+            shape=mask_shape, row_wise_idx=row_wise_idx, data=data, type="index", dtype=previous_mask.dtype
         )
 
         # 5. Merge this_mask with previous mask using previous_mask.merge and return the new mask
