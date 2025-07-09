@@ -183,9 +183,25 @@ class TestConcreteMaskerCreation:
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
+        import torch
+
+        # Create sample weight tensors
+        sample_weights = {
+            0: {
+                "key_matrix": [torch.randn(2, 64, 32), torch.randn(2, 32, 8)],
+                "key_bias": [torch.randn(2, 32), torch.randn(2, 8)],
+                "query_matrix": [torch.randn(2, 64, 32), torch.randn(2, 32, 8)],
+                "query_bias": [torch.randn(2, 32), torch.randn(2, 8)],
+            }
+        }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=100, hat_bits=8, hat_mlp_layers=2, hat_mlp_hidden_size=64
+            heavy_size=100, 
+            hat_bits=8, 
+            hat_mlp_layers=2, 
+            hat_mlp_hidden_size=64,
+            hat_mlp_activation="relu",
+            hat_weights=sample_weights
         )
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is HashAttentionTopKMasker

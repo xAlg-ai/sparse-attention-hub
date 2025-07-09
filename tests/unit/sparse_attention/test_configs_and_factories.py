@@ -182,15 +182,33 @@ class TestSparseAttentionConfigsAndFactories:
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
+        import torch
+
+        # Create sample weight tensors
+        sample_weights = {
+            0: {
+                "key_matrix": [torch.randn(2, 64, 32), torch.randn(2, 32, 8)],
+                "key_bias": [torch.randn(2, 32), torch.randn(2, 8)],
+                "query_matrix": [torch.randn(2, 64, 32), torch.randn(2, 32, 8)],
+                "query_bias": [torch.randn(2, 32), torch.randn(2, 8)],
+            }
+        }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=0.4, hat_bits=8, hat_mlp_layers=2, hat_mlp_hidden_size=64
+            heavy_size=0.4, 
+            hat_bits=8, 
+            hat_mlp_layers=2, 
+            hat_mlp_hidden_size=64,
+            hat_mlp_activation="relu",
+            hat_weights=sample_weights
         )
 
         assert config.heavy_size == 0.4
         assert config.hat_bits == 8
         assert config.hat_mlp_layers == 2
         assert config.hat_mlp_hidden_size == 64
+        assert config.hat_mlp_activation == "relu"
+        assert config.hat_weights == sample_weights
 
         # Test create_from_config
         hash_attention = HashAttentionTopKMasker.create_from_config(config)
@@ -198,6 +216,8 @@ class TestSparseAttentionConfigsAndFactories:
         assert hash_attention.hat_bits == 8
         assert hash_attention.hat_mlp_layers == 2
         assert hash_attention.hat_mlp_hidden_size == 64
+        assert hash_attention.hat_mlp_activation == "relu"
+        assert hash_attention.hat_weights == sample_weights
 
     def test_research_attention_direct_instantiation(self):
         """Test that ResearchAttention can be instantiated directly since it's not abstract."""
