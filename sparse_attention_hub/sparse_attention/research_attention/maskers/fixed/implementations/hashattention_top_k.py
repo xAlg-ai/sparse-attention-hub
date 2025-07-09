@@ -164,78 +164,6 @@ class HashAttentionTopKMasker(TopKMasker):
             sparse_meta_data["key"][layer_idx] = concatenated_signatures
             return concatenated_signatures
 
-    def _update_query_signatures(
-        self,
-        queries: torch.Tensor,
-        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
-        **kwargs: Any,
-    ) -> torch.Tensor:
-        """
-        Update query signatures in sparse_meta_data and return concatenated signatures.
-
-        Args:
-            queries: Query tensor of shape (B, H, #queries, dim)
-            sparse_meta_data: Metadata dictionary for caching
-            **kwargs: Additional arguments including layer_idx
-
-        Returns:
-            Concatenated query signatures tensor (B, H, #queries, hat_bits)
-        """
-        layer_idx = kwargs.get("layer_idx")
-        if layer_idx is None:
-            raise ValueError("layer_idx must be provided in kwargs")
-
-        # Initialize sparse_meta_data structure if needed
-        if "query" not in sparse_meta_data:
-            sparse_meta_data["query"] = {}
-        if layer_idx not in sparse_meta_data["query"]:
-            sparse_meta_data["query"][layer_idx] = None
-
-        # Get cached query signatures
-        cached_query_signatures = sparse_meta_data["query"][layer_idx]
-
-        if cached_query_signatures is None:
-            # First run - all queries are new
-            new_queries = queries
-            cached_num_queries = 0
-        else:
-            # Determine how many queries are new
-            cached_num_queries = cached_query_signatures.shape[2]
-            current_num_queries = queries.shape[2]
-
-            if current_num_queries < cached_num_queries:
-                raise ValueError(
-                    f"Current number of queries ({current_num_queries}) is less than cached number of queries ({cached_num_queries})"
-                )
-            elif current_num_queries > cached_num_queries:
-                # We have new queries to process
-                new_queries = queries[:, :, cached_num_queries:, :]
-            else:
-                # No new queries, return cached signatures
-                return cached_query_signatures
-
-        # Compute new query signatures
-        query_weights = self.hat_weights[layer_idx]
-        query_matrix_list = query_weights["query_matrix"]
-        query_bias_list = query_weights["query_bias"]
-
-        new_query_signatures: torch.Tensor = self._get_signatures(
-            new_queries, query_matrix_list, query_bias_list
-        )
-
-        # Update sparse_meta_data with new signatures
-        if cached_query_signatures is None:
-            # First run - store new signatures
-            sparse_meta_data["query"][layer_idx] = new_query_signatures
-            return new_query_signatures
-        else:
-            # Concatenate cached and new signatures
-            concatenated_signatures = torch.cat(
-                [cached_query_signatures, new_query_signatures], dim=2
-            )
-            sparse_meta_data["query"][layer_idx] = concatenated_signatures
-            return concatenated_signatures
-
     def _compute_hashattention_score(
         self,
         queries: torch.Tensor,
@@ -255,12 +183,20 @@ class HashAttentionTopKMasker(TopKMasker):
         Returns:
             Hash attention scores tensor (B, H, #queries, #keys)
         """
+        layer_idx = kwargs.get("layer_idx")
+        if layer_idx is None:
+            raise ValueError("layer_idx must be provided in kwargs")
+
         # 1. Get key signatures
         key_signatures = self._update_key_signatures(keys, sparse_meta_data, **kwargs)
 
-        # 2. Get query signatures
-        query_signatures = self._update_query_signatures(
-            queries, sparse_meta_data, **kwargs
+        # 2. Compute query signatures directly for input queries
+        query_weights = self.hat_weights[layer_idx]
+        query_matrix_list = query_weights["query_matrix"]
+        query_bias_list = query_weights["query_bias"]
+
+        query_signatures = self._get_signatures(
+            queries, query_matrix_list, query_bias_list
         )
 
         # 3. Compute scores using raw attention inner product style computation
