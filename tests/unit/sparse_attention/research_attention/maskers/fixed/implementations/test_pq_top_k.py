@@ -7,7 +7,6 @@
 """
 
 import pytest
-import torch
 
 
 @pytest.mark.unit
@@ -68,4 +67,4 @@ class TestPQCacheMaskerImplementation:
             PQCacheConfig,
         )
 
-        assert issubclass(PQCacheConfig, TopKMaskerConfig) 
+        assert issubclass(PQCacheConfig, TopKMaskerConfig)

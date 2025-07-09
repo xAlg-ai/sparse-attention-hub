@@ -178,11 +178,12 @@ class TestSparseAttentionConfigsAndFactories:
 
     def test_hash_attention_top_k_masker_config_and_creation(self):
         """Test HashAttentionTopKMaskerConfig and create_from_config method."""
+        import torch
+
         from sparse_attention_hub.sparse_attention import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -195,12 +196,12 @@ class TestSparseAttentionConfigsAndFactories:
         }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=0.4, 
-            hat_bits=8, 
-            hat_mlp_layers=2, 
+            heavy_size=0.4,
+            hat_bits=8,
+            hat_mlp_layers=2,
             hat_mlp_hidden_size=64,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
 
         assert config.heavy_size == 0.4

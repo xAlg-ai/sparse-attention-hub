@@ -41,52 +41,52 @@ class LocalMasker(FixedMasker):
         """Add local mask."""
         if previous_mask.is_full_mask():
             return previous_mask
-        
+
         batch_size = queries.shape[0]
         num_heads = queries.shape[1]
         seq_len_queries = queries.shape[2]
         seq_len_keys = keys.shape[2]
-        
+
         if isinstance(self.window_size, float):
             window_size = int(self.window_size * seq_len_keys)
         else:
             window_size = int(self.window_size)
-        
+
         if seq_len_keys <= window_size + seq_len_queries:
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
             return Mask.create_full_mask(mask_shape)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         device = keys.device
-        
+
         # Vectorized local window computation
         # For query k: window_start = seq_len_keys - (seq_len_queries - k) - window_size + 1
         query_positions = torch.arange(seq_len_queries, device=device, dtype=torch.long)
-        window_starts = seq_len_keys - seq_len_queries - window_size + query_positions + 1
+        window_starts = (
+            seq_len_keys - seq_len_queries - window_size + query_positions + 1
+        )
         window_offsets = torch.arange(window_size, device=device, dtype=torch.long)
-        
+
         all_window_indices = window_starts.unsqueeze(1) + window_offsets.unsqueeze(0)
         all_window_indices = torch.clamp(all_window_indices, 0, seq_len_keys - 1)
-        
-        row_wise_idx = all_window_indices.unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_heads, seq_len_queries, window_size
+
+        row_wise_idx = (
+            all_window_indices.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_heads, seq_len_queries, window_size)
         )
-        
+
         data = torch.ones(
             (batch_size, num_heads, seq_len_queries, window_size),
             dtype=torch.float32,
-            device=device
+            device=device,
         )
-        
-        local_mask = Mask.create_from_row_wise_idx(
-            shape=mask_shape,
-            row_wise_idx=row_wise_idx,
-            data=data,
-            type="index"
-        )
-        
-        return previous_mask.merge_mask(local_mask, inplace=False)
 
+        local_mask = Mask.create_from_row_wise_idx(
+            shape=mask_shape, row_wise_idx=row_wise_idx, data=data, type="index"
+        )
+
+        return previous_mask.merge_mask(local_mask, inplace=False)
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "LocalMasker":
@@ -154,49 +154,46 @@ class SinkMasker(FixedMasker):
         # 1. Check if previous_mask is full mask, if so return full mask
         if previous_mask.is_full_mask():
             return previous_mask
-        
+
         # Get tensor shapes
         batch_size = queries.shape[0]
         num_heads = queries.shape[1]
         seq_len_queries = queries.shape[2]
         seq_len_keys = keys.shape[2]
-        
+
         # Convert sink_size to int for tensor operations
         sink_size = int(self.sink_size)
-        
+
         # 2. Check if # keys is smaller than sink_size, if so, then return a full mask
         if seq_len_keys <= sink_size:
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
             return Mask.create_full_mask(mask_shape)
-        
+
         # 3. Compute row_wise_idx: b,h,sq,sink_size with row_wise_idx[i,j,k,:] = arrange(0,sink_size)
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        
+
         # Create row_wise_idx with shape (b, h, sq, sink_size)
         # Each row contains indices [0, 1, ..., sink_size-1]
-        row_wise_idx = torch.arange(
-            sink_size, 
-            device=keys.device, 
-            dtype=torch.long
-        ).unsqueeze(0).unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_heads, seq_len_queries, sink_size
+        row_wise_idx = (
+            torch.arange(sink_size, device=keys.device, dtype=torch.long)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_heads, seq_len_queries, sink_size)
         )
-        
+
         # Create data tensor with all ones (sink positions get weight 1.0)
         data = torch.ones(
             (batch_size, num_heads, seq_len_queries, sink_size),
             device=keys.device,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         # 4. Call Mask.create_from_row_wise_idx() to get the mask
         sink_mask = Mask.create_from_row_wise_idx(
-            shape=mask_shape,
-            row_wise_idx=row_wise_idx,
-            data=data,
-            type="index"
+            shape=mask_shape, row_wise_idx=row_wise_idx, data=data, type="index"
         )
-        
+
         # 5. Merge this_mask with previous mask using previous_mask.merge and return the new mask
         return previous_mask.merge_mask(sink_mask, inplace=False)
 

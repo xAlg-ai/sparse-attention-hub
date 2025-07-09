@@ -1,7 +1,7 @@
 """Hash attention top-K masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 
@@ -21,7 +21,9 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     hat_mlp_layers: int
     hat_mlp_hidden_size: int
     hat_mlp_activation: str  # activation to use relu / silu, etc
-    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]]  # Dict of layer_idx to tensor lists
+    hat_weights: Dict[
+        int, Dict[str, List[torch.Tensor]]
+    ]  # Dict of layer_idx to tensor lists
 
 
 class HashAttentionTopKMasker(TopKMasker):
@@ -55,41 +57,45 @@ class HashAttentionTopKMasker(TopKMasker):
             Signed signatures tensor
         """
         # Activation function mapping
-        activation_map = {
+        activation_map: Dict[str, Callable[[torch.Tensor], torch.Tensor]] = {
             "relu": torch.nn.functional.relu,
             "silu": torch.nn.functional.silu,
             "gelu": torch.nn.functional.gelu,
             "tanh": torch.nn.functional.tanh,
         }
-        
+
         if self.hat_mlp_activation not in activation_map:
-            raise ValueError(f"Unsupported activation function: {self.hat_mlp_activation}")
-        
-        activation_fn = activation_map[self.hat_mlp_activation]
+            raise ValueError(
+                f"Unsupported activation function: {self.hat_mlp_activation}"
+            )
+
+        activation_fn: Callable[[torch.Tensor], torch.Tensor] = activation_map[
+            self.hat_mlp_activation
+        ]
         signatures = input_tensor
 
         # Apply MLP layers except the last one with activation
         for i in range(len(matrix_list) - 1):
             # Use einsum for proper broadcasting: (B,H,s,d) x (H,d,d_out) -> (B,H,s,d_out)
-            signatures = torch.einsum('bhsd,hde->bhse', signatures, matrix_list[i])
+            signatures = torch.einsum("bhsd,hde->bhse", signatures, matrix_list[i])
             # Add bias with proper broadcasting: (B,H,s,d_out) + (H,d_out) -> (B,H,s,d_out)
             signatures = signatures + bias_list[i].unsqueeze(0).unsqueeze(2)
             signatures = activation_fn(signatures)
 
         # Apply final layer without activation
         if len(matrix_list) > 0:
-            signatures = torch.einsum('bhsd,hde->bhse', signatures, matrix_list[-1])
+            signatures = torch.einsum("bhsd,hde->bhse", signatures, matrix_list[-1])
             signatures = signatures + bias_list[-1].unsqueeze(0).unsqueeze(2)
 
         # Apply sign function
         signatures = torch.sign(signatures)
-        
+
         return signatures
 
     def _update_key_signatures(
         self,
         keys: torch.Tensor,
-        sparse_meta_data: Dict[str, Any],
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         **kwargs: Any,
     ) -> torch.Tensor:
         """
@@ -115,7 +121,7 @@ class HashAttentionTopKMasker(TopKMasker):
 
         # Get cached key signatures
         cached_key_signatures = sparse_meta_data["key"][layer_idx]
-        
+
         if cached_key_signatures is None:
             # First run - all keys are new
             new_keys = keys
@@ -124,9 +130,11 @@ class HashAttentionTopKMasker(TopKMasker):
             # Determine how many keys are new
             cached_num_keys = cached_key_signatures.shape[2]
             current_num_keys = keys.shape[2]
-            
+
             if current_num_keys < cached_num_keys:
-                raise ValueError(f"Current number of keys ({current_num_keys}) is less than cached number of keys ({cached_num_keys})")
+                raise ValueError(
+                    f"Current number of keys ({current_num_keys}) is less than cached number of keys ({cached_num_keys})"
+                )
             elif current_num_keys > cached_num_keys:
                 # We have new keys to process
                 new_keys = keys[:, :, cached_num_keys:, :]
@@ -138,8 +146,8 @@ class HashAttentionTopKMasker(TopKMasker):
         key_weights = self.hat_weights[layer_idx]
         key_matrix_list = key_weights["key_matrix"]
         key_bias_list = key_weights["key_bias"]
-        
-        new_key_signatures = self._get_signatures(
+
+        new_key_signatures: torch.Tensor = self._get_signatures(
             new_keys, key_matrix_list, key_bias_list
         )
 
@@ -150,14 +158,16 @@ class HashAttentionTopKMasker(TopKMasker):
             return new_key_signatures
         else:
             # Concatenate cached and new signatures
-            concatenated_signatures = torch.cat([cached_key_signatures, new_key_signatures], dim=2)
+            concatenated_signatures = torch.cat(
+                [cached_key_signatures, new_key_signatures], dim=2
+            )
             sparse_meta_data["key"][layer_idx] = concatenated_signatures
             return concatenated_signatures
 
     def _update_query_signatures(
         self,
         queries: torch.Tensor,
-        sparse_meta_data: Dict[str, Any],
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         **kwargs: Any,
     ) -> torch.Tensor:
         """
@@ -183,7 +193,7 @@ class HashAttentionTopKMasker(TopKMasker):
 
         # Get cached query signatures
         cached_query_signatures = sparse_meta_data["query"][layer_idx]
-        
+
         if cached_query_signatures is None:
             # First run - all queries are new
             new_queries = queries
@@ -192,9 +202,11 @@ class HashAttentionTopKMasker(TopKMasker):
             # Determine how many queries are new
             cached_num_queries = cached_query_signatures.shape[2]
             current_num_queries = queries.shape[2]
-            
+
             if current_num_queries < cached_num_queries:
-                raise ValueError(f"Current number of queries ({current_num_queries}) is less than cached number of queries ({cached_num_queries})")
+                raise ValueError(
+                    f"Current number of queries ({current_num_queries}) is less than cached number of queries ({cached_num_queries})"
+                )
             elif current_num_queries > cached_num_queries:
                 # We have new queries to process
                 new_queries = queries[:, :, cached_num_queries:, :]
@@ -206,8 +218,8 @@ class HashAttentionTopKMasker(TopKMasker):
         query_weights = self.hat_weights[layer_idx]
         query_matrix_list = query_weights["query_matrix"]
         query_bias_list = query_weights["query_bias"]
-        
-        new_query_signatures = self._get_signatures(
+
+        new_query_signatures: torch.Tensor = self._get_signatures(
             new_queries, query_matrix_list, query_bias_list
         )
 
@@ -218,7 +230,9 @@ class HashAttentionTopKMasker(TopKMasker):
             return new_query_signatures
         else:
             # Concatenate cached and new signatures
-            concatenated_signatures = torch.cat([cached_query_signatures, new_query_signatures], dim=2)
+            concatenated_signatures = torch.cat(
+                [cached_query_signatures, new_query_signatures], dim=2
+            )
             sparse_meta_data["query"][layer_idx] = concatenated_signatures
             return concatenated_signatures
 
@@ -243,16 +257,18 @@ class HashAttentionTopKMasker(TopKMasker):
         """
         # 1. Get key signatures
         key_signatures = self._update_key_signatures(keys, sparse_meta_data, **kwargs)
-        
+
         # 2. Get query signatures
-        query_signatures = self._update_query_signatures(queries, sparse_meta_data, **kwargs)
-        
+        query_signatures = self._update_query_signatures(
+            queries, sparse_meta_data, **kwargs
+        )
+
         # 3. Compute scores using raw attention inner product style computation
         # query_signatures: (B, H, #queries, hat_bits)
         # key_signatures: (B, H, #keys, hat_bits)
         # scores: (B, H, #queries, #keys)
         scores = torch.matmul(query_signatures, key_signatures.transpose(-2, -1))
-        
+
         return scores
 
     def add_mask(
@@ -271,47 +287,51 @@ class HashAttentionTopKMasker(TopKMasker):
             raise ValueError("sparse_meta_data cannot be None")
         if "layer_idx" not in kwargs:
             raise ValueError("layer_idx must be provided in kwargs")
-            
+
         # 1. Check if previous_mask is full mask, if so return full mask
         if previous_mask.is_full_mask():
             return previous_mask
-        
+
         # Get tensor shapes
         batch_size = queries.shape[0]
         num_heads = queries.shape[1]
         seq_len_queries = queries.shape[2]
         seq_len_keys = keys.shape[2]
-        
+
         # 2. Compute heavy_size: if int use as is, if float use heavy_size * #keys
         if isinstance(self.heavy_size, float):
             heavy_size = int(self.heavy_size * seq_len_keys)
         else:
             heavy_size = int(self.heavy_size)
-        
+
         # 3. Check if # keys is smaller than heavy_size, if so return full mask
         if seq_len_keys <= heavy_size:
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
             return Mask.create_full_mask(mask_shape)
-        
+
         # 4. Compute score using _compute_hashattention_score
-        scores = self._compute_hashattention_score(queries, keys, sparse_meta_data, **kwargs)
-        
+        scores = self._compute_hashattention_score(
+            queries, keys, sparse_meta_data, **kwargs
+        )
+
         # 5. Extract row-wise top-k indices from inactive positions in previous_mask
         # Get the dense mask from previous_mask to identify inactive positions
         previous_dense_mask = previous_mask.get_dense_mask()
-        
+
         # Mask out positions already active in previous_mask
         masked_scores = scores.clone()
-        masked_scores[previous_dense_mask != 0] = float('-inf')
-        
+        masked_scores[previous_dense_mask != 0] = float("-inf")
+
         # Get top-k indices from inactive positions
         _, top_k_indices = torch.topk(masked_scores, k=heavy_size, dim=-1, largest=True)
         data = torch.ones_like(top_k_indices, dtype=torch.float32)
-        
+
         # 6. Use this row-wise idx to compute this_mask using Mask.create_row_wise_idx()
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        this_mask = Mask.create_from_row_wise_idx(mask_shape, top_k_indices, data, type="index")
-        
+        this_mask = Mask.create_from_row_wise_idx(
+            mask_shape, top_k_indices, data, type="index"
+        )
+
         # 7. Merge this_mask with previous mask and return
         return previous_mask.merge_mask(this_mask, inplace=False)
 

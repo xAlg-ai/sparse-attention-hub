@@ -176,6 +176,8 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_hash_attention_top_k_masker(self):
         """Test that HashAttentionTopKMasker can be created from a config."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers import (
             ResearchMasker,
         )
@@ -183,7 +185,6 @@ class TestConcreteMaskerCreation:
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -196,12 +197,12 @@ class TestConcreteMaskerCreation:
         }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=100, 
-            hat_bits=8, 
-            hat_mlp_layers=2, 
+            heavy_size=100,
+            hat_bits=8,
+            hat_mlp_layers=2,
             hat_mlp_hidden_size=64,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is HashAttentionTopKMasker

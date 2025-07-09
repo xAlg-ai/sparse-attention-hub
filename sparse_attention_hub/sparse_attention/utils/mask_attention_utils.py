@@ -87,7 +87,9 @@ def _compute_masked_exp_attention_weights(
     exp_attention_weights = torch.exp(raw_attention_weights)
 
     if not sparse_attention_mask.is_empty():
-        exp_attention_weights = sparse_attention_mask.apply_inv_mask(exp_attention_weights)
+        exp_attention_weights = sparse_attention_mask.apply_inv_mask(
+            exp_attention_weights
+        )
 
     # Apply dropout to attention weights if specified
     if dropout > 0.0 and training:

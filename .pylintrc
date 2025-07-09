@@ -146,7 +146,7 @@ single-line-if-stmt=no
 # separator` is used to allow tabulation in dicts, etc.: {1  : 1,\n222: 2}.
 # `trailing-comma` allows a space between comma and closing bracket: (a, ).
 # `empty-line` allows space-only lines.
-no-space-check=trailing-comma,dict-separator
+# no-space-check=trailing-comma,dict-separator
 
 # Maximum number of lines in a module
 max-module-lines=1000
@@ -333,7 +333,7 @@ int-import-graph=
 
 # Create a graph of internal dependencies in the given file (report RP0402 must
 # not be disabled)
-internal-import-graph=
+# internal-import-graph=
 
 # Force import order to recognize a module as part of the standard
 # compatibility libraries.
@@ -345,4 +345,4 @@ known-third-party=enchant
 [EXCEPTIONS]
 # Exceptions that will emit a warning when being caught. Defaults to
 # "Exception"
-overgeneral-exceptions=Exception
+overgeneral-exceptions=builtins.Exception

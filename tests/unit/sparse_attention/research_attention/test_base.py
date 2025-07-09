@@ -17,11 +17,9 @@ class TestImports:
         """Test that all imports are working."""
         from sparse_attention_hub.sparse_attention.research_attention import (
             ResearchAttention,
-            ResearchAttentionConfig,
         )
 
         assert ResearchAttention is not None
-        assert ResearchAttentionConfig is not None
 
 
 @pytest.mark.unit
@@ -93,7 +91,6 @@ class TestSamplingMaskerValidation:
         from sparse_attention_hub.sparse_attention import SparseAttentionConfig
         from sparse_attention_hub.sparse_attention.research_attention import (
             ResearchAttention,
-            ResearchAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
             LocalMasker,
@@ -123,10 +120,10 @@ class TestSamplingMaskerValidation:
             ResearchAttention,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
-            RandomSamplingMasker,
-            RandomSamplingMaskerConfig,
             MagicPig,
             MagicPigConfig,
+            RandomSamplingMasker,
+            RandomSamplingMaskerConfig,
         )
 
         # Create two sampling maskers
@@ -139,7 +136,10 @@ class TestSamplingMaskerValidation:
 
         # This should raise an error
         config = SparseAttentionConfig()
-        with pytest.raises(ValueError, match="Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker"):
+        with pytest.raises(
+            ValueError,
+            match="Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker",
+        ):
             ResearchAttention(config, [random_masker, magic_pig_masker])
 
     def test_multiple_sampling_maskers_via_config(self):
@@ -149,8 +149,8 @@ class TestSamplingMaskerValidation:
             ResearchAttentionConfig,
         )
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling import (
-            RandomSamplingMaskerConfig,
             MagicPigConfig,
+            RandomSamplingMaskerConfig,
         )
 
         # Create config with two sampling maskers
@@ -161,7 +161,10 @@ class TestSamplingMaskerValidation:
         config = ResearchAttentionConfig(masker_configs=masker_configs)
 
         # This should raise an error
-        with pytest.raises(ValueError, match="Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker"):
+        with pytest.raises(
+            ValueError,
+            match="Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker",
+        ):
             ResearchAttention.create_from_config(config)
 
     def test_no_sampling_maskers_allowed(self):

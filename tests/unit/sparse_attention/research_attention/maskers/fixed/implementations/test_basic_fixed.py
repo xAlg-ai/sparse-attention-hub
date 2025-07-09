@@ -78,18 +78,18 @@ class TestLocalMaskerImplementation:
 
         config = LocalMaskerConfig(window_size=3)
         masker = LocalMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 2, 4, 5, 8
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 64)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 64)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 64)
-        
+
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         full_previous_mask = Mask.create_full_mask(mask_shape)
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -98,7 +98,7 @@ class TestLocalMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=full_previous_mask,
         )
-        
+
         assert result.is_full_mask()
         assert result.shape == mask_shape
 
@@ -112,18 +112,18 @@ class TestLocalMaskerImplementation:
 
         config = LocalMaskerConfig(window_size=4)  # 4 + 3 = 7, keys=6 < 7
         masker = LocalMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 2, 3, 6
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 32)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 32)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 32)
-        
+
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -132,7 +132,7 @@ class TestLocalMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
-        
+
         assert result.is_full_mask()
         assert result.shape == mask_shape
 
@@ -146,18 +146,18 @@ class TestLocalMaskerImplementation:
 
         config = LocalMaskerConfig(window_size=2)
         masker = LocalMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 3, 8
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -166,22 +166,27 @@ class TestLocalMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
-        
+
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Expected pattern based on corrected formula:
         # Query 0 → Keys [4, 5] (window_start = 8 - 3 - 2 + 0 + 1 = 4)
-        # Query 1 → Keys [5, 6] (window_start = 8 - 3 - 2 + 1 + 1 = 5)  
+        # Query 1 → Keys [5, 6] (window_start = 8 - 3 - 2 + 1 + 1 = 5)
         # Query 2 → Keys [6, 7] (window_start = 8 - 3 - 2 + 2 + 1 = 6)
-        expected_pattern = torch.tensor([
-            # Keys: 0  1  2  3  4  5  6  7
-            [      [0, 0, 0, 0, 1, 1, 0, 0],  # Query 0
-                   [0, 0, 0, 0, 0, 1, 1, 0],  # Query 1
-                   [0, 0, 0, 0, 0, 0, 1, 1]], # Query 2
-        ], dtype=torch.float32)
-        
+        expected_pattern = torch.tensor(
+            [
+                # Keys: 0  1  2  3  4  5  6  7
+                [
+                    [0, 0, 0, 0, 1, 1, 0, 0],  # Query 0
+                    [0, 0, 0, 0, 0, 1, 1, 0],  # Query 1
+                    [0, 0, 0, 0, 0, 0, 1, 1],
+                ],  # Query 2
+            ],
+            dtype=torch.float32,
+        )
+
         assert torch.allclose(result_dense[0, 0], expected_pattern[0])
 
     def test_local_masker_add_mask_float_window(self):
@@ -194,18 +199,18 @@ class TestLocalMaskerImplementation:
 
         config = LocalMaskerConfig(window_size=0.25)  # 0.25 * 8 = 2
         masker = LocalMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 3, 8
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -214,19 +219,24 @@ class TestLocalMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
-        
+
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Should create same pattern as integer window_size=2
-        expected_pattern = torch.tensor([
-            # Keys: 0  1  2  3  4  5  6  7
-            [      [0, 0, 0, 0, 1, 1, 0, 0],  # Query 0
-                   [0, 0, 0, 0, 0, 1, 1, 0],  # Query 1
-                   [0, 0, 0, 0, 0, 0, 1, 1]], # Query 2
-        ], dtype=torch.float32)
-        
+        expected_pattern = torch.tensor(
+            [
+                # Keys: 0  1  2  3  4  5  6  7
+                [
+                    [0, 0, 0, 0, 1, 1, 0, 0],  # Query 0
+                    [0, 0, 0, 0, 0, 1, 1, 0],  # Query 1
+                    [0, 0, 0, 0, 0, 0, 1, 1],
+                ],  # Query 2
+            ],
+            dtype=torch.float32,
+        )
+
         assert torch.allclose(result_dense[0, 0], expected_pattern[0])
 
     def test_local_masker_add_mask_merge_with_previous(self):
@@ -239,20 +249,20 @@ class TestLocalMaskerImplementation:
 
         config = LocalMaskerConfig(window_size=2)
         masker = LocalMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 3, 8
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         # Create a previous mask with some attention on first 2 positions
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, :2] = 1.0  # First 2 positions
         previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data)
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -261,19 +271,24 @@ class TestLocalMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=previous_mask,
         )
-        
+
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Should merge previous mask (positions 0,1) with local mask (see positions 4-7)
-        expected_pattern = torch.tensor([
-            # Keys: 0  1  2  3  4  5  6  7
-            [      [1, 1, 0, 0, 1, 1, 0, 0],  # Query 0: prev[0,1] + local[4,5]
-                   [1, 1, 0, 0, 0, 1, 1, 0],  # Query 1: prev[0,1] + local[5,6]
-                   [1, 1, 0, 0, 0, 0, 1, 1]], # Query 2: prev[0,1] + local[6,7]
-        ], dtype=torch.float32)
-        
+        expected_pattern = torch.tensor(
+            [
+                # Keys: 0  1  2  3  4  5  6  7
+                [
+                    [1, 1, 0, 0, 1, 1, 0, 0],  # Query 0: prev[0,1] + local[4,5]
+                    [1, 1, 0, 0, 0, 1, 1, 0],  # Query 1: prev[0,1] + local[5,6]
+                    [1, 1, 0, 0, 0, 0, 1, 1],
+                ],  # Query 2: prev[0,1] + local[6,7]
+            ],
+            dtype=torch.float32,
+        )
+
         assert torch.allclose(result_dense[0, 0], expected_pattern[0])
 
     def test_local_masker_add_mask_edge_case_window_size_zero(self):
@@ -286,18 +301,18 @@ class TestLocalMaskerImplementation:
 
         config = LocalMaskerConfig(window_size=0)
         masker = LocalMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 2, 5
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 8)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 8)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 8)
-        
+
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -306,7 +321,7 @@ class TestLocalMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
-        
+
         # Should return empty mask (window_size=0 means no local attention)
         assert result.is_empty()
 
@@ -431,18 +446,18 @@ class TestSinkMaskerImplementation:
         # Test case 1: Previous mask is full - should return full mask
         config = SinkMaskerConfig(sink_size=4)
         masker = SinkMasker(config)
-        
+
         batch_size, num_heads, seq_len_queries, seq_len_keys = 2, 8, 10, 16
-        
+
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 64)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 64)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 64)
-        
+
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         full_previous_mask = Mask.create_full_mask(mask_shape)
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -451,19 +466,19 @@ class TestSinkMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=full_previous_mask,
         )
-        
+
         assert result.is_full_mask()
         assert result.shape == mask_shape
-        
+
         # Test case 2: seq_len_keys <= sink_size - should return full mask
         config = SinkMaskerConfig(sink_size=20)  # larger than seq_len_keys
         masker = SinkMasker(config)
-        
+
         # Create empty mask as previous mask (to test seq_len_keys <= sink_size condition)
         empty_previous_mask = Mask.create_mask_from_dense_mask(
             mask_shape, torch.zeros(mask_shape)
         )
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -472,21 +487,21 @@ class TestSinkMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
-        
+
         assert result.is_full_mask()
         assert result.shape == mask_shape
-        
+
         # Test case 3: Normal case - should create sink mask and merge
         config = SinkMaskerConfig(sink_size=4)
         masker = SinkMasker(config)
-        
+
         # Create a partial mask as previous mask
         partial_mask_data = torch.zeros(mask_shape)
         partial_mask_data[:, :, :, -2:] = 1.0  # Last 2 positions have attention
         partial_previous_mask = Mask.create_mask_from_dense_mask(
             mask_shape, partial_mask_data
         )
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -495,25 +510,27 @@ class TestSinkMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=partial_previous_mask,
         )
-        
+
         # Result should contain sink positions (0, 1, 2, 3) and last 2 positions
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Check that sink positions (first 4 positions) are attended to
         assert torch.all(result_dense[:, :, :, :4] == 1.0)
-        
+
         # Check that last 2 positions are still attended to (from merge)
         assert torch.all(result_dense[:, :, :, -2:] == 1.0)
-        
+
         # Check that positions 4 to -3 are not attended to (should be 0)
-        if seq_len_keys > 6:  # Only check if there are positions between sink and last 2
+        if (
+            seq_len_keys > 6
+        ):  # Only check if there are positions between sink and last 2
             assert torch.all(result_dense[:, :, :, 4:-2] == 0.0)
 
         # Test case 4: Edge case with sink_size = 0
         config = SinkMaskerConfig(sink_size=0)
         masker = SinkMasker(config)
-        
+
         result = masker.add_mask(
             keys=keys,
             queries=queries,
@@ -522,10 +539,10 @@ class TestSinkMaskerImplementation:
             sparse_meta_data=None,
             previous_mask=partial_previous_mask,
         )
-        
+
         result_dense = result.get_dense_mask()
-        
+
         # Only position 0 should be attended to from sink
         assert torch.all(result_dense[:, :, :, 0] == 0.0)
         # Last 2 positions should still be attended to from merge
-        assert torch.all(result_dense[:, :, :, -2:] == 1.0) 
+        assert torch.all(result_dense[:, :, :, -2:] == 1.0)

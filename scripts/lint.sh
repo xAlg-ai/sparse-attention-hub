@@ -104,7 +104,7 @@ run_black_check() {
 run_isort_check() {
     echo -e "${BLUE}Running isort (import order check)...${NC}"
     if check_tool "isort"; then
-        echo isort \
+        isort \
             --check-only \
             --profile=black \
             --line-length=88 \

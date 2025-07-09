@@ -17,7 +17,6 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMaskerConfig,
         )
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -30,12 +29,12 @@ class TestHashAttentionTopKMaskerImplementation:
         }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=10, 
-            hat_bits=4, 
-            hat_mlp_hidden_size=128, 
+            heavy_size=10,
+            hat_bits=4,
+            hat_mlp_hidden_size=128,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         assert config is not None
         assert config.heavy_size == 10
@@ -47,11 +46,12 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_creation(self):
         """Test that hash attention top k masker can be created."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -64,12 +64,12 @@ class TestHashAttentionTopKMaskerImplementation:
         }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=10, 
-            hat_bits=4, 
-            hat_mlp_hidden_size=128, 
+            heavy_size=10,
+            hat_bits=4,
+            hat_mlp_hidden_size=128,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
         assert type(masker) is HashAttentionTopKMasker
@@ -77,11 +77,12 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_creation_from_config(self):
         """Test that hash attention top k masker can be created from a config."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -94,12 +95,12 @@ class TestHashAttentionTopKMaskerImplementation:
         }
 
         config = HashAttentionTopKMaskerConfig(
-            heavy_size=10, 
-            hat_bits=4, 
-            hat_mlp_hidden_size=128, 
+            heavy_size=10,
+            hat_bits=4,
+            hat_mlp_hidden_size=128,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker.create_from_config(config)
         assert type(masker) is HashAttentionTopKMasker
@@ -129,12 +130,13 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_add_mask_input_validation(self):
         """Test HashAttentionTopKMasker add_mask input validation."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -152,7 +154,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -161,7 +163,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
@@ -189,12 +191,13 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_add_mask_full_previous(self):
         """Test HashAttentionTopKMasker returns previous mask when it's full."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -212,7 +215,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -221,7 +224,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         full_previous_mask = Mask.create_full_mask(mask_shape)
 
@@ -241,12 +244,13 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_add_mask_small_sequence(self):
         """Test HashAttentionTopKMasker returns full mask when seq_len_keys <= heavy_size."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -264,7 +268,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -273,7 +277,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
@@ -292,12 +296,13 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_add_mask_integer_heavy_size(self):
         """Test HashAttentionTopKMasker with integer heavy_size."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -315,7 +320,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -324,7 +329,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
@@ -341,21 +346,24 @@ class TestHashAttentionTopKMaskerImplementation:
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Each query should attend to exactly 2 keys (heavy_size=2)
         for h in range(num_heads):
             for q in range(seq_len_queries):
                 num_attended = torch.sum(result_dense[0, h, q] != 0).item()
-                assert num_attended == 2, f"Head {h}, Query {q} should attend to 2 keys, got {num_attended}"
+                assert (
+                    num_attended == 2
+                ), f"Head {h}, Query {q} should attend to 2 keys, got {num_attended}"
 
     def test_hash_attention_top_k_masker_add_mask_float_heavy_size(self):
         """Test HashAttentionTopKMasker with float heavy_size (proportion of seq_len_keys)."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -373,7 +381,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -382,7 +390,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
@@ -399,21 +407,24 @@ class TestHashAttentionTopKMaskerImplementation:
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Each query should attend to exactly 2 keys (0.4 * 5 = 2)
         for h in range(num_heads):
             for q in range(seq_len_queries):
                 num_attended = torch.sum(result_dense[0, h, q] != 0).item()
-                assert num_attended == 2, f"Head {h}, Query {q} should attend to 2 keys, got {num_attended}"
+                assert (
+                    num_attended == 2
+                ), f"Head {h}, Query {q} should attend to 2 keys, got {num_attended}"
 
     def test_hash_attention_top_k_masker_add_mask_merge_with_previous(self):
         """Test HashAttentionTopKMasker merges correctly with non-empty previous mask."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -431,7 +442,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -440,7 +451,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         # Create previous mask with last 2 positions active
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         previous_mask_data = torch.zeros(mask_shape)
@@ -460,26 +471,33 @@ class TestHashAttentionTopKMaskerImplementation:
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
-        
+
         # Should have last 2 positions from previous mask + 2 new positions from top-K
         for h in range(num_heads):
             for q in range(seq_len_queries):
                 # Check that last 2 positions are still active (from previous mask)
-                assert result_dense[0, h, q, -2] == 1.0, f"Head {h}, Query {q} should attend to position -2"
-                assert result_dense[0, h, q, -1] == 1.0, f"Head {h}, Query {q} should attend to position -1"
-                
+                assert (
+                    result_dense[0, h, q, -2] == 1.0
+                ), f"Head {h}, Query {q} should attend to position -2"
+                assert (
+                    result_dense[0, h, q, -1] == 1.0
+                ), f"Head {h}, Query {q} should attend to position -1"
+
                 # Check that exactly 2 additional positions are active (from top-K)
                 additional_active = torch.sum(result_dense[0, h, q, :-2]).item()
-                assert additional_active == 2, f"Head {h}, Query {q} should have 2 additional active positions, got {additional_active}"
+                assert (
+                    additional_active == 2
+                ), f"Head {h}, Query {q} should have 2 additional active positions, got {additional_active}"
 
     def test_hash_attention_top_k_masker_add_mask_signature_caching(self):
         """Test HashAttentionTopKMasker signature caching behavior."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         # Create sample weight tensors
         sample_weights = {
@@ -497,7 +515,7 @@ class TestHashAttentionTopKMaskerImplementation:
             hat_mlp_hidden_size=8,
             hat_mlp_layers=2,
             hat_mlp_activation="relu",
-            hat_weights=sample_weights
+            hat_weights=sample_weights,
         )
         masker = HashAttentionTopKMasker(config)
 
@@ -506,7 +524,7 @@ class TestHashAttentionTopKMaskerImplementation:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
+
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
@@ -529,12 +547,22 @@ class TestHashAttentionTopKMaskerImplementation:
         assert 0 in sparse_meta_data["query"]
         assert sparse_meta_data["key"][0] is not None
         assert sparse_meta_data["query"][0] is not None
-        
+
         # Check cached signature shapes
         key_signatures = sparse_meta_data["key"][0]
         query_signatures = sparse_meta_data["query"][0]
-        assert key_signatures.shape == (batch_size, num_heads, seq_len_keys, 4)  # hat_bits=4
-        assert query_signatures.shape == (batch_size, num_heads, seq_len_queries, 4)  # hat_bits=4
+        assert key_signatures.shape == (
+            batch_size,
+            num_heads,
+            seq_len_keys,
+            4,
+        )  # hat_bits=4
+        assert query_signatures.shape == (
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            4,
+        )  # hat_bits=4
 
         # Second call with same inputs - should use cached signatures
         result2 = masker.add_mask(
@@ -554,15 +582,16 @@ class TestHashAttentionTopKMaskerImplementation:
 
     def test_hash_attention_top_k_masker_add_mask_different_activations(self):
         """Test HashAttentionTopKMasker with different activation functions."""
+        import torch
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
-        import torch
 
         activations = ["relu", "silu", "gelu", "tanh"]
-        
+
         for activation in activations:
             # Create sample weight tensors
             sample_weights = {
@@ -580,7 +609,7 @@ class TestHashAttentionTopKMaskerImplementation:
                 hat_mlp_hidden_size=8,
                 hat_mlp_layers=2,
                 hat_mlp_activation=activation,
-                hat_weights=sample_weights
+                hat_weights=sample_weights,
             )
             masker = HashAttentionTopKMasker(config)
 
@@ -589,7 +618,7 @@ class TestHashAttentionTopKMaskerImplementation:
             keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
             queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
             values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-            
+
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
             empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
@@ -607,9 +636,11 @@ class TestHashAttentionTopKMaskerImplementation:
             # Convert to dense to check pattern
             result_dense = result.get_dense_mask()
             assert result_dense.shape == mask_shape
-            
+
             # Each query should attend to exactly 2 keys
             for h in range(num_heads):
                 for q in range(seq_len_queries):
                     num_attended = torch.sum(result_dense[0, h, q] != 0).item()
-                    assert num_attended == 2, f"Head {h}, Query {q} with {activation} should attend to 2 keys, got {num_attended}" 
+                    assert (
+                        num_attended == 2
+                    ), f"Head {h}, Query {q} with {activation} should attend to 2 keys, got {num_attended}"

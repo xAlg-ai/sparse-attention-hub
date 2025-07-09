@@ -44,4 +44,4 @@ class TestImplementationsImports:
         assert OracleTopKConfig is not None
         assert PQCacheConfig is not None
         assert HashAttentionTopKMaskerConfig is not None
-        assert DoubleSparsityTopKMaskerConfig is not None 
+        assert DoubleSparsityTopKMaskerConfig is not None

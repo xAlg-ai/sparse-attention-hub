@@ -7,7 +7,6 @@
 """
 
 import pytest
-import torch
 
 
 @pytest.mark.unit
@@ -75,4 +74,4 @@ class TestDoubleSparsityTopKMaskerImplementation:
             DoubleSparsityTopKMaskerConfig,
         )
 
-        assert issubclass(DoubleSparsityTopKMaskerConfig, TopKMaskerConfig) 
+        assert issubclass(DoubleSparsityTopKMaskerConfig, TopKMaskerConfig)
