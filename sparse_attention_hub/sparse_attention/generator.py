@@ -1,7 +1,10 @@
 """Sparse attention generators and interfaces (bare metal)."""
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from typing import Any, Callable
+
+from transformers import PreTrainedModel
 
 
 class SparseAttentionGen(ABC):
@@ -13,6 +16,12 @@ class SparseAttentionGen(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Make the generator callable."""
+    def __call__(self, model: PreTrainedModel) -> Any:
+        """
+        Context manager to apply a sparse attention method to a model.
+
+        This method replaces the attention_interface in all attention layers of the model
+        with the custom attention function returned by get_custom_attention_function.
+        The custom attention function is reverted when the context manager is exited.
+        """
         pass
