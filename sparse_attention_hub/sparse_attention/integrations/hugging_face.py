@@ -8,8 +8,10 @@ from contextlib import contextmanager
 import torch
 
 from ..base import SparseAttention, SparseAttentionConfig
+from ..research_attention.base import ResearchAttention
 from ..generator import SparseAttentionGen
 from transformers.modeling_utils import PreTrainedModel, ALL_ATTENTION_FUNCTIONS
+from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
 
 
 class SparseAttentionHF(SparseAttentionGen):
@@ -72,7 +74,7 @@ class SparseAttentionHF(SparseAttentionGen):
     def _generate_unique_attention_name(self) -> str:
         """Generate a unique name not present in ALL_ATTENTION_FUNCTIONS."""
         base_name = "sparse_attention"
-        existing_keys = ALL_ATTENTION_FUNCTIONS.valid_keys()
+        existing_keys = ALL_ATTENTION_FUNCTIONS.valid_keys() + ALL_MASK_ATTENTION_FUNCTIONS.valid_keys()
         
         while True:
             suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
@@ -108,8 +110,13 @@ class SparseAttentionHF(SparseAttentionGen):
         try:
             custom_attention_fn = self.get_custom_attention_function()
             custom_attention_name = self._generate_unique_attention_name()
+            from transformers.masking_utils import eager_mask
             
             ALL_ATTENTION_FUNCTIONS.register(custom_attention_name, custom_attention_fn)
+            if isinstance(self.sparse_attention, ResearchAttention):
+                ALL_MASK_ATTENTION_FUNCTIONS.register(custom_attention_name, eager_mask) # this is true for research attention; will need to fix gracefully for efficient attention
+            else:
+                raise NotImplementedError("Sparse attention is not supported for this model yet")
             
             for name, module in model.named_modules():
                 if hasattr(module, 'config') and hasattr(module.config, '_attn_implementation'):
