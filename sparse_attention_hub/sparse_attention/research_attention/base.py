@@ -91,7 +91,6 @@ class ResearchAttention(SparseAttention):
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
-                sparse_meta_data=None,  # TODO: Define sparse_meta_data structure
                 previous_mask=sparse_attention_mask,
                 **kwargs,
             )

@@ -9,6 +9,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
+from sparse_attention_hub.sparse_attention.utils.kv_utils import repeat_kv, _get_num_key_value_groups
 
 from ..base import TopKMasker, TopKMaskerConfig
 
@@ -187,6 +188,8 @@ class HashAttentionTopKMasker(TopKMasker):
         if layer_idx is None:
             raise ValueError("layer_idx must be provided in kwargs")
 
+        num_key_value_groups = _get_num_key_value_groups(queries, keys)
+        keys = repeat_kv(keys, num_key_value_groups)
         # 1. Get key signatures
         key_signatures = self._update_key_signatures(keys, sparse_meta_data, **kwargs)
 
@@ -243,7 +246,7 @@ class HashAttentionTopKMasker(TopKMasker):
         # 3. Check if # keys is smaller than heavy_size, if so return full mask
         if seq_len_keys <= heavy_size:
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-            return Mask.create_full_mask(mask_shape)
+            return Mask.create_full_mask(mask_shape, dtype=previous_mask.dtype)
 
         # 4. Compute score using _compute_hashattention_score
         scores = self._compute_hashattention_score(
@@ -260,12 +263,12 @@ class HashAttentionTopKMasker(TopKMasker):
 
         # Get top-k indices from inactive positions
         _, top_k_indices = torch.topk(masked_scores, k=heavy_size, dim=-1, largest=True)
-        data = torch.ones_like(top_k_indices, dtype=torch.float32)
+        data = torch.ones_like(top_k_indices, dtype=previous_mask.dtype)
 
         # 6. Use this row-wise idx to compute this_mask using Mask.create_row_wise_idx()
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         this_mask = Mask.create_from_row_wise_idx(
-            mask_shape, top_k_indices, data, type="index"
+            mask_shape, top_k_indices, data, type="index", dtype=previous_mask.dtype
         )
 
         # 7. Merge this_mask with previous mask and return
