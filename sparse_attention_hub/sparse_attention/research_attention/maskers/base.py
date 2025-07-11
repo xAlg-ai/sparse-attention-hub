@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast
 
 import torch
 
@@ -70,7 +70,7 @@ class MaskerRegistry:
         Raises:
             ValueError: If no masker class is registered for the config type.
         """
-        masker_class = cls._registry.get(config_type)
+        masker_class: Optional[Type["ResearchMasker"]] = cls._registry.get(config_type)
         if masker_class is None:
             raise ValueError(
                 f"No masker class registered for config type: {config_type}"
@@ -117,7 +117,7 @@ class ResearchMasker(ABC):
         self, dims: AttentionTensorDimensions, dtype: torch.dtype
     ) -> Mask:
         """Create a full attention mask."""
-        mask_shape = (
+        mask_shape: Tuple[int, int, int, int] = (
             dims.batch_size,
             dims.num_heads,
             dims.seq_len_queries,
@@ -195,8 +195,10 @@ class ResearchMasker(ABC):
                 Make sure to import the masker module before calling this method.
         """
         # Get the masker class from the registry
-        masker_class: Type["ResearchMasker"] = MaskerRegistry.get_masker_class(type(config))
+        masker_class: Type["ResearchMasker"] = MaskerRegistry.get_masker_class(
+            type(config)
+        )
 
         # Cast to help mypy understand the type
-        masker_class = cast(Type[ResearchMasker], masker_class)
+        masker_class: Type[ResearchMasker] = cast(Type[ResearchMasker], masker_class)
         return masker_class.create_from_config(config)

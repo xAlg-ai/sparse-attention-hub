@@ -47,8 +47,10 @@ class OracleTopK(TopKMasker):
         if previous_mask.is_full_mask():
             return previous_mask
 
-        tensor_dims = self._extract_tensor_dimensions(keys, queries)
-        effective_heavy_size = self._calculate_effective_heavy_size(
+        tensor_dims: AttentionTensorDimensions = self._extract_tensor_dimensions(
+            keys, queries
+        )
+        effective_heavy_size: int = self._calculate_effective_heavy_size(
             tensor_dims.seq_len_keys
         )
 
@@ -57,7 +59,7 @@ class OracleTopK(TopKMasker):
             return self._create_full_mask(tensor_dims, previous_mask.dtype)
 
         # Create oracle top-K mask
-        oracle_mask = self._create_oracle_topk_mask(
+        oracle_mask: Mask = self._create_oracle_topk_mask(
             tensor_dims, effective_heavy_size, keys, queries, previous_mask
         )
         return previous_mask.merge_mask(oracle_mask, inplace=False)
@@ -81,8 +83,10 @@ class OracleTopK(TopKMasker):
         previous_mask: Mask,
     ) -> Mask:
         """Create oracle top-K mask using raw attention scores."""
-        raw_attention_scores = self._compute_raw_attention_scores(keys, queries)
-        top_k_indices = self._get_topk_indices_from_inactive_positions(
+        raw_attention_scores: torch.Tensor = self._compute_raw_attention_scores(
+            keys, queries
+        )
+        top_k_indices: torch.Tensor = self._get_topk_indices_from_inactive_positions(
             raw_attention_scores, previous_mask, heavy_size
         )
         return self._create_mask_from_rowise_indices(

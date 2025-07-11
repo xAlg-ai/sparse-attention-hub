@@ -158,7 +158,7 @@ class Mask:
             Mask object with from_index=True
         """
         # For multi-dimensional tensors, ptr should have size equal to the product of all dimensions except the last one, plus 1
-        expected_ptr_size = np.prod(shape[:-1]) + 1
+        expected_ptr_size: int = int(np.prod(shape[:-1]) + 1)
         if ptr.numel() != expected_ptr_size:
             raise ValueError(
                 f"ptr.numel() must be {expected_ptr_size}, got {ptr.numel()}"
@@ -222,7 +222,9 @@ class Mask:
             raise ValueError("shape must have at least one dimension")
 
         # Validate input shapes
-        expected_row_wise_shape = shape[:-1] + (row_wise_idx.shape[-1],)
+        expected_row_wise_shape: Tuple[int, ...] = shape[:-1] + (
+            row_wise_idx.shape[-1],
+        )
         if row_wise_idx.shape != expected_row_wise_shape:
             raise ValueError(
                 f"row_wise_idx.shape must be {expected_row_wise_shape}, got {row_wise_idx.shape}"
@@ -234,33 +236,33 @@ class Mask:
             )
 
         # Validate indices are within bounds (allow -1 as padding)
-        n = shape[-1]
-        valid_indices_mask = row_wise_idx >= 0
+        n: int = shape[-1]
+        valid_indices_mask: torch.Tensor = row_wise_idx >= 0
         if torch.any((row_wise_idx >= n) & valid_indices_mask):
             raise ValueError(
                 f"All valid indices in row_wise_idx must be in range [0, {n-1}]"
             )
 
         # Always compute sparse representation first
-        batch_dims = shape[:-1]
-        batch_size = int(np.prod(batch_dims))
-        k = row_wise_idx.shape[-1]
+        batch_dims: Tuple[int, ...] = shape[:-1]
+        batch_size: int = int(np.prod(batch_dims))
+        k: int = row_wise_idx.shape[-1]
 
-        flat_row_wise_idx = row_wise_idx.reshape(batch_size, k)
-        flat_data = data.reshape(batch_size, k)
+        flat_row_wise_idx: torch.Tensor = row_wise_idx.reshape(batch_size, k)
+        flat_data: torch.Tensor = data.reshape(batch_size, k)
 
-        row_offsets = (
+        row_offsets: torch.Tensor = (
             torch.arange(batch_size, device=flat_row_wise_idx.device).unsqueeze(1) * n
         )
-        flat_indices_with_offset = flat_row_wise_idx + row_offsets
+        flat_indices_with_offset: torch.Tensor = flat_row_wise_idx + row_offsets
 
         # Filter out invalid indices (e.g., -1 padding)
-        valid_mask = flat_row_wise_idx >= 0
-        valid_flat_indices = flat_indices_with_offset[valid_mask]
-        valid_values = flat_data[valid_mask]
+        valid_mask: torch.Tensor = flat_row_wise_idx >= 0
+        valid_flat_indices: torch.Tensor = flat_indices_with_offset[valid_mask]
+        valid_values: torch.Tensor = flat_data[valid_mask]
 
-        valid_counts_per_row = valid_mask.sum(dim=1)
-        ptr = torch.cat(
+        valid_counts_per_row: torch.Tensor = valid_mask.sum(dim=1)
+        ptr: torch.Tensor = torch.cat(
             [
                 torch.zeros(1, dtype=torch.long, device=flat_row_wise_idx.device),
                 torch.cumsum(valid_counts_per_row, dim=0),
@@ -268,13 +270,13 @@ class Mask:
         )
 
         # Create sparse mask
-        sparse_mask = cls.create_mask_from_indices(
+        sparse_mask: Mask = cls.create_mask_from_indices(
             shape, valid_flat_indices, ptr, valid_values, dtype
         )
 
         if type == "dense":
             # Convert to dense representation
-            dense_mask = sparse_mask.get_dense_mask()
+            dense_mask: torch.Tensor = sparse_mask.get_dense_mask()
             return cls.create_mask_from_dense_mask(shape, dense_mask, dtype)
         elif type == "index":
             return sparse_mask
@@ -290,13 +292,15 @@ class Mask:
         """
         if self.is_full:
             # For full masks, generate all indices with value 1.0
-            total_size = int(np.prod(self.shape))
-            indices = torch.arange(total_size, dtype=torch.long)
-            data = torch.ones(total_size, dtype=self.dtype)
+            total_size: int = int(np.prod(self.shape))
+            indices: torch.Tensor = torch.arange(total_size, dtype=torch.long)
+            data: torch.Tensor = torch.ones(total_size, dtype=self.dtype)
 
             # Create ptr array
-            n_cols = self.shape[-1]
-            ptr = torch.arange(0, total_size + 1, n_cols, dtype=torch.long)
+            n_cols: int = self.shape[-1]
+            ptr: torch.Tensor = torch.arange(
+                0, total_size + 1, n_cols, dtype=torch.long
+            )
 
             return indices, ptr, data
         elif self.from_index:
@@ -304,26 +308,28 @@ class Mask:
                 raise RuntimeError("Sparse mask indices or ptr is None")
             if self.data is None:
                 # If no data is provided, assume 1.0 values
-                data = torch.ones(
+                data: torch.Tensor = torch.ones(
                     self.indices.numel(), dtype=self.dtype, device=self.indices.device
                 )
             else:
-                data = self.data
+                data: torch.Tensor = self.data
             return self.indices, self.ptr, data
         elif self.from_dense_mask:
             if self.mask is None:
                 raise RuntimeError("Dense mask is None")
             # Convert dense representation to sparse representation
             # Find non-zero indices
-            non_zero_indices = torch.nonzero(
+            non_zero_indices: torch.Tensor = torch.nonzero(
                 self.mask.view(-1), as_tuple=False
             ).squeeze(-1)
-            data = self.mask.view(-1)[non_zero_indices]
+            data: torch.Tensor = self.mask.view(-1)[non_zero_indices]
 
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             # Vectorized version: count nonzero per row and cumsum
-            counts = torch.count_nonzero(self.mask.view(-1, self.shape[-1]), dim=1)
-            ptr = torch.cat(
+            counts: torch.Tensor = torch.count_nonzero(
+                self.mask.view(-1, self.shape[-1]), dim=1
+            )
+            ptr: torch.Tensor = torch.cat(
                 [
                     torch.zeros(1, dtype=torch.long, device=self.mask.device),
                     torch.cumsum(counts, dim=0),
@@ -353,8 +359,10 @@ class Mask:
                 raise RuntimeError("Sparse mask indices or ptr is None")
             # Convert sparse representation to dense mask
             # Ensure dense mask is on the same device as indices/data
-            device = self.indices.device
-            dense_mask = torch.zeros(self.shape, dtype=self.dtype, device=device)
+            device: torch.device = self.indices.device
+            dense_mask: torch.Tensor = torch.zeros(
+                self.shape, dtype=self.dtype, device=device
+            )
             if len(self.indices) > 0:
                 if self.data is not None:
                     dense_mask.view(-1)[self.indices] = self.data
@@ -426,17 +434,17 @@ class Mask:
         if self.from_dense_mask:
             if self.mask is None:
                 raise RuntimeError("Dense mask is None")
-            mask = self.mask
+            mask: torch.Tensor = self.mask
         elif self.from_index:
-            mask = self.get_dense_mask()
+            mask: torch.Tensor = self.get_dense_mask()
         else:
             raise RuntimeError("Mask object is in an invalid state")
 
         # Create output tensor
-        output = torch.zeros_like(input_tensor)
+        output: torch.Tensor = torch.zeros_like(input_tensor)
 
         # Apply inverse mask logic
-        non_zero_mask = mask != 0
+        non_zero_mask: torch.Tensor = mask != 0
         output[non_zero_mask] = input_tensor[non_zero_mask] * (
             1.0 / mask[non_zero_mask]
         )
@@ -463,19 +471,19 @@ class Mask:
         """
 
         if mask_type == "dense":
-            empty_mask = torch.zeros(shape, dtype=dtype)
+            empty_mask: torch.Tensor = torch.zeros(shape, dtype=dtype)
             return cls.create_mask_from_dense_mask(shape, empty_mask, dtype)
         elif mask_type == "index":
             # For an empty mask, we have no non-zero indices
-            empty_indices = torch.empty(0, dtype=torch.long)
+            empty_indices: torch.Tensor = torch.empty(0, dtype=torch.long)
 
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             # All rows have 0 non-zero elements, so ptr is just zeros
-            ptr_size = int(np.prod(shape[:-1]) + 1)
-            ptr = torch.zeros(ptr_size, dtype=torch.long)
+            ptr_size: int = int(np.prod(shape[:-1]) + 1)
+            ptr: torch.Tensor = torch.zeros(ptr_size, dtype=torch.long)
 
             # No data since all values are zero
-            data = torch.empty(0, dtype=dtype)
+            data: torch.Tensor = torch.empty(0, dtype=dtype)
 
             return cls.create_mask_from_indices(shape, empty_indices, ptr, data, dtype)
         else:
@@ -539,10 +547,16 @@ class Mask:
             else:
                 return Mask.create_full_mask(self.shape, self.dtype)
 
+        self_indices: torch.Tensor
+        self_ptr: torch.Tensor
+        self_data: torch.Tensor
         self_indices, self_ptr, self_data = self.get_index_mask()
+        other_indices: torch.Tensor
+        other_ptr: torch.Tensor
+        other_data: torch.Tensor
         other_indices, other_ptr, other_data = other_mask.get_index_mask()
 
-        device = (
+        device: torch.device = (
             self_indices.device
             if self_indices.numel() > 0
             else (
@@ -553,10 +567,14 @@ class Mask:
         )
 
         if self_indices.numel() == 0 and other_indices.numel() == 0:
-            final_indices = torch.empty(0, dtype=torch.long, device=device)
-            final_data = torch.empty(0, dtype=self.dtype, device=device)
-            num_rows = int(np.prod(self.shape[:-1]))
-            final_ptr = torch.zeros(num_rows + 1, dtype=torch.long, device=device)
+            final_indices: torch.Tensor = torch.empty(
+                0, dtype=torch.long, device=device
+            )
+            final_data: torch.Tensor = torch.empty(0, dtype=self.dtype, device=device)
+            num_rows: int = int(np.prod(self.shape[:-1]))
+            final_ptr: torch.Tensor = torch.zeros(
+                num_rows + 1, dtype=torch.long, device=device
+            )
         elif self_indices.numel() == 0:
             final_indices = other_indices
             final_data = torch.clamp(other_data, 0.0, 1.0)
@@ -566,17 +584,21 @@ class Mask:
             final_data = torch.clamp(self_data, 0.0, 1.0)
             final_ptr = self_ptr
         else:
-            all_indices = torch.cat([self_indices, other_indices])
-            all_data = torch.cat([self_data, other_data])
+            all_indices: torch.Tensor = torch.cat([self_indices, other_indices])
+            all_data: torch.Tensor = torch.cat([self_data, other_data])
 
+            sorted_indices: torch.Tensor
+            sort_order: torch.Tensor
             sorted_indices, sort_order = torch.sort(all_indices)
-            sorted_data = all_data[sort_order]
+            sorted_data: torch.Tensor = all_data[sort_order]
 
+            unique_indices: torch.Tensor
+            inverse_indices: torch.Tensor
             unique_indices, inverse_indices = torch.unique_consecutive(
                 sorted_indices, return_inverse=True
             )
 
-            summed_data = torch.zeros(
+            summed_data: torch.Tensor = torch.zeros(
                 unique_indices.numel(), dtype=self.dtype, device=device
             )
             summed_data.scatter_add_(0, inverse_indices, sorted_data)
@@ -585,11 +607,11 @@ class Mask:
             final_indices = unique_indices
 
             # Reconstruct ptr array by counting elements per row
-            num_rows = int(np.prod(self.shape[:-1]))
-            n_cols = self.shape[-1]
-            row_indices = final_indices // n_cols
-            row_counts = torch.bincount(row_indices, minlength=num_rows)
-            final_ptr = torch.cat(
+            num_rows: int = int(np.prod(self.shape[:-1]))
+            n_cols: int = self.shape[-1]
+            row_indices: torch.Tensor = final_indices // n_cols
+            row_counts: torch.Tensor = torch.bincount(row_indices, minlength=num_rows)
+            final_ptr: torch.Tensor = torch.cat(
                 [
                     torch.zeros(1, dtype=torch.long, device=device),
                     torch.cumsum(row_counts, dim=0),
@@ -597,7 +619,7 @@ class Mask:
             )
 
         # Check if the result is a full mask
-        expected_size = int(np.prod(self.shape))
+        expected_size: int = int(np.prod(self.shape))
         if final_indices.numel() == expected_size and torch.all(final_data == 1.0):
             # Result is a full mask, use optimization
             if inplace:

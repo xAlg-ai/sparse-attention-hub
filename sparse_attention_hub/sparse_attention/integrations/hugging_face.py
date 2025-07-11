@@ -38,7 +38,7 @@ class SparseAttentionHF(SparseAttentionGen):
         Returns:
             Instance of SparseAttentionHF with the appropriate sparse attention mechanism.
         """
-        sparse_attention = SparseAttention.create_from_config(config)
+        sparse_attention: SparseAttention = SparseAttention.create_from_config(config)
         return cls(sparse_attention)
 
     def get_custom_attention_function(self) -> Callable:
@@ -63,7 +63,7 @@ class SparseAttentionHF(SparseAttentionGen):
                 kwargs["layer_idx"] = module.layer_idx
 
             if "sparse_meta_data" in kwargs:
-                sparse_meta_data = kwargs["sparse_meta_data"]
+                sparse_meta_data: Dict[Any, Any] = kwargs["sparse_meta_data"]
                 kwargs.pop("sparse_meta_data", None)
 
             else:
@@ -102,7 +102,9 @@ class SparseAttentionHF(SparseAttentionGen):
                 return name
 
     @contextmanager
-    def __call__(self, model: PreTrainedModel) -> Generator[PreTrainedModel, None, None]:
+    def __call__(
+        self, model: PreTrainedModel
+    ) -> Generator[PreTrainedModel, None, None]:
         """Execute the sparse attention mechanism.
 
         This method registers a custom attention function with ALL_ATTENTION_FUNCTIONS,
@@ -127,7 +129,7 @@ class SparseAttentionHF(SparseAttentionGen):
 
         try:
             custom_attention_fn: Callable = self.get_custom_attention_function()
-            custom_attention_name = self._generate_unique_attention_name()
+            custom_attention_name: str = self._generate_unique_attention_name()
             from transformers.masking_utils import eager_mask
 
             ALL_ATTENTION_FUNCTIONS.register(custom_attention_name, custom_attention_fn)

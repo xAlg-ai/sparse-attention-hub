@@ -75,19 +75,25 @@ class EfficientAttention(SparseAttention):
         )
 
         # Registry mapping config types to concrete efficient attention classes
-        _EFFICIENT_ATTENTION_REGISTRY: Dict[Type[EfficientAttentionConfig], Type[EfficientAttention]] = {
+        _EFFICIENT_ATTENTION_REGISTRY: Dict[
+            Type[EfficientAttentionConfig], Type[EfficientAttention]
+        ] = {
             DoubleSparsityConfig: DoubleSparsity,
             HashAttentionConfig: HashAttention,
         }
 
         # Look up the concrete class based on the config type
-        concrete_class: Optional[Type[EfficientAttention]] = _EFFICIENT_ATTENTION_REGISTRY.get(type(config))
+        concrete_class: Optional[
+            Type[EfficientAttention]
+        ] = _EFFICIENT_ATTENTION_REGISTRY.get(type(config))
         if concrete_class is None:
             raise ValueError(
                 f"No efficient attention class found for config type: {type(config)}"
             )
 
         # Cast to help mypy understand the type
-        concrete_class = cast(Type[EfficientAttention], concrete_class)
+        concrete_class: Type[EfficientAttention] = cast(
+            Type[EfficientAttention], concrete_class
+        )
         # Call the concrete class's create_from_config method
         return concrete_class.create_from_config(config)

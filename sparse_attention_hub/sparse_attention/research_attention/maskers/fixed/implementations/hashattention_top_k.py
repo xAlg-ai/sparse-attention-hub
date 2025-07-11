@@ -62,21 +62,25 @@ class HashAttentionTopKMasker(TopKMasker):
         **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add hash attention top-K mask to enable hash-based attention selection."""
-        layer_idx = self._validate_inputs(sparse_meta_data, kwargs)
+        layer_idx: int = self._validate_inputs(sparse_meta_data, kwargs)
 
         if previous_mask.is_full_mask():
             return previous_mask
 
-        tensor_dims = self._extract_tensor_dimensions(keys, queries)
-        effective_heavy_size = self._calculate_effective_heavy_size(
+        tensor_dims: AttentionTensorDimensions = self._extract_tensor_dimensions(
+            keys, queries
+        )
+        effective_heavy_size: int = self._calculate_effective_heavy_size(
             tensor_dims.seq_len_keys
         )
 
         if self._should_use_full_attention(tensor_dims, effective_heavy_size):
             return self._create_full_mask(tensor_dims, previous_mask.dtype)
 
-        remaining_kwargs = {k: v for k, v in kwargs.items() if k != "layer_idx"}
-        hash_mask = self._create_hash_topk_mask(
+        remaining_kwargs: Dict[str, Any] = {
+            k: v for k, v in kwargs.items() if k != "layer_idx"
+        }
+        hash_mask: Mask = self._create_hash_topk_mask(
             tensor_dims,
             effective_heavy_size,
             keys,
@@ -89,7 +93,9 @@ class HashAttentionTopKMasker(TopKMasker):
         return previous_mask.merge_mask(hash_mask, inplace=False)
 
     def _validate_inputs(
-        self, sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]], kwargs: Dict[str, Any]
+        self,
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
+        kwargs: Dict[str, Any],
     ) -> int:
         """Validate required inputs for hash attention computation and return layer_idx."""
         if sparse_meta_data is None:
@@ -114,6 +120,8 @@ class HashAttentionTopKMasker(TopKMasker):
         self, tensor: torch.Tensor, layer_idx: int, tensor_type: str
     ) -> torch.Tensor:
         """Compute signatures for a specific tensor type (key or query)."""
+        matrix_list: List[torch.Tensor]
+        bias_list: List[torch.Tensor]
         matrix_list, bias_list = self._extract_weights_for_tensor_type(
             layer_idx, tensor_type
         )
@@ -141,10 +149,10 @@ class HashAttentionTopKMasker(TopKMasker):
         **kwargs: Dict[str, Any],
     ) -> Mask:
         """Create hash attention top-K mask using hash-based scoring."""
-        scores = self._compute_hashattention_score(
+        scores: torch.Tensor = self._compute_hashattention_score(
             queries, keys, sparse_meta_data, layer_idx, **kwargs
         )
-        top_k_indices = self._get_topk_indices_from_inactive_positions(
+        top_k_indices: torch.Tensor = self._get_topk_indices_from_inactive_positions(
             scores, previous_mask, heavy_size
         )
         return self._create_mask_from_rowise_indices(
@@ -170,7 +178,9 @@ class HashAttentionTopKMasker(TopKMasker):
                 f"Unsupported activation function: {self.hat_mlp_activation}"
             )
 
-        activation_fn: Callable[[torch.Tensor], torch.Tensor] = activation_map[self.hat_mlp_activation]
+        activation_fn: Callable[[torch.Tensor], torch.Tensor] = activation_map[
+            self.hat_mlp_activation
+        ]
         signatures: torch.Tensor = input_tensor
 
         for i in range(len(matrix_list) - 1):
@@ -194,7 +204,9 @@ class HashAttentionTopKMasker(TopKMasker):
     ) -> torch.Tensor:
         """Apply a single linear layer (matrix multiplication + bias addition)."""
         # (B,H,s,d) x (H,d,d_out) -> (B,H,s,d_out)
-        output = torch.einsum("bhsd,hde->bhse", input_tensor, weight_matrix)
+        output: torch.Tensor = torch.einsum(
+            "bhsd,hde->bhse", input_tensor, weight_matrix
+        )
         # (B,H,s,d_out) + (H,d_out) -> (B,H,s,d_out)
         output = output + bias_vector.unsqueeze(0).unsqueeze(2)
         return output
@@ -208,6 +220,8 @@ class HashAttentionTopKMasker(TopKMasker):
     ) -> torch.Tensor:
         """Update key signatures in sparse_meta_data and return concatenated signatures."""
         self._initialize_key_signature_cache(sparse_meta_data, layer_idx)
+        cached_signatures: Optional[torch.Tensor]
+        new_keys: Optional[torch.Tensor]
         cached_signatures, new_keys = self._determine_new_keys(
             keys, sparse_meta_data, layer_idx
         )
@@ -218,7 +232,7 @@ class HashAttentionTopKMasker(TopKMasker):
             ), "cached_signatures should not be None when new_keys is None"
             return cached_signatures
 
-        new_signatures = self._compute_signatures_for_tensor_type(
+        new_signatures: torch.Tensor = self._compute_signatures_for_tensor_type(
             new_keys, layer_idx, "key"
         )
         return self._update_and_return_key_signatures(
@@ -249,20 +263,20 @@ class HashAttentionTopKMasker(TopKMasker):
             - If cached_signatures is None, all keys are new
             - If new_keys is None, no new keys to process (return cached_signatures)
         """
-        cached_signatures = sparse_meta_data["key"][layer_idx]
+        cached_signatures: Optional[torch.Tensor] = sparse_meta_data["key"][layer_idx]
 
         if cached_signatures is None:
             return None, keys
 
-        cached_num_keys = cached_signatures.shape[2]
-        current_num_keys = keys.shape[2]
+        cached_num_keys: int = cached_signatures.shape[2]
+        current_num_keys: int = keys.shape[2]
 
         if current_num_keys < cached_num_keys:
             raise ValueError(
                 f"Current number of keys ({current_num_keys}) is less than cached number of keys ({cached_num_keys})"
             )
         elif current_num_keys > cached_num_keys:
-            new_keys = keys[:, :, cached_num_keys:, :]
+            new_keys: torch.Tensor = keys[:, :, cached_num_keys:, :]
             return cached_signatures, new_keys
         else:
             return cached_signatures, None
@@ -279,7 +293,7 @@ class HashAttentionTopKMasker(TopKMasker):
             sparse_meta_data["key"][layer_idx] = new_signatures
             return new_signatures
         else:
-            concatenated_signatures = torch.cat(
+            concatenated_signatures: torch.Tensor = torch.cat(
                 [cached_signatures, new_signatures], dim=2
             )
             sparse_meta_data["key"][layer_idx] = concatenated_signatures
@@ -294,13 +308,13 @@ class HashAttentionTopKMasker(TopKMasker):
         **kwargs: Dict[str, Any],
     ) -> torch.Tensor:
         """Compute hash attention scores using query and key signatures."""
-        num_key_value_groups = _get_num_key_value_groups(queries, keys)
-        processed_keys = repeat_kv(keys, num_key_value_groups)
+        num_key_value_groups: int = _get_num_key_value_groups(queries, keys)
+        processed_keys: torch.Tensor = repeat_kv(keys, num_key_value_groups)
 
-        key_signatures = self._update_key_signatures(
+        key_signatures: torch.Tensor = self._update_key_signatures(
             processed_keys, sparse_meta_data, layer_idx, **kwargs
         )
-        query_signatures = self._compute_signatures_for_tensor_type(
+        query_signatures: torch.Tensor = self._compute_signatures_for_tensor_type(
             queries, layer_idx, "query"
         )
 

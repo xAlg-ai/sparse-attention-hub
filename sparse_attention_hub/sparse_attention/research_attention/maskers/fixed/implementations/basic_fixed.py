@@ -47,8 +47,10 @@ class LocalMasker(FixedMasker):
         if previous_mask.is_full_mask():
             return previous_mask
 
-        tensor_dims = self._extract_tensor_dimensions(keys, queries)
-        effective_window_size = self._calculate_effective_window_size(
+        tensor_dims: AttentionTensorDimensions = self._extract_tensor_dimensions(
+            keys, queries
+        )
+        effective_window_size: int = self._calculate_effective_window_size(
             tensor_dims.seq_len_keys
         )
 
@@ -57,7 +59,7 @@ class LocalMasker(FixedMasker):
             return self._create_full_mask(tensor_dims, previous_mask.dtype)
 
         # Create local attention mask
-        local_mask = self._create_local_mask(
+        local_mask: Mask = self._create_local_mask(
             tensor_dims, effective_window_size, keys.device, previous_mask.dtype
         )
         return previous_mask.merge_mask(local_mask, inplace=False)
@@ -80,7 +82,9 @@ class LocalMasker(FixedMasker):
         dtype: torch.dtype,
     ) -> Mask:
         """Create local attention mask using vectorized computation."""
-        window_indices = self._compute_window_indices(dims, window_size, device)
+        window_indices: torch.Tensor = self._compute_window_indices(
+            dims, window_size, device
+        )
         return self._create_mask_from_rowise_indices(
             dims, window_indices, device, dtype
         )
@@ -99,10 +103,14 @@ class LocalMasker(FixedMasker):
         )
 
         # Create offset indices for the window
-        window_offsets: torch.Tensor = torch.arange(window_size, device=device, dtype=torch.long)
+        window_offsets: torch.Tensor = torch.arange(
+            window_size, device=device, dtype=torch.long
+        )
 
         # Compute all window indices: window_start + offset for each query
-        window_indices: torch.Tensor = window_starts.unsqueeze(1) + window_offsets.unsqueeze(0)
+        window_indices: torch.Tensor = window_starts.unsqueeze(
+            1
+        ) + window_offsets.unsqueeze(0)
         window_indices = torch.clamp(window_indices, 0, dims.seq_len_keys - 1)
 
         # Expand to match batch and head dimensions
@@ -182,8 +190,10 @@ class SinkMasker(FixedMasker):
         if previous_mask.is_full_mask():
             return previous_mask
 
-        tensor_dims = self._extract_tensor_dimensions(keys, queries)
-        effective_sink_size = self._calculate_effective_sink_size(
+        tensor_dims: AttentionTensorDimensions = self._extract_tensor_dimensions(
+            keys, queries
+        )
+        effective_sink_size: int = self._calculate_effective_sink_size(
             tensor_dims.seq_len_keys
         )
 
@@ -192,7 +202,7 @@ class SinkMasker(FixedMasker):
             return self._create_full_mask(tensor_dims, previous_mask.dtype)
 
         # Create sink attention mask
-        sink_mask = self._create_sink_mask(
+        sink_mask: Mask = self._create_sink_mask(
             tensor_dims, effective_sink_size, keys.device, previous_mask.dtype
         )
         return previous_mask.merge_mask(sink_mask, inplace=False)
@@ -215,7 +225,7 @@ class SinkMasker(FixedMasker):
         dtype: torch.dtype,
     ) -> Mask:
         """Create sink attention mask using vectorized computation."""
-        sink_indices = self._compute_sink_indices(dims, sink_size, device)
+        sink_indices: torch.Tensor = self._compute_sink_indices(dims, sink_size, device)
         return self._create_mask_from_rowise_indices(dims, sink_indices, device, dtype)
 
     def _compute_sink_indices(
