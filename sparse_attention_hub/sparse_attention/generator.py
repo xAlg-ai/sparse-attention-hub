@@ -1,7 +1,6 @@
 """Sparse attention generators and interfaces (bare metal)."""
 
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 from typing import Any, Callable
 
 from transformers import PreTrainedModel

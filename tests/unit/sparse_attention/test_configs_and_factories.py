@@ -259,7 +259,7 @@ class TestSparseAttentionConfigsAndFactories:
             attention_mask=attention_mask,
             scaling=scaling,
             dropout=dropout,
-            sparse_meta_data={}
+            sparse_meta_data={},
         )
         assert result[0] is not None  # attention_output should not be None
 

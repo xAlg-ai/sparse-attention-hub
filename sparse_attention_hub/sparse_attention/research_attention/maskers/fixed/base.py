@@ -61,16 +61,13 @@ class TopKMasker(FixedMasker):
         super().__init__(config)
 
     def _get_topk_indices_from_inactive_positions(
-        self, 
-        scores: torch.Tensor, 
-        previous_mask: Mask, 
-        k: int
+        self, scores: torch.Tensor, previous_mask: Mask, k: int
     ) -> torch.Tensor:
         """Get top-K indices from positions not already active in previous mask."""
         previous_dense_mask = previous_mask.get_dense_mask()
         masked_scores = scores.clone()
         masked_scores[previous_dense_mask != 0] = float("-inf")
-        
+
         _, top_k_indices = torch.topk(masked_scores, k=k, dim=-1, largest=True)
         return top_k_indices
 

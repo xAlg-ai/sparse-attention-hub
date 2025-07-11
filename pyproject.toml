@@ -153,3 +153,4 @@ module = [
     "wandb.*",
 ]
 ignore_missing_imports = true
+ignore_errors = true

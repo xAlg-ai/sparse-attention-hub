@@ -6,9 +6,9 @@ from typing import Any, Dict
 import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+    AttentionTensorDimensions,
     MaskerConfig,
     MaskerRegistry,
-    AttentionTensorDimensions,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -46,38 +46,50 @@ class OracleTopK(TopKMasker):
             return previous_mask
 
         tensor_dims = self._extract_tensor_dimensions(keys, queries)
-        effective_heavy_size = self._calculate_effective_heavy_size(tensor_dims.seq_len_keys)
-        
+        effective_heavy_size = self._calculate_effective_heavy_size(
+            tensor_dims.seq_len_keys
+        )
+
         # If sequence is small enough, use full attention
         if self._should_use_full_attention(tensor_dims, effective_heavy_size):
             return self._create_full_mask(tensor_dims, previous_mask.dtype)
-        
+
         # Create oracle top-K mask
-        oracle_mask = self._create_oracle_topk_mask(tensor_dims, effective_heavy_size, keys, queries, previous_mask)
+        oracle_mask = self._create_oracle_topk_mask(
+            tensor_dims, effective_heavy_size, keys, queries, previous_mask
+        )
         return previous_mask.merge_mask(oracle_mask, inplace=False)
 
     def _calculate_effective_heavy_size(self, seq_len_keys: int) -> int:
         """Calculate the effective heavy size based on configuration."""
         return self._calculate_effective_size(self.heavy_size, seq_len_keys)
 
-    def _should_use_full_attention(self, dims: AttentionTensorDimensions, heavy_size: int) -> bool:
+    def _should_use_full_attention(
+        self, dims: AttentionTensorDimensions, heavy_size: int
+    ) -> bool:
         """Determine if full attention should be used instead of oracle top-K attention."""
         return dims.seq_len_keys <= heavy_size
 
     def _create_oracle_topk_mask(
-        self, 
-        dims: AttentionTensorDimensions, 
-        heavy_size: int, 
-        keys: torch.Tensor, 
-        queries: torch.Tensor, 
-        previous_mask: Mask
+        self,
+        dims: AttentionTensorDimensions,
+        heavy_size: int,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        previous_mask: Mask,
     ) -> Mask:
         """Create oracle top-K mask using raw attention scores."""
         raw_attention_scores = self._compute_raw_attention_scores(keys, queries)
-        top_k_indices = self._get_topk_indices_from_inactive_positions(raw_attention_scores, previous_mask, heavy_size)
-        return self._create_mask_from_rowise_indices(dims, top_k_indices, keys.device, previous_mask.dtype)
+        top_k_indices = self._get_topk_indices_from_inactive_positions(
+            raw_attention_scores, previous_mask, heavy_size
+        )
+        return self._create_mask_from_rowise_indices(
+            dims, top_k_indices, keys.device, previous_mask.dtype
+        )
 
-    def _compute_raw_attention_scores(self, keys: torch.Tensor, queries: torch.Tensor) -> torch.Tensor:
+    def _compute_raw_attention_scores(
+        self, keys: torch.Tensor, queries: torch.Tensor
+    ) -> torch.Tensor:
         """Compute raw attention scores using query-key dot product."""
         return torch.matmul(queries, keys.transpose(-2, -1))
 

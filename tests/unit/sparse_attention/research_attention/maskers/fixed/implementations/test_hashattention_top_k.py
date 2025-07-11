@@ -42,7 +42,7 @@ def basic_config(sample_weights):
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
         HashAttentionTopKMaskerConfig,
     )
-    
+
     return HashAttentionTopKMaskerConfig(
         heavy_size=2,
         hat_bits=4,
@@ -59,7 +59,7 @@ def large_config(large_sample_weights):
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
         HashAttentionTopKMaskerConfig,
     )
-    
+
     return HashAttentionTopKMaskerConfig(
         heavy_size=10,
         hat_bits=4,
@@ -76,7 +76,7 @@ def float_heavy_size_config(sample_weights):
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
         HashAttentionTopKMaskerConfig,
     )
-    
+
     return HashAttentionTopKMaskerConfig(
         heavy_size=0.4,
         hat_bits=4,
@@ -93,7 +93,7 @@ def large_heavy_size_config(sample_weights):
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
         HashAttentionTopKMaskerConfig,
     )
-    
+
     return HashAttentionTopKMaskerConfig(
         heavy_size=8,
         hat_bits=4,
@@ -110,7 +110,7 @@ def activation_config(request, sample_weights):
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
         HashAttentionTopKMaskerConfig,
     )
-    
+
     return HashAttentionTopKMaskerConfig(
         heavy_size=2,
         hat_bits=4,
@@ -150,35 +150,48 @@ def large_test_tensors():
         "seq_len_keys": seq_len_keys,
     }
 
+
 @pytest.mark.unit
 class TestHashAttentionTopKMaskerManual:
-    def test_get_signatures(self,basic_config,test_tensors):
+    def test_get_signatures(self, basic_config, test_tensors):
         """Test that get_signatures works."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
         )
+
         masker = HashAttentionTopKMasker(basic_config)
         signature = masker._get_signatures(
             input_tensor=test_tensors["keys"],
-            matrix_list = basic_config.hat_weights[0]["key_matrix"],
-            bias_list = basic_config.hat_weights[0]["key_bias"],
+            matrix_list=basic_config.hat_weights[0]["key_matrix"],
+            bias_list=basic_config.hat_weights[0]["key_bias"],
         )
         assert signature is not None
-        assert signature.shape == (test_tensors["batch_size"], test_tensors["num_heads"], test_tensors["seq_len_keys"], basic_config.hat_bits)
+        assert signature.shape == (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_keys"],
+            basic_config.hat_bits,
+        )
 
-
-    def test_update_signatures(self,basic_config,test_tensors):
+    def test_update_signatures(self, basic_config, test_tensors):
         """Test that update_signatures works with two subsequent calls correctly."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
         )
-       
+
         masker = HashAttentionTopKMasker(basic_config)
         # phase 1 only 3 keys are processed
         sparse_meta_data = {}
-        with mock.patch("sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._get_signatures") as mock_get_signatures:
+        with mock.patch(
+            "sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._get_signatures"
+        ) as mock_get_signatures:
             input_tensor = test_tensors["keys"][:, :, :3, :]
-            mock_get_signatures.return_value = torch.randn(test_tensors["batch_size"], test_tensors["num_heads"], input_tensor.shape[2], basic_config.hat_bits)
+            mock_get_signatures.return_value = torch.randn(
+                test_tensors["batch_size"],
+                test_tensors["num_heads"],
+                input_tensor.shape[2],
+                basic_config.hat_bits,
+            )
             partial_signature_1 = masker._update_key_signatures(
                 keys=input_tensor,
                 sparse_meta_data=sparse_meta_data,
@@ -186,31 +199,51 @@ class TestHashAttentionTopKMaskerManual:
             )
         assert sparse_meta_data["key"][0].shape[2] == 3
 
-        with mock.patch("sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._get_signatures") as mock_get_signatures:
+        with mock.patch(
+            "sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._get_signatures"
+        ) as mock_get_signatures:
             rest_tensor = test_tensors["keys"][:, :, 3:, :]
-            mock_get_signatures.return_value = torch.randn(test_tensors["batch_size"], test_tensors["num_heads"], rest_tensor.shape[2], basic_config.hat_bits)
+            mock_get_signatures.return_value = torch.randn(
+                test_tensors["batch_size"],
+                test_tensors["num_heads"],
+                rest_tensor.shape[2],
+                basic_config.hat_bits,
+            )
             partial_signature_2 = masker._update_key_signatures(
-                keys=test_tensors["keys"], # passing full tensor
+                keys=test_tensors["keys"],  # passing full tensor
                 sparse_meta_data=sparse_meta_data,
                 layer_idx=0,
             )
-        
+
         assert sparse_meta_data["key"][0].shape[2] == test_tensors["seq_len_keys"]
-        assert torch.allclose(partial_signature_1, partial_signature_2[:,:,:3,:])
+        assert torch.allclose(partial_signature_1, partial_signature_2[:, :, :3, :])
 
-
-
-    def test_compute_hashattetion_scores(self,basic_config,test_tensors):
+    def test_compute_hashattetion_scores(self, basic_config, test_tensors):
         """Test that compute_hashattetion_scores works."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
         )
+
         masker = HashAttentionTopKMasker(basic_config)
         sparse_meta_data = {}
-        with mock.patch("sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._update_key_signatures") as mock_update_key_signatures:
-            with mock.patch("sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._get_signatures") as mock_get_signatures:
-                key_signatures = torch.randn(test_tensors["batch_size"], test_tensors["num_heads"], test_tensors["seq_len_keys"], basic_config.hat_bits)
-                query_signatures = torch.randn(test_tensors["batch_size"], test_tensors["num_heads"], test_tensors["seq_len_queries"], basic_config.hat_bits)
+        with mock.patch(
+            "sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._update_key_signatures"
+        ) as mock_update_key_signatures:
+            with mock.patch(
+                "sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.HashAttentionTopKMasker._get_signatures"
+            ) as mock_get_signatures:
+                key_signatures = torch.randn(
+                    test_tensors["batch_size"],
+                    test_tensors["num_heads"],
+                    test_tensors["seq_len_keys"],
+                    basic_config.hat_bits,
+                )
+                query_signatures = torch.randn(
+                    test_tensors["batch_size"],
+                    test_tensors["num_heads"],
+                    test_tensors["seq_len_queries"],
+                    basic_config.hat_bits,
+                )
                 mock_update_key_signatures.return_value = key_signatures
                 mock_get_signatures.return_value = query_signatures
                 scores = masker._compute_hashattention_score(
@@ -219,9 +252,9 @@ class TestHashAttentionTopKMaskerManual:
                     sparse_meta_data=sparse_meta_data,
                     layer_idx=0,
                 )
-                true_scores = query_signatures @ key_signatures.transpose(2,3)
+                true_scores = query_signatures @ key_signatures.transpose(2, 3)
         assert torch.allclose(scores, true_scores)
-        
+
 
 @pytest.mark.unit
 class TestHashAttentionTopKMaskerImplementation:
@@ -240,7 +273,7 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
         )
-        
+
         masker = HashAttentionTopKMasker(large_config)
         assert type(masker) is HashAttentionTopKMasker
         assert masker.config == large_config
@@ -250,7 +283,7 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
         )
-        
+
         masker = HashAttentionTopKMasker.create_from_config(large_config)
         assert type(masker) is HashAttentionTopKMasker
         assert masker.config == large_config
@@ -277,7 +310,9 @@ class TestHashAttentionTopKMaskerImplementation:
 
         assert issubclass(HashAttentionTopKMaskerConfig, TopKMaskerConfig)
 
-    def test_hash_attention_top_k_masker_add_mask_input_validation(self, basic_config, test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_input_validation(
+        self, basic_config, test_tensors
+    ):
         """Test HashAttentionTopKMasker add_mask input validation."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -285,9 +320,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(basic_config)
-        
-        mask_shape = (test_tensors["batch_size"], test_tensors["num_heads"], 
-                     test_tensors["seq_len_queries"], test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_queries"],
+            test_tensors["seq_len_keys"],
+        )
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         # Test sparse_meta_data None
@@ -312,7 +351,9 @@ class TestHashAttentionTopKMaskerImplementation:
                 previous_mask=empty_previous_mask,
             )
 
-    def test_hash_attention_top_k_masker_add_mask_full_previous(self, basic_config, test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_full_previous(
+        self, basic_config, test_tensors
+    ):
         """Test HashAttentionTopKMasker returns previous mask when it's full."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -320,9 +361,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(basic_config)
-        
-        mask_shape = (test_tensors["batch_size"], test_tensors["num_heads"], 
-                     test_tensors["seq_len_queries"], test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_queries"],
+            test_tensors["seq_len_keys"],
+        )
         full_previous_mask = Mask.create_full_mask(mask_shape)
 
         result = masker.add_mask(
@@ -339,7 +384,9 @@ class TestHashAttentionTopKMaskerImplementation:
         assert result.is_full_mask()
         assert result.shape == mask_shape
 
-    def test_hash_attention_top_k_masker_add_mask_small_sequence(self, large_heavy_size_config, large_test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_small_sequence(
+        self, large_heavy_size_config, large_test_tensors
+    ):
         """Test HashAttentionTopKMasker returns full mask when seq_len_keys <= heavy_size."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -347,9 +394,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(large_heavy_size_config)
-        
-        mask_shape = (large_test_tensors["batch_size"], large_test_tensors["num_heads"], 
-                     large_test_tensors["seq_len_queries"], large_test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            large_test_tensors["batch_size"],
+            large_test_tensors["num_heads"],
+            large_test_tensors["seq_len_queries"],
+            large_test_tensors["seq_len_keys"],
+        )
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         result = masker.add_mask(
@@ -365,7 +416,9 @@ class TestHashAttentionTopKMaskerImplementation:
         assert result.is_full_mask()
         assert result.shape == mask_shape
 
-    def test_hash_attention_top_k_masker_add_mask_integer_heavy_size(self, basic_config, test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_integer_heavy_size(
+        self, basic_config, test_tensors
+    ):
         """Test HashAttentionTopKMasker with integer heavy_size."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -373,9 +426,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(basic_config)
-        
-        mask_shape = (test_tensors["batch_size"], test_tensors["num_heads"], 
-                     test_tensors["seq_len_queries"], test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_queries"],
+            test_tensors["seq_len_keys"],
+        )
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         result = masker.add_mask(
@@ -400,7 +457,9 @@ class TestHashAttentionTopKMaskerImplementation:
                     num_attended == 2
                 ), f"Head {h}, Query {q} should attend to 2 keys, got {num_attended}"
 
-    def test_hash_attention_top_k_masker_add_mask_float_heavy_size(self, float_heavy_size_config, test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_float_heavy_size(
+        self, float_heavy_size_config, test_tensors
+    ):
         """Test HashAttentionTopKMasker with float heavy_size (proportion of seq_len_keys)."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -408,9 +467,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(float_heavy_size_config)
-        
-        mask_shape = (test_tensors["batch_size"], test_tensors["num_heads"], 
-                     test_tensors["seq_len_queries"], test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_queries"],
+            test_tensors["seq_len_keys"],
+        )
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         result = masker.add_mask(
@@ -435,7 +498,9 @@ class TestHashAttentionTopKMaskerImplementation:
                     num_attended == 2
                 ), f"Head {h}, Query {q} should attend to 2 keys, got {num_attended}"
 
-    def test_hash_attention_top_k_masker_add_mask_merge_with_previous(self, basic_config, large_test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_merge_with_previous(
+        self, basic_config, large_test_tensors
+    ):
         """Test HashAttentionTopKMasker merges correctly with non-empty previous mask."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -443,10 +508,14 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(basic_config)
-        
+
         # Create previous mask with last 2 positions active
-        mask_shape = (large_test_tensors["batch_size"], large_test_tensors["num_heads"], 
-                     large_test_tensors["seq_len_queries"], large_test_tensors["seq_len_keys"])
+        mask_shape = (
+            large_test_tensors["batch_size"],
+            large_test_tensors["num_heads"],
+            large_test_tensors["seq_len_queries"],
+            large_test_tensors["seq_len_keys"],
+        )
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, -2:] = 1.0  # Last 2 positions
         previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data)
@@ -482,7 +551,9 @@ class TestHashAttentionTopKMaskerImplementation:
                     additional_active == 2
                 ), f"Head {h}, Query {q} should have 2 additional active positions, got {additional_active}"
 
-    def test_hash_attention_top_k_masker_add_mask_signature_caching(self, basic_config, test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_signature_caching(
+        self, basic_config, test_tensors
+    ):
         """Test HashAttentionTopKMasker signature caching behavior."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -490,9 +561,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(basic_config)
-        
-        mask_shape = (test_tensors["batch_size"], test_tensors["num_heads"], 
-                     test_tensors["seq_len_queries"], test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_queries"],
+            test_tensors["seq_len_keys"],
+        )
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         # First call - should initialize cache
@@ -540,7 +615,9 @@ class TestHashAttentionTopKMaskerImplementation:
         result2_dense = result2.get_dense_mask()
         assert torch.equal(result1_dense, result2_dense)
 
-    def test_hash_attention_top_k_masker_add_mask_different_activations(self, activation_config, test_tensors):
+    def test_hash_attention_top_k_masker_add_mask_different_activations(
+        self, activation_config, test_tensors
+    ):
         """Test HashAttentionTopKMasker with different activation functions."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -548,9 +625,13 @@ class TestHashAttentionTopKMaskerImplementation:
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
         masker = HashAttentionTopKMasker(activation_config)
-        
-        mask_shape = (test_tensors["batch_size"], test_tensors["num_heads"], 
-                     test_tensors["seq_len_queries"], test_tensors["seq_len_keys"])
+
+        mask_shape = (
+            test_tensors["batch_size"],
+            test_tensors["num_heads"],
+            test_tensors["seq_len_queries"],
+            test_tensors["seq_len_keys"],
+        )
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         # Should work without errors for all activation functions

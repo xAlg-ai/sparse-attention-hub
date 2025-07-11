@@ -4,11 +4,8 @@ from typing import Any, Optional, Tuple, Union
 
 import torch
 
+from .kv_utils import _get_num_key_value_groups, repeat_kv
 from .mask import Mask
-from .kv_utils import repeat_kv, _get_num_key_value_groups
-
-
-
 
 
 def _compute_masked_exp_attention_weights(
