@@ -20,7 +20,7 @@ class FixedMaskerConfig(MaskerConfig):
 class FixedMasker(ResearchMasker):
     """Abstract base class for fixed pattern maskers."""
 
-    def __init__(self, config: FixedMaskerConfig):
+    def __init__(self, config: FixedMaskerConfig) -> None:
         """Initialize fixed masker with configuration."""
         super().__init__(config)
 
@@ -33,7 +33,7 @@ class FixedMasker(ResearchMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add fixed mask to attention computation."""
         pass
@@ -56,7 +56,7 @@ class TopKMaskerConfig(FixedMaskerConfig):
 class TopKMasker(FixedMasker):
     """Abstract base class for top-K maskers."""
 
-    def __init__(self, config: TopKMaskerConfig):
+    def __init__(self, config: TopKMaskerConfig) -> None:
         """Initialize top-K masker with configuration."""
         super().__init__(config)
 
@@ -64,10 +64,12 @@ class TopKMasker(FixedMasker):
         self, scores: torch.Tensor, previous_mask: Mask, k: int
     ) -> torch.Tensor:
         """Get top-K indices from positions not already active in previous mask."""
-        previous_dense_mask = previous_mask.get_dense_mask()
-        masked_scores = scores.clone()
+        previous_dense_mask: torch.Tensor = previous_mask.get_dense_mask()
+        masked_scores: torch.Tensor = scores.clone()
         masked_scores[previous_dense_mask != 0] = float("-inf")
 
+        _: torch.Tensor
+        top_k_indices: torch.Tensor
         _, top_k_indices = torch.topk(masked_scores, k=k, dim=-1, largest=True)
         return top_k_indices
 
@@ -80,7 +82,7 @@ class TopKMasker(FixedMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add top-K mask to attention computation."""
         pass
@@ -103,7 +105,7 @@ class TopPMaskerConfig(FixedMaskerConfig):
 class TopPMasker(FixedMasker):
     """Abstract base class for top-P maskers."""
 
-    def __init__(self, config: TopPMaskerConfig):
+    def __init__(self, config: TopPMaskerConfig) -> None:
         """Initialize top-P masker with configuration."""
         super().__init__(config)
 
@@ -116,7 +118,7 @@ class TopPMasker(FixedMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add top-P mask to attention computation."""
         pass

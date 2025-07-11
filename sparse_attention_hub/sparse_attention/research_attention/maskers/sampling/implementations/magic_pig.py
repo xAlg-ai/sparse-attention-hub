@@ -26,7 +26,11 @@ class MagicPigConfig(SamplingMaskerConfig):
 class MagicPig(SamplingMasker):
     """Magic Pig masker."""
 
-    def __init__(self, config: MagicPigConfig):
+    sampling_rate: float
+    lsh_l: int
+    lsh_k: int
+
+    def __init__(self, config: MagicPigConfig) -> None:
         """Initialize Magic Pig masker with configuration."""
         super().__init__(config)
         self.sampling_rate = config.sampling_rate
@@ -41,7 +45,7 @@ class MagicPig(SamplingMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add Magic Pig mask."""
         # just return the same mask for now

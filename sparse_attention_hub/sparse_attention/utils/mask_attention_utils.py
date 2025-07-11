@@ -1,8 +1,9 @@
 """Utility functions for masked attention computation."""
 
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
+from torch import nn
 
 from .kv_utils import _get_num_key_value_groups, repeat_kv
 from .mask import Mask
@@ -91,14 +92,14 @@ def _get_attention_numerator(
 
 
 def get_attention_denominator(
-    module: Optional[Any],
+    module: Optional[nn.Module],
     queries: torch.Tensor,
     keys: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
     scaling: float,
     dropout: float,
     sparse_attention_mask: Mask,
-    **kwargs: Any,
+    **kwargs: Dict[str, Any],
 ) -> torch.Tensor:
     """Get masked attention denominator.
 
@@ -130,7 +131,7 @@ def get_attention_denominator(
 
 
 def get_attention_numerator(
-    module: Any,
+    module: nn.Module,
     queries: torch.Tensor,
     keys: torch.Tensor,
     values: torch.Tensor,
@@ -138,7 +139,7 @@ def get_attention_numerator(
     scaling: float,
     dropout: float,
     sparse_attention_mask: Mask,
-    **kwargs: Any,
+    **kwargs: Dict[str, Any],
 ) -> torch.Tensor:
     """Get masked attention numerator.
 
@@ -175,7 +176,7 @@ def get_attention_numerator(
 
 
 def get_masked_attention_output(
-    module: Any,
+    module: nn.Module,
     queries: torch.Tensor,
     keys: torch.Tensor,
     values: torch.Tensor,
@@ -184,7 +185,7 @@ def get_masked_attention_output(
     dropout: float,
     sparse_attention_mask: Mask,
     return_attention_weights: bool = False,
-    **kwargs: Any,
+    **kwargs: Dict[str, Any],
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     """Get masked attention output by dividing numerator by denominator.
 

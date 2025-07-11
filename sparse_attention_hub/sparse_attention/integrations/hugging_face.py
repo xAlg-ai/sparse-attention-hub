@@ -3,9 +3,10 @@
 import random
 import string
 from contextlib import contextmanager
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Generator, List, Optional
 
 import torch
+from torch import nn
 from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 
@@ -16,6 +17,8 @@ from ..research_attention.base import ResearchAttention
 
 class SparseAttentionHF(SparseAttentionGen):
     """HuggingFace-compatible sparse attention generator."""
+
+    sparse_attention: SparseAttention
 
     def __init__(self, sparse_attention: SparseAttention) -> None:
         """Initialize HF generator.
@@ -46,14 +49,14 @@ class SparseAttentionHF(SparseAttentionGen):
         """
 
         def custom_attention_callable(
-            module: Any,
+            module: nn.Module,
             queries: torch.Tensor,
             keys: torch.Tensor,
             values: torch.Tensor,
             attention_mask: Optional[torch.Tensor],
             scaling: float = 1.0,
             dropout: float = 0.0,
-            **kwargs: Any,
+            **kwargs: Dict[str, Any],
         ):
             """Custom attention callable for HuggingFace integration."""
             if hasattr(module, "layer_idx"):
@@ -83,23 +86,23 @@ class SparseAttentionHF(SparseAttentionGen):
 
     def _generate_unique_attention_name(self) -> str:
         """Generate a unique name not present in ALL_ATTENTION_FUNCTIONS."""
-        base_name = "sparse_attention"
-        existing_keys = (
+        base_name: str = "sparse_attention"
+        existing_keys: List[str] = (
             ALL_ATTENTION_FUNCTIONS.valid_keys()
             + ALL_MASK_ATTENTION_FUNCTIONS.valid_keys()
         )
 
         while True:
-            suffix = "".join(
+            suffix: str = "".join(
                 random.choices(string.ascii_lowercase + string.digits, k=8)
             )
-            name = f"{base_name}_{suffix}"
+            name: str = f"{base_name}_{suffix}"
 
             if name not in existing_keys:
                 return name
 
     @contextmanager
-    def __call__(self, model: PreTrainedModel) -> Any:
+    def __call__(self, model: PreTrainedModel) -> Generator[PreTrainedModel, None, None]:
         """Execute the sparse attention mechanism.
 
         This method registers a custom attention function with ALL_ATTENTION_FUNCTIONS,
@@ -119,11 +122,11 @@ class SparseAttentionHF(SparseAttentionGen):
         ...     # sparse_meta_cache = {} # start with empty cache
         ...     outputs = model(input_ids, past_key_values=cache, sparse_meta_data=sparse_meta_cache)
         """
-        original_implementations = {}
-        custom_attention_name = None
+        original_implementations: Dict[str, str] = {}
+        custom_attention_name: Optional[str] = None
 
         try:
-            custom_attention_fn = self.get_custom_attention_function()
+            custom_attention_fn: Callable = self.get_custom_attention_function()
             custom_attention_name = self._generate_unique_attention_name()
             from transformers.masking_utils import eager_mask
 

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Type, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Tuple, Type, TypeVar, Union, cast
 
 import torch
 
@@ -88,7 +88,9 @@ class MaskerRegistry:
 class ResearchMasker(ABC):
     """Abstract base class for research maskers."""
 
-    def __init__(self, config: MaskerConfig):
+    config: MaskerConfig
+
+    def __init__(self, config: MaskerConfig) -> None:
         """Initialize masker with configuration."""
         self.config = config
 
@@ -131,13 +133,13 @@ class ResearchMasker(ABC):
         dtype: torch.dtype,
     ) -> Mask:
         """Create mask from row-wise indices."""
-        mask_shape = (
+        mask_shape: Tuple[int, int, int, int] = (
             dims.batch_size,
             dims.num_heads,
             dims.seq_len_queries,
             dims.seq_len_keys,
         )
-        data = torch.ones_like(indices, dtype=dtype, device=device)
+        data: torch.Tensor = torch.ones_like(indices, dtype=dtype, device=device)
 
         return Mask.create_from_row_wise_idx(
             shape=mask_shape, row_wise_idx=indices, data=data, type="index", dtype=dtype
@@ -160,7 +162,7 @@ class ResearchMasker(ABC):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],  # want to keep it general here.
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add mask to attention computation."""
         pass
@@ -193,7 +195,7 @@ class ResearchMasker(ABC):
                 Make sure to import the masker module before calling this method.
         """
         # Get the masker class from the registry
-        masker_class = MaskerRegistry.get_masker_class(type(config))
+        masker_class: Type["ResearchMasker"] = MaskerRegistry.get_masker_class(type(config))
 
         # Cast to help mypy understand the type
         masker_class = cast(Type[ResearchMasker], masker_class)

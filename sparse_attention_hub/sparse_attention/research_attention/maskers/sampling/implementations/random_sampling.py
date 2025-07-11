@@ -25,7 +25,7 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
 class RandomSamplingMasker(SamplingMasker):
     """Random sampling masker."""
 
-    def __init__(self, config: RandomSamplingMaskerConfig):
+    def __init__(self, config: RandomSamplingMaskerConfig) -> None:
         """Initialize random sampling masker with configuration."""
         super().__init__(config)
         self.sampling_rate = config.sampling_rate
@@ -38,7 +38,7 @@ class RandomSamplingMasker(SamplingMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add random sampling mask."""
         # just return the same mask for now

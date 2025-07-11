@@ -1,7 +1,7 @@
 """Hash attention top-K masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 
@@ -34,7 +34,14 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
 class HashAttentionTopKMasker(TopKMasker):
     """Hash attention top-K masker."""
 
-    def __init__(self, config: HashAttentionTopKMaskerConfig):
+    heavy_size: Union[float, int]
+    hat_bits: int
+    hat_mlp_layers: int
+    hat_mlp_hidden_size: int
+    hat_mlp_activation: str
+    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]]
+
+    def __init__(self, config: HashAttentionTopKMaskerConfig) -> None:
         """Initialize hash attention top-K masker with configuration."""
         super().__init__(config)
         self.heavy_size = config.heavy_size
@@ -50,9 +57,9 @@ class HashAttentionTopKMasker(TopKMasker):
         queries: torch.Tensor,
         values: torch.Tensor,
         attention_mask: torch.Tensor,
-        sparse_meta_data: Dict[Any, Any],
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add hash attention top-K mask to enable hash-based attention selection."""
         layer_idx = self._validate_inputs(sparse_meta_data, kwargs)
@@ -82,13 +89,13 @@ class HashAttentionTopKMasker(TopKMasker):
         return previous_mask.merge_mask(hash_mask, inplace=False)
 
     def _validate_inputs(
-        self, sparse_meta_data: Dict[Any, Any], kwargs: Dict[str, Any]
+        self, sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]], kwargs: Dict[str, Any]
     ) -> int:
         """Validate required inputs for hash attention computation and return layer_idx."""
         if sparse_meta_data is None:
             raise ValueError("sparse_meta_data cannot be None")
 
-        layer_idx = kwargs.get("layer_idx")
+        layer_idx: Optional[int] = kwargs.get("layer_idx")
         if layer_idx is None:
             raise ValueError("layer_idx must be provided in kwargs")
 
@@ -98,9 +105,9 @@ class HashAttentionTopKMasker(TopKMasker):
         self, layer_idx: int, tensor_type: str
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         """Extract weight matrices and bias vectors for a specific tensor type (key or query)."""
-        weights = self.hat_weights[layer_idx]
-        matrix_list = weights[f"{tensor_type}_matrix"]
-        bias_list = weights[f"{tensor_type}_bias"]
+        weights: Dict[str, List[torch.Tensor]] = self.hat_weights[layer_idx]
+        matrix_list: List[torch.Tensor] = weights[f"{tensor_type}_matrix"]
+        bias_list: List[torch.Tensor] = weights[f"{tensor_type}_bias"]
         return matrix_list, bias_list
 
     def _compute_signatures_for_tensor_type(
@@ -128,10 +135,10 @@ class HashAttentionTopKMasker(TopKMasker):
         heavy_size: int,
         keys: torch.Tensor,
         queries: torch.Tensor,
-        sparse_meta_data: Dict[Any, Any],
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         previous_mask: Mask,
         layer_idx: int,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Create hash attention top-K mask using hash-based scoring."""
         scores = self._compute_hashattention_score(
@@ -163,8 +170,8 @@ class HashAttentionTopKMasker(TopKMasker):
                 f"Unsupported activation function: {self.hat_mlp_activation}"
             )
 
-        activation_fn = activation_map[self.hat_mlp_activation]
-        signatures = input_tensor
+        activation_fn: Callable[[torch.Tensor], torch.Tensor] = activation_map[self.hat_mlp_activation]
+        signatures: torch.Tensor = input_tensor
 
         for i in range(len(matrix_list) - 1):
             signatures = self._apply_single_layer(
@@ -282,9 +289,9 @@ class HashAttentionTopKMasker(TopKMasker):
         self,
         queries: torch.Tensor,
         keys: torch.Tensor,
-        sparse_meta_data: Dict[str, Any],
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         layer_idx: int,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> torch.Tensor:
         """Compute hash attention scores using query and key signatures."""
         num_key_value_groups = _get_num_key_value_groups(queries, keys)

@@ -26,7 +26,9 @@ class LocalMaskerConfig(FixedMaskerConfig):
 class LocalMasker(FixedMasker):
     """Local attention masker."""
 
-    def __init__(self, config: LocalMaskerConfig):
+    window_size: Union[float, int]
+
+    def __init__(self, config: LocalMaskerConfig) -> None:
         """Initialize local masker with configuration."""
         super().__init__(config)
         self.window_size = config.window_size
@@ -39,7 +41,7 @@ class LocalMasker(FixedMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add local mask to enable local attention pattern."""
         if previous_mask.is_full_mask():
@@ -89,18 +91,18 @@ class LocalMasker(FixedMasker):
         """Compute window indices for local attention using vectorized operations."""
         # For each query position, compute the start of its local window
         # Formula: window_start = seq_len_keys - (seq_len_queries - query_pos) - window_size + 1
-        query_positions = torch.arange(
+        query_positions: torch.Tensor = torch.arange(
             dims.seq_len_queries, device=device, dtype=torch.long
         )
-        window_starts = (
+        window_starts: torch.Tensor = (
             dims.seq_len_keys - dims.seq_len_queries - window_size + query_positions + 1
         )
 
         # Create offset indices for the window
-        window_offsets = torch.arange(window_size, device=device, dtype=torch.long)
+        window_offsets: torch.Tensor = torch.arange(window_size, device=device, dtype=torch.long)
 
         # Compute all window indices: window_start + offset for each query
-        window_indices = window_starts.unsqueeze(1) + window_offsets.unsqueeze(0)
+        window_indices: torch.Tensor = window_starts.unsqueeze(1) + window_offsets.unsqueeze(0)
         window_indices = torch.clamp(window_indices, 0, dims.seq_len_keys - 1)
 
         # Expand to match batch and head dimensions
@@ -122,7 +124,7 @@ class LocalMasker(FixedMasker):
 class CausalMasker(FixedMasker):
     """Causal attention masker."""
 
-    def __init__(self, config: FixedMaskerConfig):
+    def __init__(self, config: FixedMaskerConfig) -> None:
         """Initialize causal masker with configuration."""
         super().__init__(config)
 
@@ -134,7 +136,7 @@ class CausalMasker(FixedMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add causal mask."""
         # just return the same mask for now
@@ -159,7 +161,9 @@ class SinkMaskerConfig(FixedMaskerConfig):
 class SinkMasker(FixedMasker):
     """Sink attention masker."""
 
-    def __init__(self, config: SinkMaskerConfig):
+    sink_size: Union[float, int]
+
+    def __init__(self, config: SinkMaskerConfig) -> None:
         """Initialize sink masker with configuration."""
         super().__init__(config)
         self.sink_size = config.sink_size
@@ -172,7 +176,7 @@ class SinkMasker(FixedMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add sink mask to enable sink attention pattern."""
         if previous_mask.is_full_mask():
@@ -220,7 +224,7 @@ class SinkMasker(FixedMasker):
         """Compute sink indices for sink attention pattern."""
         # Create row_wise_idx with shape (b, h, sq, sink_size)
         # Each row contains indices [0, 1, ..., sink_size-1] (first sink_size positions)
-        sink_indices = (
+        sink_indices: torch.Tensor = (
             torch.arange(sink_size, device=device, dtype=torch.long)
             .unsqueeze(0)
             .unsqueeze(0)

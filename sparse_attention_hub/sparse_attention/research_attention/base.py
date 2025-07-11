@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+from torch import nn
 
 from ..base import SparseAttention, SparseAttentionConfig
 from ..utils.mask import Mask
@@ -21,6 +22,8 @@ class ResearchAttentionConfig(SparseAttentionConfig):
 
 class ResearchAttention(SparseAttention):
     """Base class for research attention mechanisms with maskers."""
+
+    maskers: List[ResearchMasker]
 
     def __init__(
         self,
@@ -51,7 +54,7 @@ class ResearchAttention(SparseAttention):
 
     def custom_attention(
         self,
-        module: Any,
+        module: nn.Module,
         queries: torch.Tensor,
         keys: torch.Tensor,
         values: torch.Tensor,
@@ -59,7 +62,7 @@ class ResearchAttention(SparseAttention):
         scaling: float,
         dropout: float,
         sparse_meta_data: Dict[Any, Any],
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute research attention mechanism with masking.
 

@@ -20,7 +20,7 @@ class SamplingMaskerConfig(MaskerConfig):
 class SamplingMasker(ResearchMasker):
     """Abstract base class for sampling-based maskers."""
 
-    def __init__(self, config: SamplingMaskerConfig):
+    def __init__(self, config: SamplingMaskerConfig) -> None:
         """Initialize sampling masker with configuration."""
         super().__init__(config)
 
@@ -33,7 +33,7 @@ class SamplingMasker(ResearchMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add sampling mask to attention computation."""
         pass

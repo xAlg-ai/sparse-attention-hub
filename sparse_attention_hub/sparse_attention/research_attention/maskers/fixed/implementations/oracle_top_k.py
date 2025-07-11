@@ -1,7 +1,7 @@
 """Oracle top-K masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import torch
 
@@ -26,7 +26,9 @@ class OracleTopKConfig(TopKMaskerConfig):
 class OracleTopK(TopKMasker):
     """Oracle top-K masker."""
 
-    def __init__(self, config: OracleTopKConfig):
+    heavy_size: Union[float, int]
+
+    def __init__(self, config: OracleTopKConfig) -> None:
         """Initialize oracle top-K masker with configuration."""
         super().__init__(config)
         self.heavy_size = config.heavy_size
@@ -39,7 +41,7 @@ class OracleTopK(TopKMasker):
         attention_mask: torch.Tensor,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Mask:
         """Add oracle top-K mask to enable oracle-based attention selection."""
         if previous_mask.is_full_mask():
