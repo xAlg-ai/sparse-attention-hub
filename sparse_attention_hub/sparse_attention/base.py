@@ -1,18 +1,42 @@
 """Base classes for sparse attention mechanisms (bare metal)."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+
+import torch
+
+
+@dataclass
+class SparseAttentionConfig:
+    """Configuration class for sparse attention mechanisms."""
+
+    pass
 
 
 class SparseAttention(ABC):
     """Abstract base class for sparse attention mechanisms."""
 
-    def __init__(self) -> None:
-        """Initialize sparse attention mechanism."""
-        pass
+    def __init__(self, sparse_attention_config: SparseAttentionConfig) -> None:
+        """Initialize sparse attention mechanism.
+
+        Args:
+            sparse_attention_config: Configuration for the sparse attention mechanism.
+        """
+        self.sparse_attention_config = sparse_attention_config
 
     @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
+    def custom_attention(
+        self,
+        module: Any,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+        scaling: float,
+        dropout: float,
+        **kwargs: Any,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute custom attention mechanism.
 
         Returns:
@@ -24,33 +48,25 @@ class SparseAttention(ABC):
         """Generate pre-attention hooks for model integration."""
         pass
 
+    @classmethod
+    def create_from_config(cls, config: SparseAttentionConfig) -> "SparseAttention":
+        """Create sparse attention instance from configuration.
 
-class EfficientAttention(SparseAttention):
-    """Abstract base class for efficient attention mechanisms."""
-
-    @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
-        """Compute efficient attention mechanism.
-
-        Returns:
-            Tuple of attention output and optional attention weights.
-        """
-        pass
-
-
-class ResearchAttention(SparseAttention):
-    """Abstract base class for research attention mechanisms with maskers."""
-
-    def __init__(self) -> None:
-        """Initialize research attention mechanism."""
-        super().__init__()
-        self.masks: list = []
-
-    @abstractmethod
-    def custom_attention(self) -> Tuple[Any, Optional[Any]]:
-        """Compute research attention mechanism with masking.
+        Args:
+            config: Configuration for the sparse attention mechanism.
 
         Returns:
-            Tuple of attention output and optional attention weights.
+            Instance of the sparse attention mechanism.
         """
-        pass
+        # Import here to avoid circular imports
+        from .efficient_attention import EfficientAttention, EfficientAttentionConfig
+        from .research_attention import ResearchAttention, ResearchAttentionConfig
+
+        # Check config type and route to appropriate create_from_config method
+        if isinstance(config, ResearchAttentionConfig):
+            return ResearchAttention.create_from_config(config)
+        elif isinstance(config, EfficientAttentionConfig):
+            return EfficientAttention.create_from_config(config)
+        else:
+            # Fallback to default behavior for base config
+            return cls(config)

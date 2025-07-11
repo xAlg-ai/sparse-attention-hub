@@ -1,0 +1,138 @@
+"""Base classes for research attention mechanisms."""
+
+from dataclasses import dataclass
+from typing import Any, List, Optional, Tuple
+
+import torch
+
+from ..base import SparseAttention, SparseAttentionConfig
+from ..utils.mask import Mask
+from ..utils.mask_attention_utils import get_masked_attention_output
+from .maskers.base import MaskerConfig, ResearchMasker
+from .maskers.sampling.base import SamplingMasker
+
+
+@dataclass
+class ResearchAttentionConfig(SparseAttentionConfig):
+    """Configuration class for research attention mechanisms."""
+
+    masker_configs: List[MaskerConfig]
+
+
+class ResearchAttention(SparseAttention):
+    """Base class for research attention mechanisms with maskers."""
+
+    def __init__(
+        self,
+        sparse_attention_config: SparseAttentionConfig,
+        maskers: List[ResearchMasker],
+    ) -> None:
+        """Initialize research attention mechanism.
+
+        Args:
+            sparse_attention_config: Configuration for the sparse attention mechanism.
+            maskers: List of research maskers to apply.
+
+        Raises:
+            ValueError: If more than one sampling masker is provided.
+        """
+        super().__init__(sparse_attention_config)
+
+        # Validate that there's at most one sampling masker
+        sampling_masker_count = sum(
+            1 for masker in maskers if isinstance(masker, SamplingMasker)
+        )
+        if sampling_masker_count > 1:
+            raise ValueError(
+                "Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker"
+            )
+
+        self.maskers = maskers
+
+    def custom_attention(
+        self,
+        module: Any,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+        scaling: float,
+        dropout: float,
+        **kwargs: Any,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Compute research attention mechanism with masking.
+
+        Args:
+            module: The attention module
+            queries: Query tensor of shape (b, h, sk, d)
+            keys: Key tensor of shape (b, h, sq, d)
+            values: Value tensor of shape (b, h, sq, d)
+            attention_mask: Optional attention mask of shape (b, h, sq, sk)
+            scaling: Scaling factor for attention weights
+            dropout: Dropout probability
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Tuple of attention output and optional attention weights.
+        """
+        # Create an empty Mask object
+        mask_shape = (
+            queries.shape[0],
+            queries.shape[1],
+            queries.shape[2],
+            keys.shape[2],
+        )
+        sparse_attention_mask = Mask.create_empty_mask(mask_shape)
+
+        # Apply all maskers sequentially, each one on the output of the previous one
+        for masker in self.maskers:
+            sparse_attention_mask = masker.add_mask(
+                keys=keys,
+                queries=queries,
+                values=values,
+                attention_mask=attention_mask,
+                sparse_meta_data=None,  # TODO: Define sparse_meta_data structure
+                previous_mask=sparse_attention_mask,
+                **kwargs,
+            )
+
+        # Call compute_masked_attention_output on the result of the last mask
+        # Always request attention weights to match the expected return signature
+        attention_output, attention_weights = get_masked_attention_output(
+            module=module,
+            queries=queries,
+            keys=keys,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=scaling,
+            dropout=dropout,
+            sparse_attention_mask=sparse_attention_mask,
+            return_attention_weights=True,
+            **kwargs,
+        )
+
+        return attention_output, attention_weights
+
+    @classmethod
+    def create_from_config(cls, config: SparseAttentionConfig) -> "ResearchAttention":
+        """Create research attention instance from configuration.
+
+        Args:
+            config: Configuration for the research attention mechanism.
+
+        Returns:
+            Instance of the research attention mechanism.
+
+        Raises:
+            TypeError: If config is not a ResearchAttentionConfig.
+        """
+        if not isinstance(config, ResearchAttentionConfig):
+            raise TypeError(f"Expected ResearchAttentionConfig, got {type(config)}")
+
+        # Create ResearchMasker objects from the configs using the factory method
+        maskers = []
+        for masker_config in config.masker_configs:
+            masker = ResearchMasker.create_masker_from_config(masker_config)
+            maskers.append(masker)
+
+        return cls(config, maskers)
