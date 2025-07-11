@@ -7,6 +7,7 @@ import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -22,6 +23,7 @@ class DoubleSparsityTopKMaskerConfig(TopKMaskerConfig):
     channel_config: Any  # config with stats required for double sparsity
 
 
+@MaskerRegistry.register(DoubleSparsityTopKMaskerConfig)
 class DoubleSparsityTopKMasker(TopKMasker):
     """Double sparsity top-K masker."""
 

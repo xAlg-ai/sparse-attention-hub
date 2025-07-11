@@ -7,6 +7,7 @@ import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -21,6 +22,7 @@ class MagicPigConfig(SamplingMaskerConfig):
     lsh_k: int  # number of bits per table
 
 
+@MaskerRegistry.register(MagicPigConfig)
 class MagicPig(SamplingMasker):
     """Magic Pig masker."""
 

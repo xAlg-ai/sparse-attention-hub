@@ -7,6 +7,7 @@ import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -20,6 +21,7 @@ class OracleTopKConfig(TopKMaskerConfig):
     pass
 
 
+@MaskerRegistry.register(OracleTopKConfig)
 class OracleTopK(TopKMasker):
     """Oracle top-K masker."""
 

@@ -7,6 +7,7 @@ import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -20,6 +21,7 @@ class LocalMaskerConfig(FixedMaskerConfig):
     window_size: Union[float, int]
 
 
+@MaskerRegistry.register(LocalMaskerConfig)
 class LocalMasker(FixedMasker):
     """Local attention masker."""
 
@@ -96,6 +98,7 @@ class LocalMasker(FixedMasker):
         return cls(config)
 
 
+@MaskerRegistry.register(FixedMaskerConfig)
 class CausalMasker(FixedMasker):
     """Causal attention masker."""
 
@@ -132,6 +135,7 @@ class SinkMaskerConfig(FixedMaskerConfig):
     sink_size: Union[float, int]
 
 
+@MaskerRegistry.register(SinkMaskerConfig)
 class SinkMasker(FixedMasker):
     """Sink attention masker."""
 

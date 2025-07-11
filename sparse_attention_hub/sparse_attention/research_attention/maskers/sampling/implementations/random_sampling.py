@@ -7,6 +7,7 @@ import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -20,6 +21,7 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
     pass
 
 
+@MaskerRegistry.register(RandomSamplingMaskerConfig)
 class RandomSamplingMasker(SamplingMasker):
     """Random sampling masker."""
 

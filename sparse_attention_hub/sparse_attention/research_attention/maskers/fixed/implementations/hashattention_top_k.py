@@ -7,6 +7,7 @@ import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 from sparse_attention_hub.sparse_attention.utils.kv_utils import repeat_kv, _get_num_key_value_groups
@@ -27,6 +28,7 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     ]  # Dict of layer_idx to tensor lists
 
 
+@MaskerRegistry.register(HashAttentionTopKMaskerConfig)
 class HashAttentionTopKMasker(TopKMasker):
     """Hash attention top-K masker."""
 
