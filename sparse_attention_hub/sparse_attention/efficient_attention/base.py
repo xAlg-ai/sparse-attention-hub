@@ -3,7 +3,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 from torch import nn

@@ -15,12 +15,19 @@ from ..base import TopKMasker, TopKMaskerConfig
 
 
 @dataclass
+class ChannelConfig:
+    """Configuration for channel statistics in double sparsity."""
+
+    pass
+
+
+@dataclass
 class DoubleSparsityTopKMaskerConfig(TopKMaskerConfig):
     """Configuration for DoubleSparsityTopKMasker."""
 
     group_factor: int
     label_bits: int
-    channel_config: "ChannelConfig"  # config with stats required for double sparsity
+    channel_config: ChannelConfig  # config with stats required for double sparsity
 
 
 @MaskerRegistry.register(DoubleSparsityTopKMaskerConfig)
@@ -30,7 +37,7 @@ class DoubleSparsityTopKMasker(TopKMasker):
     heavy_size: Union[float, int]
     group_factor: int
     label_bits: int
-    channel_config: "ChannelConfig"
+    channel_config: ChannelConfig
 
     def __init__(self, config: DoubleSparsityTopKMaskerConfig) -> None:
         """Initialize double sparsity top-K masker with configuration."""
