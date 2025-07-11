@@ -1,7 +1,7 @@
 """Basic fixed pattern masker implementations."""
 
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Dict, Union
 
 import torch
 
@@ -30,14 +30,14 @@ class LocalMasker(FixedMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add local mask."""
         if previous_mask.is_full_mask():
             return previous_mask
@@ -105,14 +105,14 @@ class CausalMasker(FixedMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add causal mask."""
         # just return the same mask for now
         return previous_mask
@@ -142,14 +142,14 @@ class SinkMasker(FixedMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add sink mask."""
         # 1. Check if previous_mask is full mask, if so return full mask
         if previous_mask.is_full_mask():

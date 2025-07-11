@@ -2,7 +2,11 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
+
+import torch
+
+from ...utils.mask import Mask
 
 
 @dataclass
@@ -23,14 +27,14 @@ class ResearchMasker(ABC):
     @abstractmethod
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any], # want to keep it general here.
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add mask to attention computation."""
         pass
 

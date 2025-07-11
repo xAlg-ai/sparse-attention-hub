@@ -212,14 +212,14 @@ class HashAttentionTopKMasker(TopKMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add hash attention top-K mask."""
         # Input validation
         if sparse_meta_data is None:

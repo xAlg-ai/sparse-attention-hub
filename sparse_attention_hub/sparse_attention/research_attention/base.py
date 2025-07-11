@@ -1,7 +1,7 @@
 """Base classes for research attention mechanisms."""
 
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 
@@ -58,6 +58,7 @@ class ResearchAttention(SparseAttention):
         attention_mask: Optional[torch.Tensor],
         scaling: float,
         dropout: float,
+        sparse_meta_data: Dict[Any, Any],
         **kwargs: Any,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute research attention mechanism with masking.
@@ -91,6 +92,7 @@ class ResearchAttention(SparseAttention):
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
+                sparse_meta_data=sparse_meta_data,
                 previous_mask=sparse_attention_mask,
                 **kwargs,
             )

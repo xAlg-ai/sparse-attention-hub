@@ -50,14 +50,22 @@ class SparseAttentionHF(SparseAttentionGen):
             keys: torch.Tensor,
             values: torch.Tensor,
             attention_mask: Optional[torch.Tensor],
-            scaling: float,
-            dropout: float,
+            scaling: float = 1.0,
+            dropout: float = 0.0,
             **kwargs: Any,
         ):
             """Custom attention callable for HuggingFace integration."""
             if hasattr(module, 'layer_idx'):
                 kwargs['layer_idx'] = module.layer_idx
-            
+
+            if 'sparse_meta_data' in kwargs:
+                sparse_meta_data = kwargs['sparse_meta_data']
+                kwargs.pop('sparse_meta_data', None)
+
+            else:
+                raise ValueError(
+                    "sparse_meta_data must be provided while calling model.forward()"
+                )
             return self.sparse_attention.custom_attention(
                 module=module,
                 queries=queries,
@@ -66,6 +74,7 @@ class SparseAttentionHF(SparseAttentionGen):
                 attention_mask=attention_mask,
                 scaling=scaling,
                 dropout=dropout,
+                sparse_meta_data=sparse_meta_data,
                 **kwargs
             )
         

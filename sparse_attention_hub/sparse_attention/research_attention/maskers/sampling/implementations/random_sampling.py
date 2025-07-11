@@ -1,11 +1,14 @@
 """Random sampling masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
+
+import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
 )
+from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import SamplingMasker, SamplingMaskerConfig
 
@@ -27,14 +30,14 @@ class RandomSamplingMasker(SamplingMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add random sampling mask."""
         # just return the same mask for now
         return previous_mask

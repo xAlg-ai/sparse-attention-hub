@@ -2,8 +2,11 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Dict, Union
 
+import torch
+
+from ....utils.mask import Mask
 from ..base import MaskerConfig, ResearchMasker
 
 
@@ -24,14 +27,14 @@ class SamplingMasker(ResearchMasker):
     @abstractmethod
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Mask:
         """Add sampling mask to attention computation."""
         pass
 
