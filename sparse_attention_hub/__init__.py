@@ -8,6 +8,14 @@ benchmarking tools, and integration with popular model frameworks.
 __version__ = "0.1.0"
 __author__ = "AlexCuadron"
 
+from .adapters import (
+    ModelAdapter,
+    ModelAdapterHF,
+    ModelHubAdapterInterface,
+    Request,
+    RequestResponse,
+    SparseAttentionAdapterInterface,
+)
 from .benchmark import Benchmark, BenchmarkExecutor
 from .metrics import MicroMetric, MicroMetricLogger
 from .model_hub import ModelHub, ModelHubHF
@@ -38,4 +46,10 @@ __all__ = [
     "MicroMetric",
     "PlotGenerator",
     "Granularity",
+    "Request",
+    "RequestResponse",
+    "ModelHubAdapterInterface",
+    "SparseAttentionAdapterInterface",
+    "ModelAdapter",
+    "ModelAdapterHF",
 ]
