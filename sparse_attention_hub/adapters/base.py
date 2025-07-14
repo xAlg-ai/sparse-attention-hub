@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Generator, List, Optional, Union
+from typing import Any, Callable, Generator, List, Optional, Union, Dict
 
 from ..sparse_attention.base import SparseAttention, SparseAttentionConfig
 
@@ -32,18 +32,6 @@ class ModelHubAdapterInterface(ABC):
     """Defines the interface between external model hosting libraries,
     e.g. huggingface transformers and sparse-attention-hub project.
     """
-
-    @abstractmethod
-    def create_model(self, model_name: str) -> Any:
-        """Creates a model given model_name.
-
-        Args:
-            model_name: Name of the model to create
-
-        Returns:
-            model: The created model instance
-        """
-        pass
 
     @abstractmethod
     def process_request(self, request: Request) -> RequestResponse:
@@ -86,7 +74,10 @@ class ModelAdapter(SparseAttentionAdapterInterface, ModelHubAdapterInterface, AB
     """
 
     def __init__(
-        self, sparse_attention_config: Optional[SparseAttentionConfig], model_name: str
+        self, 
+        model_name: str, 
+        sparse_attention_config: Optional[SparseAttentionConfig], 
+        **kwargs: Dict[str, Any]
     ) -> None:
         """Initialize model adapter.
 
@@ -94,15 +85,17 @@ class ModelAdapter(SparseAttentionAdapterInterface, ModelHubAdapterInterface, AB
             sparse_attention_config: Configuration for sparse attention. If None, adapter runs in dense-only mode.
             model_name: Name of the model to use
         """
-        self.sparse_attention_config = sparse_attention_config
-        self.sparse_attention: Optional[SparseAttention] = (
-            SparseAttention.create_from_config(sparse_attention_config)
-            if sparse_attention_config is not None
-            else None
-        )
         self.model_name = model_name
-        self.model: Any = self.create_model(model_name)
-
+        self.sparse_attention_config = sparse_attention_config
+        self.sparse_attention = None
+        self.kwargs = kwargs
+        self.sparse_attention = (
+            SparseAttention.create_from_config(self.sparse_attention_config)
+            if self.sparse_attention_config is not None
+            else None
+        )        
+        
+        
     @abstractmethod
     @contextmanager
     def enable_sparse_mode(self) -> Generator[None, None, None]:
@@ -113,19 +106,6 @@ class ModelAdapter(SparseAttentionAdapterInterface, ModelHubAdapterInterface, AB
             In order to run in sparse mode, use the context manager like:
             with ModelAdapterObject.enable_sparse_mode():
                 <do something while using sparse attention>
-
-        Yields:
-            None
-        """
-        pass
-
-    @abstractmethod
-    @contextmanager
-    def enable_dense_mode(self) -> Generator[None, None, None]:
-        """Context manager to explicitly enable dense attention mode.
-
-        Note: This is the default mode, so this context manager is mainly
-        for clarity and consistency with enable_sparse_mode.
 
         Yields:
             None

@@ -120,7 +120,6 @@ class TestInterfaces:
     def test_model_hub_adapter_interface_methods(self) -> None:
         """Test ModelHubAdapterInterface has required abstract methods."""
         interface_methods = dir(ModelHubAdapterInterface)
-        assert "create_model" in interface_methods
         assert "process_request" in interface_methods
 
     def test_sparse_attention_adapter_interface_methods(self) -> None:
@@ -157,7 +156,8 @@ class TestModelAdapterHF:
         adapter = ModelAdapterHF(
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
-            device="cpu",
+            model_kwargs={"torch_dtype": torch.float16},
+            device="cpu"
         )
 
         # Check that model and tokenizer were created
@@ -170,7 +170,7 @@ class TestModelAdapterHF:
         # Check that the correct methods were called
         mock_tokenizer.from_pretrained.assert_called_once_with("test-model")
         mock_model.from_pretrained.assert_called_once_with(
-            "test-model", device_map="cpu"
+            "test-model", torch_dtype=torch.float16
         )
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
@@ -191,15 +191,17 @@ class TestModelAdapterHF:
         adapter = ModelAdapterHF(
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
-            device="cpu",
-            torch_dtype=torch.float16,
+            model_kwargs={"torch_dtype": torch.float16},
+            device="cpu"
         )
+
 
         # Check that model was created with correct parameters
         mock_model.from_pretrained.assert_called_once_with(
-            "test-model", device_map="cpu", torch_dtype=torch.float16
+            "test-model", torch_dtype=torch.float16
         )
-
+        assert adapter.device == "cpu"
+        assert adapter.torch_dtype == torch.float16
         # Check that adapter was created successfully
         assert adapter is not None
 
@@ -223,7 +225,9 @@ class TestModelAdapterHF:
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
         )
-
+        assert adapter.torch_dtype is not None
+        assert adapter.model is not None
+        assert adapter.tokenizer is not None
         # Check that pad_token was not changed
         assert adapter.tokenizer.pad_token == "<PAD>"
 
@@ -241,8 +245,12 @@ class TestModelAdapterHF:
         adapter = ModelAdapterHF(
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
+            model_kwargs={"torch_dtype": torch.float16},
         )
-
+        assert adapter.device == "cuda"
+        assert adapter.torch_dtype == torch.float16
+        assert adapter.model is not None
+        assert adapter.tokenizer is not None
         custom_fn = adapter.get_custom_attention_function(adapter.sparse_attention)
         assert callable(custom_fn)
 
@@ -320,11 +328,6 @@ class TestModelAdapterHF:
             # Should not raise any errors
             pass
 
-        # Test dense mode context manager works
-        with adapter.enable_dense_mode():
-            # Should not raise any errors
-            pass
-
         # Test that custom attention name is reused
         with adapter.enable_sparse_mode():
             first_name = adapter._registered_attention_name
@@ -356,34 +359,6 @@ class TestModelAdapterHF:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_process_request_tokenizer_not_initialized(
-        self, mock_tokenizer, mock_model
-    ) -> None:
-        """Test process_request when tokenizer is not initialized."""
-        # Mock the tokenizer and model
-        mock_tokenizer_instance = Mock()
-        mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
-
-        mock_model_instance = Mock()
-        mock_model.from_pretrained.return_value = mock_model_instance
-
-        adapter = ModelAdapterHF(
-            sparse_attention_config=self.sparse_attention_config,
-            model_name="test-model",
-        )
-
-        # Manually set tokenizer to None to simulate uninitialized state
-        adapter.tokenizer = None
-
-        request = Request(context="Test context", questions="Test question?")
-
-        with pytest.raises(ValueError) as exc_info:
-            adapter.process_request(request)
-
-        assert "Tokenizer not initialized" in str(exc_info.value)
-
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
     def test_adapter_properties(self, mock_tokenizer, mock_model) -> None:
         """Test adapter properties are set correctly."""
         # Mock the tokenizer and model
@@ -396,9 +371,7 @@ class TestModelAdapterHF:
         adapter = ModelAdapterHF(
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
-            device="cuda",
         )
-
         # Check properties
         assert adapter.device == "cuda"
         assert adapter.model_name == "test-model"

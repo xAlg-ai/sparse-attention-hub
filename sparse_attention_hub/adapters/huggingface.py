@@ -22,58 +22,47 @@ class ModelAdapterHF(ModelAdapter):
 
     def __init__(
         self,
-        sparse_attention_config: Optional[SparseAttentionConfig],
         model_name: str,
+        sparse_attention_config: Optional[SparseAttentionConfig],
+        model_kwargs: Optional[Dict[str, Any]] = None,
+        tokenizer_kwargs: Optional[Dict[str, Any]] = None,
         device: Optional[str] = None,
-        torch_dtype: Optional[torch.dtype] = None,
+        **kwargs: Dict[str, Any]
     ) -> None:
         """Initialize HuggingFace adapter.
 
         Args:
-            sparse_attention_config: Configuration for sparse attention. If None, adapter runs in dense-only mode.
             model_name: Name of the HuggingFace model to use
-            device: Device to load the model on
-            torch_dtype: Torch data type for the model
+            sparse_attention_config: Configuration for sparse attention. If None, adapter runs in dense-only mode.
+            model_kwargs: Additional keyword arguments for model creation
+            device: Device to run the model on TODO: support dynamic and multipledevice placement 
+            tokenizer_kwargs: Additional keyword arguments for tokenizer creation
         """
-        self.device = device
-        self.torch_dtype = torch_dtype
-        self.tokenizer: Optional[Any] = None
+        super().__init__(model_name, sparse_attention_config, **kwargs)
         self._registered_attention_name: Optional[str] = None
         self._custom_attention_fn: Optional[Callable] = None
+        self.model_kwargs = model_kwargs or {}
+        self.tokenizer_kwargs = tokenizer_kwargs or {}
+
+        # more useful parameters to store
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.torch_dtype = self.model_kwargs.get("torch_dtype", torch.float32)
 
         # Handle dense-only mode when sparse_attention_config is None
         self._sparse_attention_available: bool = sparse_attention_config is not None
 
-        super().__init__(sparse_attention_config, model_name)
+        # create model and tokenizer
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, **self.model_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, **self.tokenizer_kwargs)
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # TODO: support dynamic and multipledevice placement 
+        self.model.to(self.device)
 
     def __del__(self) -> None:
         """Clean up registered attention functions when the adapter is destroyed."""
         self._cleanup_attention_registration()
-
-    def create_model(self, model_name: str) -> Any:
-        """Creates a model using HuggingFace transformers library.
-
-        Args:
-            model_name: Name of the model to create
-
-        Returns:
-            model: The created HuggingFace model instance
-        """
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-        self.tokenizer = tokenizer
-
-        model_kwargs = {}
-        if self.device is not None:
-            model_kwargs["device_map"] = self.device
-        if self.torch_dtype is not None:
-            model_kwargs["torch_dtype"] = self.torch_dtype
-
-        model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-            model_name, **model_kwargs
-        )
-        return model
 
     def process_request(self, request: Request) -> RequestResponse:
         """Processes request with optimized tokenization but independent question processing.
@@ -85,15 +74,11 @@ class ModelAdapterHF(ModelAdapter):
         Returns:
             response: The response to the request
         """
-        if self.tokenizer is None:
-            raise ValueError("Tokenizer not initialized")
-
         questions: List[str] = (
             request.questions
             if isinstance(request.questions, list)
             else [request.questions]
         )
-
         context_tokens = self.tokenizer.encode(request.context, return_tensors="pt")
         if self.device is not None:
             context_tokens = context_tokens.to(self.device)
@@ -107,13 +92,12 @@ class ModelAdapterHF(ModelAdapter):
             if self.device is not None:
                 question_tokens = question_tokens.to(self.device)
 
-            with self.enable_dense_mode():
-                context_outputs = self.model(
-                    context_tokens,
-                    past_key_values=None,
-                    use_cache=True,
-                    sparse_meta_data=sparse_meta_data,
-                )
+            context_outputs = self.model(
+                context_tokens,
+                past_key_values=None,
+                use_cache=True,
+                sparse_meta_data=sparse_meta_data,
+            )
 
             if self._sparse_attention_available:
                 with self.enable_sparse_mode():
@@ -126,14 +110,13 @@ class ModelAdapterHF(ModelAdapter):
                     responses.append(response_text)
             else:
                 # Dense-only mode: process questions with dense attention
-                with self.enable_dense_mode():
-                    response_text = self._generate_response(
-                        question_tokens,
-                        context_outputs,
-                        sparse_meta_data,
-                        max_new_tokens=50,
-                    )
-                    responses.append(response_text)
+                response_text = self._generate_response(
+                    question_tokens,
+                    context_outputs,
+                    sparse_meta_data,
+                    max_new_tokens=50,
+                )
+                responses.append(response_text)
 
         if isinstance(request.questions, str):
             return RequestResponse(responses=responses[0])
@@ -151,7 +134,6 @@ class ModelAdapterHF(ModelAdapter):
         Returns:
             custom_attention_fn: Callable with correct signature for HuggingFace
         """
-
         def custom_attention_callable(
             module: torch.nn.Module,
             queries: torch.Tensor,
@@ -226,13 +208,13 @@ class ModelAdapterHF(ModelAdapter):
 
             from transformers.masking_utils import eager_mask
 
-            ALL_ATTENTION_FUNCTIONS[
-                self._registered_attention_name
-            ] = self._custom_attention_fn
+            ALL_ATTENTION_FUNCTIONS.register(
+                self._registered_attention_name, self._custom_attention_fn
+            )
             if isinstance(self.sparse_attention, ResearchAttention):
-                ALL_MASK_ATTENTION_FUNCTIONS[
-                    self._registered_attention_name
-                ] = eager_mask
+                ALL_MASK_ATTENTION_FUNCTIONS.register(
+                    self._registered_attention_name, eager_mask
+                )
             else:
                 raise NotImplementedError(
                     "Sparse attention is not supported for this model yet"
@@ -246,13 +228,15 @@ class ModelAdapterHF(ModelAdapter):
             self._registered_attention_name is not None
             and self._registered_attention_name in ALL_ATTENTION_FUNCTIONS.valid_keys()
         ):
-            del ALL_ATTENTION_FUNCTIONS[self._registered_attention_name]
+            ALL_ATTENTION_FUNCTIONS._global_mapping.pop(self._registered_attention_name)
         if (
             self._registered_attention_name is not None
             and self._registered_attention_name
             in ALL_MASK_ATTENTION_FUNCTIONS.valid_keys()
         ):
-            del ALL_MASK_ATTENTION_FUNCTIONS[self._registered_attention_name]
+            ALL_MASK_ATTENTION_FUNCTIONS._global_mapping.pop(
+                self._registered_attention_name
+            )
         self._registered_attention_name = None
         self._custom_attention_fn = None
 
@@ -297,19 +281,6 @@ class ModelAdapterHF(ModelAdapter):
             for name, module in self.model.named_modules():
                 if name in original_implementations:
                     module.config._attn_implementation = original_implementations[name]
-
-    @contextmanager
-    def enable_dense_mode(self) -> Generator[None, None, None]:
-        """Context manager to explicitly enable dense attention mode.
-
-        Note: This is the default mode, so this context manager is mainly
-        for clarity and consistency with enable_sparse_mode.
-
-        Yields:
-            None
-        """
-        # Dense mode is always available - just yield
-        yield
 
     def _generate_response(
         self,
