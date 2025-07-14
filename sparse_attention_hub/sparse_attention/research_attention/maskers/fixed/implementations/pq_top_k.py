@@ -1,11 +1,15 @@
 """PQ cache top-K masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
+
+import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
 
@@ -18,10 +22,11 @@ class PQCacheConfig(TopKMaskerConfig):
     pq_bits: int
 
 
+@MaskerRegistry.register(PQCacheConfig)
 class PQCache(TopKMasker):
     """PQ cache-based top-K masker."""
 
-    def __init__(self, config: PQCacheConfig):
+    def __init__(self, config: PQCacheConfig) -> None:
         """Initialize PQ cache masker with configuration."""
         super().__init__(config)
         self.heavy_size = config.heavy_size
@@ -30,14 +35,14 @@ class PQCache(TopKMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
-        **kwargs: Any,
-    ) -> Any:
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
+        **kwargs: Dict[str, Any],
+    ) -> Mask:
         """Add PQ cache mask."""
         # just return the same mask for now
         return previous_mask

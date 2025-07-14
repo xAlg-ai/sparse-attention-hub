@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
+from torch import nn
 
 from ..base import EfficientAttention, EfficientAttentionConfig, SparseAttentionConfig
 
@@ -15,7 +16,7 @@ class HashAttentionConfig(EfficientAttentionConfig):
     heavy_size: Union[int, float]
     sink_size: int
     local_size: int
-    hat_weights: Dict[str, Any]  # state dict
+    hat_weights: Dict[str, torch.Tensor]  # state dict
     hat_bits: int
     hat_mlp_layers: int
     hat_mlp_hidden_size: int
@@ -24,13 +25,18 @@ class HashAttentionConfig(EfficientAttentionConfig):
 class HashAttention(EfficientAttention):
     """Hash-based attention mechanism."""
 
+    hat_bits: int
+    hat_mlp_layers: int
+    hat_mlp_hidden_size: int
+    hat_weights: Dict[str, torch.Tensor]
+
     def __init__(
         self,
         sparse_attention_config: SparseAttentionConfig,
         hat_bits: int,
         hat_mlp_layers: int,
         hat_mlp_hidden_size: int,
-        hat_weights: Dict,
+        hat_weights: Dict[str, torch.Tensor],
     ) -> None:
         """Initialize hash attention mechanism.
 
@@ -49,14 +55,14 @@ class HashAttention(EfficientAttention):
 
     def custom_attention(
         self,
-        module: Any,
+        module: nn.Module,
         queries: torch.Tensor,
         keys: torch.Tensor,
         values: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
         scaling: float,
         dropout: float,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute hash-based attention.
 

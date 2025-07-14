@@ -1,49 +1,12 @@
 """Utility functions for masked attention computation."""
 
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
+from torch import nn
 
+from .kv_utils import _get_num_key_value_groups, repeat_kv
 from .mask import Mask
-
-
-def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
-    """
-    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
-    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
-    """
-    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
-    if n_rep == 1:
-        return hidden_states
-    hidden_states = hidden_states[:, :, None, :, :].expand(
-        batch, num_key_value_heads, n_rep, slen, head_dim
-    )
-    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
-
-
-def _get_num_key_value_groups(queries: torch.Tensor, kv_tensor: torch.Tensor) -> int:
-    """
-    Calculate the number of key-value groups based on tensor shapes.
-
-    Args:
-        queries: Query tensor of shape (b, h, sk, d)
-        kv_tensor: Key or Value tensor of shape (b, h_kv, sq, d)
-
-    Returns:
-        Number of key-value groups (h // h_kv)
-
-    Raises:
-        ValueError: If num_attention_heads is not divisible by num_key_value_heads
-    """
-    num_attention_heads = queries.shape[1]
-    num_key_value_heads = kv_tensor.shape[1]
-
-    if num_attention_heads % num_key_value_heads != 0:
-        raise ValueError(
-            f"num_attention_heads ({num_attention_heads}) must be divisible by num_key_value_heads ({num_key_value_heads})"
-        )
-
-    return num_attention_heads // num_key_value_heads
 
 
 def _compute_masked_exp_attention_weights(
@@ -70,21 +33,25 @@ def _compute_masked_exp_attention_weights(
         Masked exponential attention weights tensor of shape (b, h, sq, sk)
     """
     # Calculate num_key_value_groups from tensor shapes
-    num_key_value_groups = _get_num_key_value_groups(queries, keys)
+    num_key_value_groups: int = _get_num_key_value_groups(queries, keys)
 
     # Apply key-value grouping if needed
-    key_states = repeat_kv(keys, num_key_value_groups)
+    key_states: torch.Tensor = repeat_kv(keys, num_key_value_groups)
 
-    raw_attention_weights = torch.matmul(queries, key_states.transpose(2, 3)) * scaling
+    raw_attention_weights: torch.Tensor = (
+        torch.matmul(queries, key_states.transpose(2, 3)) * scaling
+    )
 
     if attention_mask is not None:
         raw_attention_weights = (
             raw_attention_weights + attention_mask[:, :, :, : key_states.shape[-2]]
         )
 
-    row_wise_max = torch.max(raw_attention_weights, dim=-1, keepdim=True)[0]
+    row_wise_max: torch.Tensor = torch.max(raw_attention_weights, dim=-1, keepdim=True)[
+        0
+    ]
     raw_attention_weights = raw_attention_weights - row_wise_max
-    exp_attention_weights = torch.exp(raw_attention_weights)
+    exp_attention_weights: torch.Tensor = torch.exp(raw_attention_weights)
 
     if not sparse_attention_mask.is_empty():
         exp_attention_weights = sparse_attention_mask.apply_inv_mask(
@@ -129,14 +96,14 @@ def _get_attention_numerator(
 
 
 def get_attention_denominator(
-    module: Optional[Any],
+    module: Optional[nn.Module],
     queries: torch.Tensor,
     keys: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
     scaling: float,
     dropout: float,
     sparse_attention_mask: Mask,
-    **kwargs: Any,
+    **kwargs: Dict[str, Any],
 ) -> torch.Tensor:
     """Get masked attention denominator.
 
@@ -153,8 +120,8 @@ def get_attention_denominator(
     Returns:
         Denominator tensor of shape (b, h, sq, 1)
     """
-    training = module.training if module is not None else False
-    exp_attention_weights = _compute_masked_exp_attention_weights(
+    training: bool = module.training if module is not None else False
+    exp_attention_weights: torch.Tensor = _compute_masked_exp_attention_weights(
         queries=queries,
         keys=keys,
         attention_mask=attention_mask,
@@ -168,7 +135,7 @@ def get_attention_denominator(
 
 
 def get_attention_numerator(
-    module: Any,
+    module: nn.Module,
     queries: torch.Tensor,
     keys: torch.Tensor,
     values: torch.Tensor,
@@ -176,7 +143,7 @@ def get_attention_numerator(
     scaling: float,
     dropout: float,
     sparse_attention_mask: Mask,
-    **kwargs: Any,
+    **kwargs: Dict[str, Any],
 ) -> torch.Tensor:
     """Get masked attention numerator.
 
@@ -194,8 +161,8 @@ def get_attention_numerator(
     Returns:
         Numerator tensor of shape (b, h, sq, d)
     """
-    training = module.training if module is not None else False
-    exp_attention_weights = _compute_masked_exp_attention_weights(
+    training: bool = module.training if module is not None else False
+    exp_attention_weights: torch.Tensor = _compute_masked_exp_attention_weights(
         queries=queries,
         keys=keys,
         attention_mask=attention_mask,
@@ -206,14 +173,14 @@ def get_attention_numerator(
     )
 
     # Prepare values by applying key-value grouping
-    num_key_value_groups = _get_num_key_value_groups(queries, values)
-    value_states = repeat_kv(values, num_key_value_groups)
+    num_key_value_groups: int = _get_num_key_value_groups(queries, values)
+    value_states: torch.Tensor = repeat_kv(values, num_key_value_groups)
 
     return _get_attention_numerator(exp_attention_weights, value_states)
 
 
 def get_masked_attention_output(
-    module: Any,
+    module: nn.Module,
     queries: torch.Tensor,
     keys: torch.Tensor,
     values: torch.Tensor,
@@ -222,7 +189,7 @@ def get_masked_attention_output(
     dropout: float,
     sparse_attention_mask: Mask,
     return_attention_weights: bool = False,
-    **kwargs: Any,
+    **kwargs: Dict[str, Any],
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     """Get masked attention output by dividing numerator by denominator.
 
@@ -247,8 +214,8 @@ def get_masked_attention_output(
             - attention_weights: tensor of shape (b, h, sq, sk)
     """
     # Compute exponential attention weights once and reuse
-    training = module.training if module is not None else False
-    exp_attention_weights = _compute_masked_exp_attention_weights(
+    training: bool = module.training if module is not None else False
+    exp_attention_weights: torch.Tensor = _compute_masked_exp_attention_weights(
         queries=queries,
         keys=keys,
         attention_mask=attention_mask,
@@ -259,19 +226,19 @@ def get_masked_attention_output(
     )
 
     # Prepare values by applying key-value grouping
-    num_key_value_groups = _get_num_key_value_groups(queries, values)
-    value_states = repeat_kv(values, num_key_value_groups)
+    num_key_value_groups: int = _get_num_key_value_groups(queries, values)
+    value_states: torch.Tensor = repeat_kv(values, num_key_value_groups)
 
     # Use internal helpers with pre-computed weights
-    num = _get_attention_numerator(exp_attention_weights, value_states)
-    den = _get_attention_denominator(exp_attention_weights)
+    num: torch.Tensor = _get_attention_numerator(exp_attention_weights, value_states)
+    den: torch.Tensor = _get_attention_denominator(exp_attention_weights)
 
     # Compute final attention output
-    attention_output = (num / den).transpose(1, 2).contiguous()
+    attention_output: torch.Tensor = (num / den).transpose(1, 2).contiguous()
 
     if return_attention_weights:
         # Normalize exponential weights to get attention probabilities
-        attention_weights = exp_attention_weights / den
+        attention_weights: torch.Tensor = exp_attention_weights / den
         return attention_output, attention_weights
 
     return attention_output

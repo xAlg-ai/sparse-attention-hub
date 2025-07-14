@@ -2,9 +2,10 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
+from torch import nn
 
 
 @dataclass
@@ -17,6 +18,8 @@ class SparseAttentionConfig:
 class SparseAttention(ABC):
     """Abstract base class for sparse attention mechanisms."""
 
+    sparse_attention_config: SparseAttentionConfig
+
     def __init__(self, sparse_attention_config: SparseAttentionConfig) -> None:
         """Initialize sparse attention mechanism.
 
@@ -28,14 +31,14 @@ class SparseAttention(ABC):
     @abstractmethod
     def custom_attention(
         self,
-        module: Any,
+        module: nn.Module,
         queries: torch.Tensor,
         keys: torch.Tensor,
         values: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
         scaling: float,
         dropout: float,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute custom attention mechanism.
 

@@ -1,9 +1,10 @@
 """Base classes for research attention mechanisms."""
 
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+from torch import nn
 
 from ..base import SparseAttention, SparseAttentionConfig
 from ..utils.mask import Mask
@@ -22,6 +23,8 @@ class ResearchAttentionConfig(SparseAttentionConfig):
 class ResearchAttention(SparseAttention):
     """Base class for research attention mechanisms with maskers."""
 
+    maskers: List[ResearchMasker]
+
     def __init__(
         self,
         sparse_attention_config: SparseAttentionConfig,
@@ -39,7 +42,7 @@ class ResearchAttention(SparseAttention):
         super().__init__(sparse_attention_config)
 
         # Validate that there's at most one sampling masker
-        sampling_masker_count = sum(
+        sampling_masker_count: int = sum(
             1 for masker in maskers if isinstance(masker, SamplingMasker)
         )
         if sampling_masker_count > 1:
@@ -51,14 +54,15 @@ class ResearchAttention(SparseAttention):
 
     def custom_attention(
         self,
-        module: Any,
+        module: nn.Module,
         queries: torch.Tensor,
         keys: torch.Tensor,
         values: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
         scaling: float,
         dropout: float,
-        **kwargs: Any,
+        sparse_meta_data: Dict[Any, Any],
+        **kwargs: Dict[str, Any],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Compute research attention mechanism with masking.
 
@@ -76,13 +80,15 @@ class ResearchAttention(SparseAttention):
             Tuple of attention output and optional attention weights.
         """
         # Create an empty Mask object
-        mask_shape = (
+        mask_shape: Tuple[int, int, int, int] = (
             queries.shape[0],
             queries.shape[1],
             queries.shape[2],
             keys.shape[2],
         )
-        sparse_attention_mask = Mask.create_empty_mask(mask_shape)
+        sparse_attention_mask: Mask = Mask.create_empty_mask(
+            mask_shape, dtype=queries.dtype
+        )
 
         # Apply all maskers sequentially, each one on the output of the previous one
         for masker in self.maskers:
@@ -91,13 +97,15 @@ class ResearchAttention(SparseAttention):
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
-                sparse_meta_data=None,  # TODO: Define sparse_meta_data structure
+                sparse_meta_data=sparse_meta_data,
                 previous_mask=sparse_attention_mask,
                 **kwargs,
             )
 
         # Call compute_masked_attention_output on the result of the last mask
         # Always request attention weights to match the expected return signature
+        attention_output: torch.Tensor
+        attention_weights: torch.Tensor
         attention_output, attention_weights = get_masked_attention_output(
             module=module,
             queries=queries,
@@ -130,9 +138,11 @@ class ResearchAttention(SparseAttention):
             raise TypeError(f"Expected ResearchAttentionConfig, got {type(config)}")
 
         # Create ResearchMasker objects from the configs using the factory method
-        maskers = []
+        maskers: List[ResearchMasker] = []
         for masker_config in config.masker_configs:
-            masker = ResearchMasker.create_masker_from_config(masker_config)
+            masker: ResearchMasker = ResearchMasker.create_masker_from_config(
+                masker_config
+            )
             maskers.append(masker)
 
         return cls(config, maskers)

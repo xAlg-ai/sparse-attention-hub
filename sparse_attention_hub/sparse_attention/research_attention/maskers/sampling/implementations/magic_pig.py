@@ -1,11 +1,15 @@
 """Magic pig sampling masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
+
+import torch
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
+    MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import SamplingMasker, SamplingMaskerConfig
 
@@ -18,10 +22,15 @@ class MagicPigConfig(SamplingMaskerConfig):
     lsh_k: int  # number of bits per table
 
 
+@MaskerRegistry.register(MagicPigConfig)
 class MagicPig(SamplingMasker):
     """Magic Pig masker."""
 
-    def __init__(self, config: MagicPigConfig):
+    sampling_rate: float
+    lsh_l: int
+    lsh_k: int
+
+    def __init__(self, config: MagicPigConfig) -> None:
         """Initialize Magic Pig masker with configuration."""
         super().__init__(config)
         self.sampling_rate = config.sampling_rate
@@ -30,14 +39,14 @@ class MagicPig(SamplingMasker):
 
     def add_mask(
         self,
-        keys: Any,
-        queries: Any,
-        values: Any,
-        attention_mask: Any,
-        sparse_meta_data: Any,
-        previous_mask: Any,
-        **kwargs: Any,
-    ) -> Any:
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        values: torch.Tensor,
+        attention_mask: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        previous_mask: Mask,
+        **kwargs: Dict[str, Any],
+    ) -> Mask:
         """Add Magic Pig mask."""
         # just return the same mask for now
         return previous_mask
