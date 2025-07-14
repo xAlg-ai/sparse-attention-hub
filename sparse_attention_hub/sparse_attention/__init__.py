@@ -9,8 +9,6 @@ from .efficient_attention.implementations import (
     HashAttention,
     HashAttentionConfig,
 )
-from .generator import SparseAttentionGen
-from .integrations import SparseAttentionHF
 from .metadata import SparseAttentionMetadata
 from .research_attention import ResearchAttention, ResearchAttentionConfig
 from .research_attention.maskers import ResearchMasker
@@ -69,8 +67,6 @@ __all__ = [
     "DoubleSparsityTopKMasker",
     "RandomSamplingMasker",
     "MagicPig",
-    "SparseAttentionGen",
-    "SparseAttentionHF",
     "SparseAttentionMetadata",
     "Mask",
 ]

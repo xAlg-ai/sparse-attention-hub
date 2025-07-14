@@ -1,8 +1,8 @@
 """Integration tests for the adapter implementation."""
 
-import pytest
 from unittest.mock import Mock, patch
 
+import pytest
 import torch
 
 from sparse_attention_hub.adapters import ModelAdapterHF, Request, RequestResponse
@@ -47,7 +47,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_full_request_processing_flow(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_full_request_processing_flow(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test complete request processing flow from context to response."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -110,7 +112,7 @@ class TestAdapterIntegration:
             sparse_attention_config=sparse_attention_config,
             model_kwargs={"torch_dtype": torch.float16},
         )
-        
+
         # Create request
         request = Request(
             context="What is the capital of France?", questions="Tell me about Paris."
@@ -129,7 +131,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_multiple_questions_processing(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_multiple_questions_processing(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test processing multiple questions in a single request."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -211,7 +215,7 @@ class TestAdapterIntegration:
             sparse_attention_config=sparse_attention_config,
             model_kwargs={"torch_dtype": torch.float16},
         )
-        
+
         # Create request with multiple questions
         request = Request(
             context="Context about France",
@@ -231,7 +235,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_mode_switching_integration(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_mode_switching_integration(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test mode switching between sparse and dense modes."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -252,7 +258,7 @@ class TestAdapterIntegration:
             sparse_attention_config=sparse_attention_config,
             model_kwargs={"torch_dtype": torch.float16},
         )
-        
+
         # Test switching to sparse mode
         with adapter.enable_sparse_mode():
             # Should not raise any errors
@@ -270,7 +276,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_custom_attention_function_integration(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_custom_attention_function_integration(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test custom attention function integration."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -291,7 +299,7 @@ class TestAdapterIntegration:
             sparse_attention_config=sparse_attention_config,
             model_kwargs={"torch_dtype": torch.float16},
         )
-        
+
         # Get custom attention function
         assert adapter.sparse_attention is not None
         custom_fn = adapter.get_custom_attention_function(adapter.sparse_attention)
@@ -331,7 +339,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_error_handling_integration(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_error_handling_integration(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test error handling in integration scenarios."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -352,7 +362,7 @@ class TestAdapterIntegration:
             sparse_attention_config=sparse_attention_config,
             model_kwargs={"torch_dtype": torch.float16},
         )
-        
+
         # Test error when custom attention function is called without sparse_meta_data
         assert adapter.sparse_attention is not None
         custom_fn = adapter.get_custom_attention_function(adapter.sparse_attention)
@@ -378,7 +388,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_adapter_with_device_configuration(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_adapter_with_device_configuration(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test adapter with device configuration."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -427,7 +439,9 @@ class TestAdapterIntegration:
 
     @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
     @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
-    def test_adapter_cleanup_on_exception(self, mock_tokenizer, mock_model, sparse_attention_config):
+    def test_adapter_cleanup_on_exception(
+        self, mock_tokenizer, mock_model, sparse_attention_config
+    ):
         """Test adapter cleanup when exceptions occur during mode switching."""
         # Mock tokenizer
         mock_tokenizer_instance = Mock()
@@ -448,7 +462,7 @@ class TestAdapterIntegration:
             sparse_attention_config=sparse_attention_config,
             model_kwargs={"torch_dtype": torch.float16},
         )
-        
+
         # Test cleanup on exception
         with pytest.raises(ValueError):
             with adapter.enable_sparse_mode():
@@ -460,20 +474,23 @@ class TestAdapterIntegration:
             # Should work fine - cleanup was successful
             pass
 
+
 class TestAdapterManual:
     """Manual tests for adapter functionality with real models."""
 
-    def test_adapter_basic_process_request(self, sparse_attention_config_multi, model_name):
+    def test_adapter_basic_process_request(
+        self, sparse_attention_config_multi, model_name
+    ):
         """Test basic process request."""
         adapter = ModelAdapterHF(
             model_name=model_name,
             sparse_attention_config=sparse_attention_config_multi,
             model_kwargs={"device_map": "cuda", "torch_dtype": torch.bfloat16},
-            device="cuda"
+            device="cuda",
         )
-        
+
         request = Request(
-            context='''
+            context="""
          From July 4 through July 7, 2025, a destructive and deadly flood took place in
          the Texas Hill Country, particularly in Kerr County, in the U.S. state of Texas.
          During the flooding, water levels along the Guadalupe River rose rapidly in a short time.
@@ -481,23 +498,24 @@ class TestAdapterManual:
          Kerr County, with about 170 reported missing. The flooding was caused by a mesoscale
          convective vortex with enhanced tropical moisture from the remnants of Tropical Storm Barry.
          Answer the following question based on the paragraph above:
-            ''',
-            questions="What county was the most affected by the flood?"
+            """,
+            questions="What county was the most affected by the flood?",
         )
         response = adapter.process_request(request)
         assert isinstance(response.responses, str)
 
-    def test_adapter_basic_process_request_with_multiple_questions(self, sparse_attention_config_multi, model_name):
+    def test_adapter_basic_process_request_with_multiple_questions(
+        self, sparse_attention_config_multi, model_name
+    ):
         """Test basic process request with multiple questions."""
         adapter = ModelAdapterHF(
             model_name=model_name,
             sparse_attention_config=sparse_attention_config_multi,
             model_kwargs={"device_map": "cuda", "torch_dtype": torch.bfloat16},
         )
-        
-        
+
         request = Request(
-            context='''
+            context="""
          From July 4 through July 7, 2025, a destructive and deadly flood took place in
          the Texas Hill Country, particularly in Kerr County, in the U.S. state of Texas.
          During the flooding, water levels along the Guadalupe River rose rapidly in a short time.
@@ -505,8 +523,11 @@ class TestAdapterManual:
          Kerr County, with about 170 reported missing. The flooding was caused by a mesoscale
          convective vortex with enhanced tropical moisture from the remnants of Tropical Storm Barry.
          Answer the following question based on the paragraph above:
-            ''',
-            questions=["What county was the most affected by the flood?", "What was the cause of the flood?"]
+            """,
+            questions=[
+                "What county was the most affected by the flood?",
+                "What was the cause of the flood?",
+            ],
         )
         response = adapter.process_request(request)
         assert len(response.responses) == 2
@@ -522,11 +543,13 @@ class TestAdapterManual:
             sparse_attention_config=sparse_attention_config_multi,
             model_kwargs={"torch_dtype": torch.bfloat16},
         )
-        
+
         for name, module in adapter.model.named_modules():
             if isinstance(module, LlamaAttention):
-                assert not module.config._attn_implementation.startswith("sparse_attention")
-        
+                assert not module.config._attn_implementation.startswith(
+                    "sparse_attention"
+                )
+
         # Test sparse mode
         with adapter.enable_sparse_mode():
             # Should not raise any errors - sparse mode is working
@@ -536,7 +559,9 @@ class TestAdapterManual:
                         module.config._attn_implementation
                         == adapter._registered_attention_name
                     )
-                    assert module.config._attn_implementation.startswith("sparse_attention")
+                    assert module.config._attn_implementation.startswith(
+                        "sparse_attention"
+                    )
 
         assert (
             adapter._registered_attention_name in ALL_ATTENTION_FUNCTIONS.valid_keys()
@@ -558,7 +583,7 @@ class TestAdapterManual:
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
-        
+
         assert (
             adapter._registered_attention_name in ALL_ATTENTION_FUNCTIONS.valid_keys()
         )
@@ -573,4 +598,3 @@ class TestAdapterManual:
         assert (
             registered_attention_name not in ALL_MASK_ATTENTION_FUNCTIONS.valid_keys()
         )
-

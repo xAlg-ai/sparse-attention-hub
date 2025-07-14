@@ -79,7 +79,6 @@ Documentation = "https://sparse-attention-hub.readthedocs.io"
 "Bug Tracker" = "https://github.com/xAlg-ai/sparse-attention-hub/issues"
 
 [project.scripts]
-sparse-attention-server = "sparse_attention_hub.pipeline.server:main"
 sparse-attention-benchmark = "sparse_attention_hub.benchmark.executor:main"
 
 [tool.setuptools.packages.find]

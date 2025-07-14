@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Generator, List, Optional, Union, Dict
+from typing import Any, Callable, Dict, Generator, List, Optional, Union
 
 from ..sparse_attention.base import SparseAttention, SparseAttentionConfig
 
@@ -74,10 +74,10 @@ class ModelAdapter(SparseAttentionAdapterInterface, ModelHubAdapterInterface, AB
     """
 
     def __init__(
-        self, 
-        model_name: str, 
-        sparse_attention_config: Optional[SparseAttentionConfig], 
-        **kwargs: Dict[str, Any]
+        self,
+        model_name: str,
+        sparse_attention_config: Optional[SparseAttentionConfig],
+        **kwargs: Dict[str, Any],
     ) -> None:
         """Initialize model adapter.
 
@@ -93,9 +93,8 @@ class ModelAdapter(SparseAttentionAdapterInterface, ModelHubAdapterInterface, AB
             SparseAttention.create_from_config(self.sparse_attention_config)
             if self.sparse_attention_config is not None
             else None
-        )        
-        
-        
+        )
+
     @abstractmethod
     @contextmanager
     def enable_sparse_mode(self) -> Generator[None, None, None]:

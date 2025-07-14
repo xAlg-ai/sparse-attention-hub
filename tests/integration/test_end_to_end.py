@@ -7,13 +7,22 @@ import pytest
 class TestEndToEndSparseAttention:
     """Test end-to-end sparse attention pipeline."""
 
-    def test_full_attention_pipeline(self, medium_sequence_length):
+    def test_adapter_dense_mode(self, medium_sequence_length):
+        """Test adapter in dense mode."""
+        # TODO: Implement adapter dense mode integration test
+        pass
+
+    def test_adapter_sparse_mode(self, medium_sequence_length):
+        """Test adapter in sparse mode."""
+        # TODO: Implement adapter sparse mode integration test
         pass
 
     def test_benchmark_integration(self, small_sequence_length):
         pass
 
-    def test_model_hub_integration(self):
+    def test_adapter_request_response_integration(self):
+        """Test adapter with Request/RequestResponse pattern."""
+        # TODO: Implement adapter request/response integration test
         pass
 
     def test_metrics_integration(self):
@@ -22,18 +31,23 @@ class TestEndToEndSparseAttention:
 
 # @pytest.mark.integration
 # class TestUserStory:
-#     """Test end-to-end sparse attention pipeline."""
+#     """Test end-to-end sparse attention pipeline using new adapter system."""
 
 #     def test_user_story_1(self):
-#         from sparse_attention_hub.sparse_attention.generator import SparseAttentionHF
-#         sparse_attention_config = OracleTopKConfig(heavy_size=0.25)
-#         sparse_attention = SparseAttentionHF(sparse_attention_config)
-#         custom_attention = sparse_attention.get_custom_attention()
-#         from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
-#         ALL_ATTENTION_FUNCTIONS.register("custom_attention", custom_attention)
-#         model = AutoModelForCausalLM.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct", torch_dtype=torch.bfloat16, _attn_implementation="custom_attention")
-#         sparse_attention_meta_data = {}
-#         prompt = "Hello, world!" *100
-#         inputs = tokenizer(prompt, return_tensors="pt")
-#         outputs = model.generate(**inputs, max_new_tokens=10, do_sample=False, sparse_attention_meta_data=sparse_attention_meta_data)
-#         print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+#         from sparse_attention_hub.adapters import ModelAdapterHF, Request
+#         from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
+#         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import OracleTopKConfig
+#
+#         # Create adapter with sparse attention configuration
+#         sparse_attention_config = ResearchAttentionConfig(masker_configs=[OracleTopKConfig(heavy_size=0.25)])
+#         adapter = ModelAdapterHF(
+#             model_name="meta-llama/Meta-Llama-3-8B-Instruct",
+#             sparse_attention_config=sparse_attention_config,
+#             model_kwargs={"torch_dtype": torch.bfloat16}
+#         )
+#
+#         # Create request and process with sparse attention
+#         request = Request(context="Hello, world!" * 100, questions=["Continue the story"])
+#         with adapter.enable_sparse_mode():
+#             response = adapter.process_request(request, max_new_tokens=10)
+#         print(response.responses[0])

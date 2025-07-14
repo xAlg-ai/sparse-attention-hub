@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
-from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
+from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 from ..sparse_attention.base import SparseAttention, SparseAttentionConfig
 from ..sparse_attention.research_attention.base import ResearchAttention
@@ -27,7 +27,7 @@ class ModelAdapterHF(ModelAdapter):
         model_kwargs: Optional[Dict[str, Any]] = None,
         tokenizer_kwargs: Optional[Dict[str, Any]] = None,
         device: Optional[str] = None,
-        **kwargs: Dict[str, Any]
+        **kwargs: Dict[str, Any],
     ) -> None:
         """Initialize HuggingFace adapter.
 
@@ -35,7 +35,7 @@ class ModelAdapterHF(ModelAdapter):
             model_name: Name of the HuggingFace model to use
             sparse_attention_config: Configuration for sparse attention. If None, adapter runs in dense-only mode.
             model_kwargs: Additional keyword arguments for model creation
-            device: Device to run the model on TODO: support dynamic and multipledevice placement 
+            device: Device to run the model on TODO: support dynamic and multipledevice placement
             tokenizer_kwargs: Additional keyword arguments for tokenizer creation
         """
         super().__init__(model_name, sparse_attention_config, **kwargs)
@@ -45,27 +45,37 @@ class ModelAdapterHF(ModelAdapter):
         self.tokenizer_kwargs = tokenizer_kwargs or {}
 
         # more useful parameters to store
-        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = (
+            device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+        )
         self.torch_dtype = self.model_kwargs.get("torch_dtype", torch.float32)
 
         # Handle dense-only mode when sparse_attention_config is None
         self._sparse_attention_available: bool = sparse_attention_config is not None
 
         # create model and tokenizer
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, **self.model_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, **self.tokenizer_kwargs)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_name, **self.model_kwargs
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_name, **self.tokenizer_kwargs
+        )
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # TODO: support dynamic and multipledevice placement 
+        # TODO: support dynamic and multipledevice placement
         self.model.to(self.device)
-        self.random_separator = "".join(random.choices(string.ascii_lowercase + string.digits, k=100))
+        self.random_separator = "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=100)
+        )
 
     def __del__(self) -> None:
         """Clean up registered attention functions when the adapter is destroyed."""
         self._cleanup_attention_registration()
 
-    def process_request(self, request: Request, **kwargs: Dict[str, Any]) -> RequestResponse:
+    def process_request(
+        self, request: Request, **kwargs: Dict[str, Any]
+    ) -> RequestResponse:
         """Processes request with optimized tokenization but independent question processing.
         Context is tokenized once but each question is processed independently to avoid KV cache contamination.
 
@@ -128,8 +138,9 @@ class ModelAdapterHF(ModelAdapter):
         else:
             return RequestResponse(responses=responses)
 
-
-    def _preprocess_context_and_questions(self, context: str, questions: List[str]) -> Tuple[str, List[str]]:
+    def _preprocess_context_and_questions(
+        self, context: str, questions: List[str]
+    ) -> Tuple[str, List[str]]:
         """Preprocess the context and questions -- apply chat template if needed
 
         Args:
@@ -144,9 +155,11 @@ class ModelAdapterHF(ModelAdapter):
                 add_generation_prompt=True,
             )
         new_context = context.split(self.random_separator)[0]
-        new_questions = [ question + context.split(self.random_separator)[1] for question in questions]
+        new_questions = [
+            question + context.split(self.random_separator)[1] for question in questions
+        ]
         return new_context, new_questions
-    
+
     def get_custom_attention_function(
         self, sparse_attention: SparseAttention
     ) -> Callable:
@@ -158,6 +171,7 @@ class ModelAdapterHF(ModelAdapter):
         Returns:
             custom_attention_fn: Callable with correct signature for HuggingFace
         """
+
         def custom_attention_callable(
             module: torch.nn.Module,
             queries: torch.Tensor,

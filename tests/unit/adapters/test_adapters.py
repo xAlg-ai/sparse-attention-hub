@@ -157,7 +157,7 @@ class TestModelAdapterHF:
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
             model_kwargs={"torch_dtype": torch.float16},
-            device="cpu"
+            device="cpu",
         )
 
         # Check that model and tokenizer were created
@@ -192,9 +192,8 @@ class TestModelAdapterHF:
             sparse_attention_config=self.sparse_attention_config,
             model_name="test-model",
             model_kwargs={"torch_dtype": torch.float16},
-            device="cpu"
+            device="cpu",
         )
-
 
         # Check that model was created with correct parameters
         mock_model.from_pretrained.assert_called_once_with(

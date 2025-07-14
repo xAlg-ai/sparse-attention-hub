@@ -37,14 +37,12 @@ The framework is organized into several key modules:
 - **Research Maskers**: Various masking strategies for attention patterns
 - **Generators**: Integration interfaces for different frameworks
 
-### Model Hub
-- **ModelHub**: Abstract interface for model integration
-- **ModelHubHF**: HuggingFace-specific implementation
-
-### Pipeline
-- **Pipeline**: Base pipeline interface
-- **PipelineHF**: HuggingFace-compatible pipeline
-- **SparseAttentionServer**: Server for hosting sparse attention models
+### Adapter System
+- **ModelAdapterHF**: Unified adapter for HuggingFace integration
+- **Request/RequestResponse**: Structured request/response handling
+- **ModelAdapter**: Abstract base class for model adapters
+- **ModelHubAdapterInterface**: Interface for model hosting libraries
+- **SparseAttentionAdapterInterface**: Interface for sparse attention integration
 
 ### Benchmarking
 - **Benchmark**: Abstract benchmark interface
@@ -60,36 +58,52 @@ The framework is organized into several key modules:
 ## 🚀 Quick Start
 
 ```python
-from sparse_attention_hub import (
-    SparseAttentionHF, 
-    ModelHubHF,
-    BenchmarkExecutor,
-    PlotGenerator,
-    Granularity
+from sparse_attention_hub.adapters import ModelAdapterHF, Request, RequestResponse
+from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
+    LocalMaskerConfig, SinkMaskerConfig
 )
-from sparse_attention_hub.sparse_attention.efficient import DoubleSparsity
-from sparse_attention_hub.benchmark.datasets import LongBench
+from sparse_attention_hub.benchmark import BenchmarkExecutor
+from sparse_attention_hub.plotting import PlotGenerator, Granularity
 
-# Create sparse attention mechanism
-sparse_attention = DoubleSparsity()
-attention_generator = SparseAttentionHF(sparse_attention)
+# Create sparse attention configuration
+local_config = LocalMaskerConfig(window_size=16)
+sink_config = SinkMaskerConfig(sink_size=4)
+sparse_attention_config = ResearchAttentionConfig(
+    masker_configs=[local_config, sink_config]
+)
 
-# Set up model hub
-model_hub = ModelHubHF(api_token="your_token")
+# Create model adapter
+adapter = ModelAdapterHF(
+    model_name="microsoft/DialoGPT-small",
+    sparse_attention_config=sparse_attention_config,
+    device="auto"
+)
 
-# Run benchmarks
+# Create request
+request = Request(
+    context="The capital of France is Paris. It is known for the Eiffel Tower.",
+    questions=["What is the capital of France?", "What is Paris known for?"]
+)
+
+# Process request with sparse attention
+with adapter.enable_sparse_mode():
+    response = adapter.process_request(request)
+    print(response.responses)  # ['Paris', 'The Eiffel Tower']
+
+# Process request with dense attention (default)
+response = adapter.process_request(request)
+print(response.responses)
+
+# Run benchmarks and visualizations
 benchmark_executor = BenchmarkExecutor()
-longbench = LongBench()
-benchmark_executor.register_benchmark(longbench)
-
-# Generate visualizations
 plot_generator = PlotGenerator()
 plot_path = plot_generator.generate_plot(Granularity.PER_HEAD)
 ```
 
 ## 📊 Benchmarking
 
-The framework supports multiple benchmark datasets:
+The framework supports multiple benchmark datasets and integrates seamlessly with the new adapter system:
 
 - **LongBench**: Long-context understanding tasks
 - **Loogle**: Dependency tracking benchmarks  
@@ -98,10 +112,18 @@ The framework supports multiple benchmark datasets:
 ```python
 from sparse_attention_hub.benchmark import BenchmarkExecutor
 from sparse_attention_hub.benchmark.datasets import LongBench
+from sparse_attention_hub.adapters import ModelAdapterHF
 
+# Create adapter with sparse attention
+adapter = ModelAdapterHF(
+    model_name="microsoft/DialoGPT-small",
+    sparse_attention_config=your_sparse_config
+)
+
+# Run benchmarks
 executor = BenchmarkExecutor()
 benchmark = LongBench()
-results = executor.evaluate(benchmark, your_model)
+results = executor.evaluate(benchmark, adapter)
 ```
 
 ## 📈 Metrics and Logging
@@ -219,8 +241,7 @@ make ci
 sparse-attention-hub/
 ├── sparse_attention_hub/          # Main package
 │   ├── sparse_attention/           # Sparse attention implementations
-│   ├── model_hub/                  # Model integration
-│   ├── pipeline/                   # Pipeline implementations
+│   ├── adapters/                   # Model adapter system
 │   ├── benchmark/                  # Benchmarking tools
 │   ├── metrics/                    # Metrics and logging
 │   ├── plotting/                   # Visualization tools
@@ -229,6 +250,7 @@ sparse-attention-hub/
 │   ├── unit/                       # Unit tests
 │   └── integration/                # Integration tests
 ├── scripts/                        # Utility scripts
+├── tutorials/                      # Tutorial notebooks and examples
 └── docs/                          # Documentation
 ```
 
