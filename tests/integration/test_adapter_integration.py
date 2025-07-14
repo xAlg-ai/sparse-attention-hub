@@ -55,6 +55,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance.eos_token = "<EOS>"
         mock_tokenizer_instance.pad_token_id = 0
         mock_tokenizer_instance.eos_token_id = 1
+        mock_tokenizer_instance.chat_template = None
         # Updated to handle the corrected calling pattern: context, then question
         mock_tokenizer_instance.encode.side_effect = [
             torch.tensor([[1, 2, 3, 4]]),  # context tokens
@@ -136,6 +137,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance.eos_token = "<EOS>"
         mock_tokenizer_instance.pad_token_id = 0
         mock_tokenizer_instance.eos_token_id = 1
+        mock_tokenizer_instance.chat_template = None
         # Updated to handle the corrected calling pattern: context once, then questions
         mock_tokenizer_instance.encode.side_effect = [
             torch.tensor([[1, 2, 3, 4]]),  # context tokens (once)
@@ -235,6 +237,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance = Mock()
         mock_tokenizer_instance.pad_token = None
         mock_tokenizer_instance.eos_token = "<EOS>"
+        mock_tokenizer_instance.chat_template = None
         mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
 
         # Mock model
@@ -273,6 +276,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance = Mock()
         mock_tokenizer_instance.pad_token = None
         mock_tokenizer_instance.eos_token = "<EOS>"
+        mock_tokenizer_instance.chat_template = None
         mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
 
         # Mock model
@@ -333,6 +337,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance = Mock()
         mock_tokenizer_instance.pad_token = None
         mock_tokenizer_instance.eos_token = "<EOS>"
+        mock_tokenizer_instance.chat_template = None
         mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
 
         # Mock model
@@ -379,6 +384,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance = Mock()
         mock_tokenizer_instance.pad_token = None
         mock_tokenizer_instance.eos_token = "<EOS>"
+        mock_tokenizer_instance.chat_template = None
         mock_tokenizer_instance.encode.return_value = torch.tensor([[1, 2, 3, 4]])
         mock_tokenizer_instance.decode.return_value = "Generated response"
         mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
@@ -427,6 +433,7 @@ class TestAdapterIntegration:
         mock_tokenizer_instance = Mock()
         mock_tokenizer_instance.pad_token = None
         mock_tokenizer_instance.eos_token = "<EOS>"
+        mock_tokenizer_instance.chat_template = None
         mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
 
         # Mock model

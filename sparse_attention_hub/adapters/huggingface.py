@@ -3,7 +3,7 @@
 import random
 import string
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -59,12 +59,13 @@ class ModelAdapterHF(ModelAdapter):
 
         # TODO: support dynamic and multipledevice placement 
         self.model.to(self.device)
+        self.random_separator = "".join(random.choices(string.ascii_lowercase + string.digits, k=100))
 
     def __del__(self) -> None:
         """Clean up registered attention functions when the adapter is destroyed."""
         self._cleanup_attention_registration()
 
-    def process_request(self, request: Request) -> RequestResponse:
+    def process_request(self, request: Request, **kwargs: Dict[str, Any]) -> RequestResponse:
         """Processes request with optimized tokenization but independent question processing.
         Context is tokenized once but each question is processed independently to avoid KV cache contamination.
 
@@ -79,10 +80,14 @@ class ModelAdapterHF(ModelAdapter):
             if isinstance(request.questions, list)
             else [request.questions]
         )
-        context_tokens = self.tokenizer.encode(request.context, return_tensors="pt")
+        context: str = request.context
+
+        context, questions = self._preprocess_context_and_questions(context, questions)
+
+        context_tokens = self.tokenizer.encode(context, return_tensors="pt")
         if self.device is not None:
             context_tokens = context_tokens.to(self.device)
-
+        print(f"Context tokens: {context_tokens.shape}")
         responses: List[str] = []
 
         for question in questions:
@@ -105,7 +110,7 @@ class ModelAdapterHF(ModelAdapter):
                         question_tokens,
                         context_outputs,
                         sparse_meta_data,
-                        max_new_tokens=50,
+                        **kwargs,
                     )
                     responses.append(response_text)
             else:
@@ -114,7 +119,7 @@ class ModelAdapterHF(ModelAdapter):
                     question_tokens,
                     context_outputs,
                     sparse_meta_data,
-                    max_new_tokens=50,
+                    **kwargs,
                 )
                 responses.append(response_text)
 
@@ -123,6 +128,25 @@ class ModelAdapterHF(ModelAdapter):
         else:
             return RequestResponse(responses=responses)
 
+
+    def _preprocess_context_and_questions(self, context: str, questions: List[str]) -> Tuple[str, List[str]]:
+        """Preprocess the context and questions -- apply chat template if needed
+
+        Args:
+            context: The context to preprocess
+            questions: The questions to preprocess
+        """
+        context = context + self.random_separator
+        if self.tokenizer.chat_template is not None:
+            context = self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": context}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        new_context = context.split(self.random_separator)[0]
+        new_questions = [ question + context.split(self.random_separator)[1] for question in questions]
+        return new_context, new_questions
+    
     def get_custom_attention_function(
         self, sparse_attention: SparseAttention
     ) -> Callable:
@@ -287,7 +311,7 @@ class ModelAdapterHF(ModelAdapter):
         question_tokens: torch.Tensor,
         context_outputs: Any,
         sparse_meta_data: Dict[str, Any],
-        max_new_tokens: int = 50,
+        **kwargs: Dict[str, Any],
     ) -> str:
         """Generate text response using greedy decoding based on kvpress pipeline approach.
 
@@ -302,6 +326,7 @@ class ModelAdapterHF(ModelAdapter):
         if self.tokenizer is None:
             raise ValueError("Tokenizer not initialized")
 
+        max_new_tokens: int = kwargs.get("max_new_tokens", 50)
         context_length: int = context_outputs.past_key_values.get_seq_length()
 
         position_ids = torch.arange(
