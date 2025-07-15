@@ -16,7 +16,6 @@ from .adapters import (
     RequestResponse,
     SparseAttentionAdapterInterface,
 )
-from .benchmark import Benchmark, BenchmarkExecutor
 from .metrics import MicroMetric, MicroMetricLogger
 from .plotting import Granularity, PlotGenerator
 from .sparse_attention import EfficientAttention, ResearchAttention, SparseAttention
@@ -25,8 +24,6 @@ __all__ = [
     "SparseAttention",
     "EfficientAttention",
     "ResearchAttention",
-    "Benchmark",
-    "BenchmarkExecutor",
     "MicroMetricLogger",
     "MicroMetric",
     "PlotGenerator",
