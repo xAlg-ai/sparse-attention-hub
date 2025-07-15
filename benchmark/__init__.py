@@ -10,6 +10,7 @@ from .base import Benchmark
 
 # Import concrete benchmark implementations
 from .longbench import LongBench
+from .mock_benchmark import MockBenchmark
 
 # Import all benchmark submodules to make them available for import
 from . import AIME2024
@@ -18,18 +19,21 @@ from . import infinite_bench
 from . import longbench
 from . import longbenchv2
 from . import loogle
+from . import mock_benchmark
 from . import ruler
 from . import zero_scrolls
 
 __all__ = [
     "Benchmark",
     "LongBench",
+    "MockBenchmark",
     "AIME2024",
     "AIME2025", 
     "infinite_bench",
     "longbench",
     "longbenchv2",
     "loogle",
+    "mock_benchmark",
     "ruler",
     "zero_scrolls"
 ]

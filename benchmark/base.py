@@ -23,7 +23,7 @@ class Benchmark(ABC):
     Todo:
         * Add support for generation_kwargs to be passed to adapter.process_request()
         * Add support for answer_prefix handling in request processing
-        * These were simplified in Phase 1 implementation for initial development
+        * Add support for passing max_context_length to the adapter.process_request()
 
     Attributes:
         all_datasets: List of all available datasets for this benchmark (to be overridden)
@@ -208,7 +208,6 @@ class Benchmark(ABC):
         print(f"Loading {self.benchmark_name} datasets: {self.subsets_to_run}")
         dataset_df: pd.DataFrame = self._load_datasets()
         print(f"Loaded {len(dataset_df)} samples")
-        
         # Validate dataset size
         self._validate_dataset_size(dataset_df)
         
