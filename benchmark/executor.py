@@ -203,10 +203,12 @@ def _benchmark_worker(
                 continue
 
             # Step 3: Run the benchmark on the current GPU
+            start_time = time.time()
+            execution_time = 0.0  # Initialize execution_time
+            
             try:
                 with set_gpu(current_gpu_id):
                     logger.debug(f"Worker {worker_id}: Set CUDA device to {current_gpu_id}")
-                    start_time = time.time()
                     execution_success = False
 
                     # Create model adapter with sparse attention config
@@ -253,6 +255,7 @@ def _benchmark_worker(
                     logger.info(f"Worker {worker_id}: Successfully completed {stub.model_name}/{stub.sparse_config_name}/{stub.benchmark_name} in {execution_time:.2f}s")
 
             except Exception as e:
+                execution_time = time.time() - start_time  # Calculate execution time even on failure
                 error_category = _categorize_error(e, "benchmark execution")
                 error_msg = f"Benchmark execution failed: {e}"
                 logger.error(f"Worker {worker_id}: {error_msg}")

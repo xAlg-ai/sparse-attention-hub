@@ -26,7 +26,8 @@ from .gpu import (
 
 from .data import (
     escape_dataframe_for_csv,
-    save_dataframe_to_csv
+    save_dataframe_to_csv,
+    make_serializable
 )
 
 # Re-export all utilities for backward compatibility
@@ -48,5 +49,6 @@ __all__ = [
     
     # Data utilities
     "escape_dataframe_for_csv",
-    "save_dataframe_to_csv"
+    "save_dataframe_to_csv",
+    "make_serializable"
 ] 
