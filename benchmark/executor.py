@@ -15,6 +15,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from queue import Empty
+from contextlib import contextmanager
 
 # Set multiprocessing start method to 'spawn' for CUDA compatibility
 if multiprocessing.get_start_method(allow_none=True) != 'spawn':
@@ -30,23 +31,40 @@ from .executor_config import (
     ExecutionProgress,
     BenchmarkResult,
     BenchmarkFailure,
-    create_gpu_pool,
     filter_existing_results,
     generate_benchmark_stubs,
-    validate_gpu_availability,
-    acquire_gpu_from_pool,
-    release_gpu_to_pool,
-    set_cuda_visible_devices,
-    cleanup_gpu_memory,
+
 )
 from .benchmark_registry import (
     ensure_benchmarks_loaded,
     create_benchmark_instance
 )
 
+from .utils.gpu import (
+    cleanup_gpu_memory,
+    release_gpu_to_pool,
+    acquire_gpu_from_pool,
+    create_gpu_pool,
+    validate_gpu_availability,
+)
 
 # Global flag for graceful shutdown
 _shutdown_requested = False
+
+
+@contextmanager
+def set_gpu(gpu_id: int):
+    """Context manager to set the current CUDA device.
+    
+    Args:
+        gpu_id: The GPU device ID to set as current device
+        
+    Yields:
+        None: The context manager yields control to the with block
+    """
+    import torch
+    torch.cuda.set_device(gpu_id)
+    yield
 
 
 def _signal_handler(signum: int, frame: Any) -> None:
@@ -147,7 +165,7 @@ def _benchmark_worker(
     # Track resources for cleanup
     current_gpu_id: Optional[int] = None
     adapter = None
-    
+
     try:
         while True:
             # Check for shutdown signal
@@ -183,75 +201,58 @@ def _benchmark_worker(
                     execution_time=0.0
                 ))
                 continue
-            
-            # Step 3: Set CUDA_VISIBLE_DEVICES for this process
+
+            # Step 3: Run the benchmark on the current GPU
             try:
-                set_cuda_visible_devices(current_gpu_id)
-                logger.debug(f"Worker {worker_id}: Set CUDA_VISIBLE_DEVICES={current_gpu_id}")
+                with set_gpu(current_gpu_id):
+                    logger.debug(f"Worker {worker_id}: Set CUDA device to {current_gpu_id}")
+                    start_time = time.time()
+                    execution_success = False
+
+                    # Create model adapter with sparse attention config
+                    logger.info(f"Worker {worker_id}: Creating model adapter for {stub.model_name}")
+                    
+                    # Import here to avoid issues with multiprocessing
+                    from sparse_attention_hub.adapters.huggingface import ModelAdapterHF
+                    
+                    adapter = ModelAdapterHF(
+                        model_name=stub.model_name,
+                        sparse_attention_config=stub.sparse_attention_config,
+                        model_kwargs=stub.adapter_config.model_kwargs,
+                        tokenizer_kwargs=stub.adapter_config.tokenizer_kwargs
+                    )
+                    
+                    # Create benchmark instance
+                    logger.info(f"Worker {worker_id}: Creating benchmark instance for {stub.benchmark_name}")
+                    benchmark = create_benchmark_instance(
+                        benchmark_name=stub.benchmark_name,
+                        subsets=[stub.subset] if stub.subset else None
+                    )
+                    
+                    # Execute benchmark
+                    logger.info(f"Worker {worker_id}: Executing benchmark {stub.benchmark_name} on GPU {current_gpu_id}")
+                    metrics = benchmark.run_benchmark(
+                        adapter=adapter,
+                        result_dir=stub.result_dir,
+                        generation_kwargs=stub.generation_kwargs,
+                        request_kwargs=stub.request_kwargs
+                    )
+                    
+                    execution_time = time.time() - start_time
+                    execution_success = True
+                    
+                    # Report successful result
+                    result = BenchmarkResult(
+                        stub=stub,
+                        metrics=metrics,
+                        execution_time=execution_time,
+                        success=True
+                    )
+                    result_queue.put(result)
+                    
+                    logger.info(f"Worker {worker_id}: Successfully completed {stub.model_name}/{stub.sparse_config_name}/{stub.benchmark_name} in {execution_time:.2f}s")
+
             except Exception as e:
-                error_category = _categorize_error(e, "CUDA device setup")
-                error_msg = f"Failed to set CUDA_VISIBLE_DEVICES for GPU {current_gpu_id}: {e}"
-                logger.error(f"Worker {worker_id}: {error_msg}")
-                _cleanup_worker_resources(gpu_pool, current_gpu_id, adapter, logger, worker_id)
-                current_gpu_id = None
-                error_queue.put(BenchmarkFailure(
-                    stub=stub,
-                    error_message=error_msg,
-                    error_type=error_category,
-                    execution_time=0.0
-                ))
-                continue
-            
-            # Step 4: Execute benchmark
-            start_time = time.time()
-            execution_success = False
-            
-            try:
-                # Create model adapter with sparse attention config
-                logger.info(f"Worker {worker_id}: Creating model adapter for {stub.model_name}")
-                
-                # Import here to avoid issues with multiprocessing
-                from sparse_attention_hub.adapters.huggingface import ModelAdapterHF
-                
-                adapter = ModelAdapterHF(
-                    model_name=stub.model_name,
-                    sparse_attention_config=stub.sparse_attention_config,
-                    model_kwargs=stub.adapter_config.model_kwargs,
-                    tokenizer_kwargs=stub.adapter_config.tokenizer_kwargs
-                )
-                
-                # Create benchmark instance
-                logger.info(f"Worker {worker_id}: Creating benchmark instance for {stub.benchmark_name}")
-                benchmark = create_benchmark_instance(
-                    benchmark_name=stub.benchmark_name,
-                    subsets=[stub.subset] if stub.subset else None
-                )
-                
-                # Execute benchmark
-                logger.info(f"Worker {worker_id}: Executing benchmark {stub.benchmark_name} on GPU {current_gpu_id}")
-                metrics = benchmark.run_benchmark(
-                    adapter=adapter,
-                    result_dir=stub.result_dir,
-                    generation_kwargs=stub.generation_kwargs,
-                    request_kwargs=stub.request_kwargs
-                )
-                
-                execution_time = time.time() - start_time
-                execution_success = True
-                
-                # Report successful result
-                result = BenchmarkResult(
-                    stub=stub,
-                    metrics=metrics,
-                    execution_time=execution_time,
-                    success=True
-                )
-                result_queue.put(result)
-                
-                logger.info(f"Worker {worker_id}: Successfully completed {stub.model_name}/{stub.sparse_config_name}/{stub.benchmark_name} in {execution_time:.2f}s")
-                
-            except Exception as e:
-                execution_time = time.time() - start_time
                 error_category = _categorize_error(e, "benchmark execution")
                 error_msg = f"Benchmark execution failed: {e}"
                 logger.error(f"Worker {worker_id}: {error_msg}")
@@ -267,9 +268,10 @@ def _benchmark_worker(
                     execution_time=execution_time
                 )
                 error_queue.put(failure)
+                continue
             
             finally:
-                # Step 5: Cleanup and release GPU
+                # Step 4: Cleanup and release GPU
                 _cleanup_worker_resources(gpu_pool, current_gpu_id, adapter, logger, worker_id)
                 current_gpu_id = None
                 adapter = None
@@ -301,7 +303,7 @@ def _cleanup_worker_resources(
     
     Args:
         gpu_pool: GPU pool queue to return GPU to
-        gpu_id: GPU ID to release (can be None)
+        gpu_id: GPU ID to release (can be None) - this is the actual GPU ID from the pool
         adapter: Model adapter to cleanup (can be None)
         logger: Logger instance for the worker
         worker_id: Worker process ID for logging
@@ -321,10 +323,10 @@ def _cleanup_worker_resources(
         # Clean up GPU memory and release GPU
         if gpu_id is not None:
             try:
-                # Clean up GPU memory
                 cleanup_gpu_memory(gpu_id)
-                
-                # Release GPU back to pool
+                logger.debug(f"Worker {worker_id}: Cleaned up GPU memory for GPU {gpu_id}")
+            
+                # Release GPU back to pool (always use the original GPU ID for the pool)
                 release_gpu_to_pool(gpu_pool, gpu_id)
                 logger.debug(f"Worker {worker_id}: Released GPU {gpu_id} back to pool")
                 

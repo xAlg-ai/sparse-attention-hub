@@ -12,9 +12,22 @@ import multiprocessing
 import os
 import queue
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import torch
+
+
+def get_cuda_visible_devices() -> List[int]:
+    """Get the CUDA_VISIBLE_DEVICES environment variable.
+    
+    Returns:
+        CUDA_VISIBLE_DEVICES environment variable, or None if not set
+    """
+    if "CUDA_VISIBLE_DEVICES" not in os.environ:
+        all_devices = [i for i in range(torch.cuda.device_count())]
+        return all_devices
+    else:
+        return [int(id) for id in os.environ["CUDA_VISIBLE_DEVICES"].split(",")]
 
 
 def validate_gpu_availability(gpu_ids: List[int]) -> None:
@@ -49,8 +62,8 @@ def validate_gpu_availability(gpu_ids: List[int]) -> None:
         if not isinstance(gpu_id, int) or gpu_id < 0:
             raise ValueError(f"Invalid GPU ID: {gpu_id}")
         
-        if gpu_id >= num_gpus:
-            raise ValueError(f"GPU {gpu_id} does not exist. Available GPUs: 0-{num_gpus-1}")
+        # if gpu_id >= num_gpus:
+        #     raise ValueError(f"GPU {gpu_id} does not exist. Available GPUs: 0-{num_gpus-1}")
         
         # Test GPU access
         try:
@@ -195,20 +208,6 @@ def validate_gpu_for_model(gpu_id: int, model_name: str, check_memory: bool = Tr
     except Exception as e:
         raise OSError(f"Failed to validate GPU {gpu_id} for {model_name}: {e}") from e
 
-
-def set_cuda_visible_devices(gpu_id: int) -> None:
-    """Set CUDA_VISIBLE_DEVICES environment variable for this process.
-    
-    This makes only the specified GPU visible to the current process,
-    which will see it as device 0.
-    
-    Args:
-        gpu_id: GPU device ID to make visible
-        
-    Example:
-        >>> set_cuda_visible_devices(1)  # Process will only see GPU 1 as device 0
-    """
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 
 
 def cleanup_gpu_memory(gpu_id: Optional[int] = None) -> None:
