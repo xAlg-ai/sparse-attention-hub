@@ -5,7 +5,47 @@ This module contains utility functions for data processing, formatting, and expo
 
 import pandas as pd
 import csv
+import json
+import dataclasses
+import torch
 from typing import Any
+
+
+def make_serializable(obj: Any) -> Any:
+    """Convert non-serializable objects to strings recursively, including dataclasses.
+    
+    Args:
+        obj: Object to make JSON serializable
+        
+    Returns:
+        JSON serializable version of the object
+        
+    Example:
+        >>> config = {"torch_dtype": torch.bfloat16, "device": "cuda"}
+        >>> serializable = make_serializable(config)
+        >>> json.dumps(serializable)  # Works without error
+    """
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return {k: make_serializable(v) for k, v in dataclasses.asdict(obj).items()}
+    if isinstance(obj, (torch.dtype, torch.device)):
+        return str(obj)
+    elif hasattr(obj, 'dtype'):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {k: make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_serializable(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        # For custom objects
+        return make_serializable(vars(obj))
+    elif obj is None:
+        return None
+    else:
+        try:
+            json.dumps(obj)
+            return obj
+        except Exception:
+            return str(obj)
 
 
 def escape_dataframe_for_csv(df: pd.DataFrame) -> pd.DataFrame:
