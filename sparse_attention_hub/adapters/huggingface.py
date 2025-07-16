@@ -14,6 +14,7 @@ from ..sparse_attention.base import SparseAttention, SparseAttentionConfig
 from ..sparse_attention.research_attention.base import ResearchAttention
 from .base import ModelAdapter, Request, RequestResponse
 
+INT_MAX = 2**31 - 1
 
 class ModelAdapterHF(ModelAdapter):
     """ModelAdapter for HuggingFace integration. Provides concrete implementations for huggingface's
@@ -74,7 +75,7 @@ class ModelAdapterHF(ModelAdapter):
         self._cleanup_attention_registration()
 
     def process_request(
-        self, request: Request, **kwargs: Dict[str, Any]
+        self, request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]
     ) -> RequestResponse:
         """Processes request with optimized tokenization but independent question processing.
         Context is tokenized once but each question is processed independently to avoid KV cache contamination.
@@ -85,6 +86,8 @@ class ModelAdapterHF(ModelAdapter):
         Returns:
             response: The response to the request
         """
+        max_context_length: int = request_kwargs.get("max_context_length",INT_MAX)
+        
         questions: List[str] = (
             request.questions
             if isinstance(request.questions, list)
@@ -95,6 +98,7 @@ class ModelAdapterHF(ModelAdapter):
         context, questions = self._preprocess_context_and_questions(context, questions)
 
         context_tokens = self.tokenizer.encode(context, return_tensors="pt")
+        context_tokens = context_tokens[:, :max_context_length] # truncate context to max_context_length
         if self.device is not None:
             context_tokens = context_tokens.to(self.device)
         print(f"Context tokens: {context_tokens.shape}")
@@ -120,6 +124,7 @@ class ModelAdapterHF(ModelAdapter):
                         question_tokens,
                         context_outputs,
                         sparse_meta_data,
+                        generation_kwargs,
                         **kwargs,
                     )
                     responses.append(response_text)
@@ -129,6 +134,7 @@ class ModelAdapterHF(ModelAdapter):
                     question_tokens,
                     context_outputs,
                     sparse_meta_data,
+                    generation_kwargs,
                     **kwargs,
                 )
                 responses.append(response_text)
@@ -325,6 +331,7 @@ class ModelAdapterHF(ModelAdapter):
         question_tokens: torch.Tensor,
         context_outputs: Any,
         sparse_meta_data: Dict[str, Any],
+        generation_kwargs: Dict[str, Any],
         **kwargs: Dict[str, Any],
     ) -> str:
         """Generate text response using greedy decoding based on kvpress pipeline approach.
@@ -336,11 +343,15 @@ class ModelAdapterHF(ModelAdapter):
 
         Returns:
             Generated text response
+
+        TODO:
+            move to huggingface genera`te() to leverage all possible generations
+            pass generation_kwargs appropriately
         """
         if self.tokenizer is None:
             raise ValueError("Tokenizer not initialized")
 
-        max_new_tokens: int = kwargs.get("max_new_tokens", 50)  # type: ignore
+        max_new_tokens: int = generation_kwargs.get("max_new_tokens", 50)  # type: ignore
         context_length: int = context_outputs.past_key_values.get_seq_length()
 
         position_ids = torch.arange(
@@ -373,6 +384,7 @@ class ModelAdapterHF(ModelAdapter):
                     position_ids=position_ids + i,
                     sparse_meta_data=sparse_meta_data,
                 )
+                # TODO: support other forms of decoding
                 new_id = outputs.logits[0, -1].argmax()
                 generated_ids.append(new_id)
 
