@@ -25,7 +25,6 @@ from .utils import (
     acquire_gpu_from_pool,
     release_gpu_to_pool,
     validate_gpu_for_model,
-    set_cuda_visible_devices,
     cleanup_gpu_memory
 )
 
