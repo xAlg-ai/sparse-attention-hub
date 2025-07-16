@@ -10,8 +10,47 @@ from pathlib import Path
 from datasets import load_dataset
 from tqdm import tqdm
 import torch
+import sys
+import dataclasses
 
 from sparse_attention_hub.adapters.base import Request, RequestResponse, ModelAdapter
+
+
+def make_serializable(obj: Any) -> Any:
+    """Convert non-serializable objects to strings recursively, including dataclasses.
+    
+    Args:
+        obj: Object to make JSON serializable
+        
+    Returns:
+        JSON serializable version of the object
+        
+    Example:
+        >>> config = {"torch_dtype": torch.bfloat16, "device": "cuda"}
+        >>> serializable = make_serializable(config)
+        >>> json.dumps(serializable)  # Works without error
+    """
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return {k: make_serializable(v) for k, v in dataclasses.asdict(obj).items()}
+    if isinstance(obj, (torch.dtype, torch.device)):
+        return str(obj)
+    elif hasattr(obj, 'dtype'):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {k: make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_serializable(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        # For custom objects
+        return make_serializable(vars(obj))
+    elif obj is None:
+        return None
+    else:
+        try:
+            json.dumps(obj)
+            return obj
+        except Exception:
+            return str(obj)
 
 
 class Benchmark(ABC):
@@ -41,7 +80,7 @@ class Benchmark(ABC):
         ...         return {"accuracy": 0.95}
         >>> 
         >>> benchmark = MyBenchmark(subsets_to_run=["task1"])
-        >>> results = benchmark.run_benchmark(adapter, result_dir="/path/to/results")
+        >>> results = benchmark.run_benchmark(adapter, result_dir="/path/to/results", generation_kwargs={"max_new_tokens": 50}, request_kwargs={"max_context_length": 1024})
     """
 
     # Class attributes to be overridden in subclasses
@@ -139,7 +178,9 @@ class Benchmark(ABC):
     def _process_all_requests(
         self, 
         adapter: ModelAdapter, 
-        dataset_df: pd.DataFrame
+        dataset_df: pd.DataFrame,
+        generation_kwargs: Dict[str, Any],
+        request_kwargs: Dict[str, Any]
     ) -> pd.DataFrame:
         """Process all samples through the model adapter using context grouping for efficiency.
 
@@ -150,9 +191,15 @@ class Benchmark(ABC):
         Returns:
             DataFrame with added 'predicted_answer' column.
         """
+        max_requests = request_kwargs.get("max_requests", sys.maxsize)
+
         # Initialize predicted_answer column
         dataset_df = dataset_df.copy()
         dataset_df["predicted_answer"] = None
+
+        # Truncate dataset to max_requests
+        dataset_df = dataset_df.head(max_requests)
+        
         
         # Group by context for efficiency (following HashAttention approach)
         df_context = dataset_df.groupby("context")
@@ -165,7 +212,7 @@ class Benchmark(ABC):
                 request: Request = Request(context=context, questions=questions)
                 
                 # Process through adapter
-                response: RequestResponse = adapter.process_request(request)
+                response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
                 
                 # Assign responses back to DataFrame
                 if isinstance(response.responses, list):
@@ -189,17 +236,27 @@ class Benchmark(ABC):
     def run_benchmark(
         self, 
         adapter: ModelAdapter, 
-        result_dir: str
+        result_dir: str,
+        generation_kwargs: Optional[Dict[str, Any]] = None,
+        request_kwargs: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Main orchestration method for running complete benchmark.
 
         Args:
             adapter: Model adapter implementing ModelHubAdapterInterface.
             result_dir: Directory to save results.
+            generation_kwargs: Parameters for model inference/generation.
+            request_kwargs: Parameters for request processing (e.g., max_context_length).
 
         Returns:
             Dictionary containing evaluation results and metadata.
         """
+        # Set default values if not provided
+        if generation_kwargs is None:
+            generation_kwargs = {}
+        if request_kwargs is None:
+            request_kwargs = {}
+            
         # Create result directory if it doesn't exist
         result_path: Path = Path(result_dir)
         result_path.mkdir(parents=True, exist_ok=True)
@@ -213,7 +270,7 @@ class Benchmark(ABC):
         
         # Process all requests through the adapter
         print("Processing requests through adapter...")
-        results_df: pd.DataFrame = self._process_all_requests(adapter, dataset_df)
+        results_df: pd.DataFrame = self._process_all_requests(adapter, dataset_df, generation_kwargs, request_kwargs)
         
         # Compute evaluation metrics
         print("Computing evaluation metrics...")
@@ -224,10 +281,28 @@ class Benchmark(ABC):
         results_df.to_csv(raw_results_path, index=False)
         print(f"Saved raw results to {raw_results_path}")
         
+        # Save metrics
         metrics_path: Path = result_path / "metrics.json"
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
         print(f"Saved metrics to {metrics_path}")
+        
+        # Save configuration parameters
+        config_path: Path = result_path / "config.json"
+        
+        config_data = {
+            "model_kwargs": make_serializable(getattr(adapter, 'model_kwargs', {})),
+            "tokenizer_kwargs": make_serializable(getattr(adapter, 'tokenizer_kwargs', {})),
+            "sparse_attention_config": make_serializable(getattr(adapter, 'sparse_attention_config', None)),
+            "generation_kwargs": make_serializable(generation_kwargs),
+            "request_kwargs": make_serializable(request_kwargs),
+            "benchmark_name": self.benchmark_name,
+            "subsets_to_run": self.subsets_to_run,
+            "huggingface_dataset_id": self.huggingface_dataset_id
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f, indent=2)
+        print(f"Saved configuration to {config_path}")
         
         return metrics
 
@@ -249,3 +324,6 @@ class Benchmark(ABC):
             Dictionary containing computed metrics (e.g., {"accuracy": 0.95, "f1": 0.88}).
         """
         pass
+
+
+

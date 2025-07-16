@@ -4,6 +4,7 @@ This module provides configuration dataclasses and factory functions for orchest
 parallel benchmark execution across multiple GPUs using multiprocessing.
 """
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,6 +14,20 @@ import multiprocessing
 from sparse_attention_hub.sparse_attention.base import SparseAttentionConfig
 
 from .base import Benchmark
+from .utils import (
+    sanitize_model_name,
+    construct_result_directory,
+    create_result_directory,
+    validate_result_directory_path,
+    ensure_result_directory,
+    validate_gpu_availability,
+    create_gpu_pool,
+    acquire_gpu_from_pool,
+    release_gpu_to_pool,
+    validate_gpu_for_model,
+    set_cuda_visible_devices,
+    cleanup_gpu_memory
+)
 
 
 @dataclass
@@ -123,6 +138,7 @@ class BenchmarkStub:
         subset: Specific subset name (e.g., "narrativeqa") or None for full benchmark
         adapter_config: Base adapter configuration (without sparse attention)
         generation_kwargs: Parameters for model inference/generation
+        request_kwargs: Parameters for request processing (e.g., max_context_length)
         result_dir: Full path to directory where results should be saved
     
     Example:
@@ -134,6 +150,7 @@ class BenchmarkStub:
         ...     subset="narrativeqa",
         ...     adapter_config=adapter_config,
         ...     generation_kwargs={"max_new_tokens": 256},
+        ...     request_kwargs={"max_context_length": 1024},
         ...     result_dir="/path/to/results/phi4_dense_longbench_narrativeqa"
         ... )
     """
@@ -145,6 +162,7 @@ class BenchmarkStub:
     subset: Optional[str]
     adapter_config: AdapterConfig
     generation_kwargs: Dict[str, Any]
+    request_kwargs: Dict[str, Any]
     result_dir: str
     
     def __post_init__(self) -> None:
@@ -255,137 +273,19 @@ class ExecutionResults:
 
 
 # =============================================================================
-# Automatic Benchmark Registry (Task 1.1.2 - Improved)
+# Benchmark Registry Import (Moved to base.py)
 # =============================================================================
 
-# Global registry for benchmarks
-_BENCHMARK_REGISTRY: Dict[str, type] = {}
-
-
-def register_benchmark(name: Optional[str] = None, aliases: Optional[List[str]] = None):
-    """Decorator to automatically register benchmark classes.
-    
-    This decorator allows benchmark classes to register themselves automatically,
-    eliminating the need for manual registry maintenance.
-    
-    Args:
-        name: Custom name for the benchmark (defaults to class.benchmark_name)
-        aliases: Optional list of alternative names for the benchmark
-        
-    Example:
-        >>> @register_benchmark("my_benchmark", aliases=["my_bench", "mb"])
-        >>> class MyBenchmark(Benchmark):
-        ...     benchmark_name = "my_benchmark"
-        ...     # ... rest of implementation
-    """
-    def decorator(benchmark_class: type) -> type:
-        # Get benchmark name from parameter, class attribute, or class name
-        if name is not None:
-            benchmark_name = name
-        elif hasattr(benchmark_class, 'benchmark_name') and benchmark_class.benchmark_name:
-            benchmark_name = benchmark_class.benchmark_name
-        else:
-            benchmark_name = benchmark_class.__name__.lower()
-        
-        # Register main name
-        _BENCHMARK_REGISTRY[benchmark_name.lower()] = benchmark_class
-        
-        # Register aliases
-        if aliases:
-            for alias in aliases:
-                _BENCHMARK_REGISTRY[alias.lower()] = benchmark_class
-        
-        return benchmark_class
-    
-    return decorator
-
-
-def get_registered_benchmarks() -> Dict[str, type]:
-    """Get all registered benchmark classes.
-    
-    Returns:
-        Dictionary mapping benchmark names to their classes
-    """
-    return _BENCHMARK_REGISTRY.copy()
-
-
-def get_available_benchmark_names() -> List[str]:
-    """Get list of all available benchmark names.
-    
-    Returns:
-        Sorted list of registered benchmark names
-    """
-    return sorted(_BENCHMARK_REGISTRY.keys())
-
-
-def create_benchmark_instance(
-    benchmark_name: str, 
-    subsets: Optional[List[str]] = None
-) -> Benchmark:
-    """Factory function to create benchmark instances by name.
-    
-    Uses the automatic registry to instantiate benchmark classes.
-    No manual maintenance required - benchmarks register themselves.
-    
-    Args:
-        benchmark_name: Name of the benchmark to create
-        subsets: Optional list of subsets to run for the benchmark
-        
-    Returns:
-        Instantiated benchmark object
-        
-    Raises:
-        ValueError: If benchmark_name is not registered
-        
-    Example:
-        >>> benchmark = create_benchmark_instance("longbench", ["narrativeqa"])
-        >>> benchmark = create_benchmark_instance("mock_benchmark")
-    """
-    # Normalize benchmark name
-    benchmark_name = benchmark_name.strip().lower()
-    
-    if benchmark_name not in _BENCHMARK_REGISTRY:
-        available_benchmarks: List[str] = get_available_benchmark_names()
-        raise ValueError(
-            f"Unknown benchmark '{benchmark_name}'. Available benchmarks: {available_benchmarks}"
-        )
-    
-    benchmark_class = _BENCHMARK_REGISTRY[benchmark_name]
-    
-    try:
-        # Create instance with optional subsets
-        benchmark_instance: Benchmark = benchmark_class(subsets_to_run=subsets)
-        return benchmark_instance
-        
-    except Exception as e:
-        raise RuntimeError(f"Failed to instantiate benchmark '{benchmark_name}': {e}")
-
-
-def ensure_benchmarks_loaded() -> None:
-    """Ensure all benchmark modules are loaded to trigger registration.
-    
-    This function imports all benchmark modules to ensure their decorators
-    have been executed and they're registered in the global registry.
-    """
-    import importlib
-    import pkgutil
-    import benchmark
-    
-    # Get all modules in the benchmark package
-    benchmark_package_path = benchmark.__path__
-    
-    for importer, module_name, ispkg in pkgutil.iter_modules(benchmark_package_path):
-        if not ispkg and module_name != '__init__' and module_name != 'base':
-            try:
-                # Import the module to trigger @register_benchmark decorators
-                module_full_name = f"benchmark.{module_name}"
-                importlib.import_module(module_full_name)
-            except ImportError as e:
-                # Some modules might not be importable (missing dependencies, etc.)
-                # This is OK - we just skip them
-                import logging
-                logging.debug(f"Could not import benchmark module {module_name}: {e}")
-                continue
+# Import registry functions from benchmark_registry.py to maintain backward compatibility
+from .benchmark_registry import (
+    register_benchmark,
+    get_registered_benchmarks,
+    get_available_benchmark_names,
+    create_benchmark_instance,
+    ensure_benchmarks_loaded,
+    validate_benchmark_config as _validate_benchmark_config_base,
+    get_benchmark_subsets
+)
 
 
 def validate_benchmark_config(config: BenchmarkConfig) -> None:
@@ -417,256 +317,17 @@ def validate_benchmark_config(config: BenchmarkConfig) -> None:
         raise ValueError(f"Invalid benchmark configuration: {e}")
 
 
-def sanitize_model_name(model_name: str) -> str:
-    """Sanitize model name for use in directory paths.
-    
-    Replaces special characters that are not filesystem-safe with underscores.
-    This ensures model names can be used as directory names across different operating systems.
-    
-    Args:
-        model_name: Original model name (e.g., "meta-llama/Llama-3.1-8B-Instruct")
-        
-    Returns:
-        Sanitized model name safe for filesystem use
-        
-    Example:
-        >>> sanitized = sanitize_model_name("meta-llama/Llama-3.1-8B-Instruct")
-        >>> print(sanitized)
-        "meta_llama_Llama_3.1_8B_Instruct"
-    """
-    # Characters that need to be replaced: / \ : * ? " < > |
-    special_chars: str = r'\/\:*?"<>|'
-    
-    sanitized: str = model_name
-    for char in special_chars:
-        sanitized = sanitized.replace(char, '_')
-    
-    # Remove multiple consecutive underscores
-    while '__' in sanitized:
-        sanitized = sanitized.replace('__', '_')
-    
-    # Remove leading/trailing underscores
-    sanitized = sanitized.strip('_')
-    
-    return sanitized
-
-
-def construct_result_directory(
-    base_result_dir: str,
-    model_name: str,
-    sparse_config_name: str,
-    benchmark_name: str,
-    subset: Optional[str] = None
-) -> str:
-    """Construct result directory path following the standard hierarchy.
-    
-    Creates a path following the pattern:
-    base_dir/sanitized_model/sparse_config/benchmark_subset/
-    
-    Note: No timestamp in path to enable resumability across runs.
-    
-    Args:
-        base_result_dir: Base directory for all benchmark results
-        model_name: Original model name (will be sanitized)
-        sparse_config_name: Name of sparse attention configuration
-        benchmark_name: Name of the benchmark
-        subset: Optional subset name (appended to benchmark_name with underscore)
-        
-    Returns:
-        Complete path to result directory
-        
-    Example:
-        >>> path = construct_result_directory(
-        ...     "./results", "meta-llama/Llama-3.1-8B", 
-        ...     "dense", "longbench", "narrativeqa"
-        ... )
-        >>> print(path)
-        "./results/meta_llama_Llama_3.1_8B/dense/longbench_narrativeqa"
-    """
-    sanitized_model: str = sanitize_model_name(model_name)
-    
-    # Construct benchmark directory name
-    benchmark_dir: str = benchmark_name
-    if subset is not None:
-        benchmark_dir = f"{benchmark_name}_{subset}"
-    
-    # Build path components (no timestamp for resumability)
-    path_components: List[str] = [
-        base_result_dir,
-        sanitized_model,
-        sparse_config_name,
-        benchmark_dir
-    ]
-    
-    result_path: str = os.path.join(*path_components)
-    return str(Path(result_path).resolve())
-
-
-def create_result_directory(
-    result_dir: str,
-    create_parents: bool = True
-) -> bool:
-    """Create result directory with proper error handling.
-    
-    Creates the specified directory and all necessary parent directories.
-    This function is safe to call multiple times on the same path.
-    
-    Args:
-        result_dir: Path to the directory to create
-        create_parents: Whether to create parent directories if they don't exist
-        
-    Returns:
-        True if directory was created or already exists, False if creation failed
-        
-    Raises:
-        ValueError: If result_dir is empty or invalid
-        PermissionError: If insufficient permissions to create directory
-        OSError: If directory creation fails for other reasons
-        
-    Example:
-        >>> success = create_result_directory("/path/to/results/model_experiment")
-        >>> print(success)  # True if successful
-    """
-    if not result_dir or not result_dir.strip():
-        raise ValueError("result_dir cannot be empty")
-    
-    result_path = Path(result_dir.strip())
-    
-    try:
-        # Create directory and parents if needed
-        result_path.mkdir(parents=create_parents, exist_ok=True)
-        
-        # Verify directory was created and is writable
-        if not result_path.exists():
-            return False
-        
-        if not result_path.is_dir():
-            raise OSError(f"Path exists but is not a directory: {result_path}")
-        
-        # Test write permissions by creating a temporary file
-        test_file = result_path / ".write_test"
-        try:
-            test_file.touch()
-            test_file.unlink()  # Remove test file
-        except (PermissionError, OSError) as e:
-            raise PermissionError(f"Directory created but not writable: {result_path}") from e
-        
-        return True
-        
-    except PermissionError:
-        raise
-    except OSError as e:
-        raise OSError(f"Failed to create directory {result_path}: {e}") from e
-
-
-def validate_result_directory_path(
-    result_dir: str,
-    check_parent_writable: bool = True
-) -> None:
-    """Validate that a result directory path is valid and can be created.
-    
-    Performs validation without actually creating the directory.
-    
-    Args:
-        result_dir: Path to validate
-        check_parent_writable: Whether to check if parent directory is writable
-        
-    Raises:
-        ValueError: If path is invalid or unsafe
-        PermissionError: If parent directory is not writable
-        OSError: If path validation fails
-        
-    Example:
-        >>> validate_result_directory_path("/valid/path/to/results")  # Passes
-        >>> validate_result_directory_path("")  # Raises ValueError
-    """
-    if not result_dir or not result_dir.strip():
-        raise ValueError("result_dir cannot be empty")
-    
-    result_path = Path(result_dir.strip())
-    
-    # Check for potentially dangerous paths
-    try:
-        # Resolve to absolute path to detect path traversal attempts
-        absolute_path = result_path.resolve()
-        
-        # Basic security check - ensure path doesn't try to escape reasonable bounds
-        if ".." in str(result_path):
-            # Allow .. only if resolved path is still reasonable
-            path_str = str(absolute_path)
-            if any(dangerous in path_str for dangerous in ["/etc", "/usr", "/bin", "/sbin", "/sys", "/proc"]):
-                raise ValueError(f"Path appears to target system directories: {result_path}")
-        
-    except (OSError, RuntimeError) as e:
-        raise ValueError(f"Invalid path format: {result_path}") from e
-    
-    # Check if parent directory exists and is writable (if requested)
-    if check_parent_writable:
-        parent_dir = result_path.parent
-        
-        if not parent_dir.exists():
-            # Check if we can create the parent directories
-            try:
-                # Test by checking the first existing parent
-                existing_parent = parent_dir
-                while not existing_parent.exists() and existing_parent.parent != existing_parent:
-                    existing_parent = existing_parent.parent
-                
-                if existing_parent.exists() and not os.access(existing_parent, os.W_OK):
-                    raise PermissionError(f"Cannot write to parent directory tree: {existing_parent}")
-                    
-            except (OSError, AttributeError) as e:
-                raise PermissionError(f"Cannot validate parent directory permissions: {parent_dir}") from e
-        
-        elif not os.access(parent_dir, os.W_OK):
-            raise PermissionError(f"Parent directory is not writable: {parent_dir}")
-
-
-def ensure_result_directory(
-    result_dir: str,
-    validate_first: bool = True
-) -> str:
-    """Ensure result directory exists and is ready for use.
-    
-    This is a convenience function that combines validation and creation.
-    
-    Args:
-        result_dir: Path to the result directory
-        validate_first: Whether to validate the path before creating
-        
-    Returns:
-        Absolute path to the created directory
-        
-    Raises:
-        ValueError: If path validation fails
-        PermissionError: If directory cannot be created due to permissions
-        OSError: If directory creation fails
-        
-    Example:
-        >>> abs_path = ensure_result_directory("./results/experiment_1")
-        >>> print(abs_path)  # "/absolute/path/to/results/experiment_1"
-    """
-    if validate_first:
-        validate_result_directory_path(result_dir, check_parent_writable=True)
-    
-    success = create_result_directory(result_dir, create_parents=True)
-    if not success:
-        raise OSError(f"Failed to create result directory: {result_dir}")
-    
-    # Return absolute path
-    return str(Path(result_dir).resolve()) 
-
-
 # =============================================================================
-# Matrix Expansion and Resumability Functions (Task 1.3)
+# Matrix Expansion and Benchmark Stub Generation Functions
 # =============================================================================
 
 def generate_benchmark_stubs(
     model_names: List[str],
-    sparse_attention_configs: List[Tuple[str, Optional['SparseAttentionConfig']]],
+    sparse_attention_configs: List[Tuple[str, Optional[SparseAttentionConfig]]],
     benchmark_configs: List[BenchmarkConfig],
     adapter_config: AdapterConfig,
     generation_kwargs: Optional[Dict[str, Any]] = None,
+    request_kwargs: Optional[Dict[str, Any]] = None,
     base_result_dir: str = "./benchmark_results"
 ) -> List[BenchmarkStub]:
     """Generate all benchmark stubs for the model × sparse_config × benchmark × subset matrix.
@@ -680,6 +341,7 @@ def generate_benchmark_stubs(
         benchmark_configs: List of benchmark configurations
         adapter_config: Configuration for model adapter
         generation_kwargs: Optional generation parameters
+        request_kwargs: Optional request processing parameters
         base_result_dir: Base directory for storing results
         
     Returns:
@@ -698,6 +360,8 @@ def generate_benchmark_stubs(
     
     if generation_kwargs is None:
         generation_kwargs = {}
+    if request_kwargs is None:
+        request_kwargs = {}
         
     stubs: List[BenchmarkStub] = []
     
@@ -724,6 +388,7 @@ def generate_benchmark_stubs(
                             subset=subset,
                             adapter_config=adapter_config,
                             generation_kwargs=generation_kwargs.copy(),
+                            request_kwargs=request_kwargs.copy(),
                             result_dir=result_dir
                         )
                         stubs.append(stub)
@@ -746,6 +411,7 @@ def generate_benchmark_stubs(
                         subset=None,
                         adapter_config=adapter_config,
                         generation_kwargs=generation_kwargs.copy(),
+                        request_kwargs=request_kwargs.copy(),
                         result_dir=result_dir
                     )
                     stubs.append(stub)
@@ -779,9 +445,6 @@ def filter_existing_results(
         >>> pending, completed = filter_existing_results(all_stubs)
         >>> print(f"Found {len(completed)} completed, {len(pending)} pending")
     """
-    import logging
-    from pathlib import Path
-    
     if required_files is None:
         required_files = ["results.json"]
     
@@ -823,255 +486,7 @@ def filter_existing_results(
     if verbose:
         total = len(stubs)
         completed_count = len(completed_stubs)
-        pending_count = len(pending_stubs)
+        pending_count = len(completed_stubs)
         logging.info(f"Resumability check: {completed_count}/{total} completed, {pending_count}/{total} pending")
     
-    return pending_stubs, completed_stubs
-
-
-def get_benchmark_subsets(benchmark_name: str) -> Optional[List[str]]:
-    """Get available subsets for a benchmark by introspecting the benchmark class.
-    
-    This is a utility function that can help users determine what subsets are
-    available for a given benchmark without having to know the internals.
-    
-    Args:
-        benchmark_name: Name of the benchmark to inspect
-        
-    Returns:
-        List of available subset names, or None if benchmark doesn't support subsets
-        
-    Example:
-        >>> subsets = get_benchmark_subsets("longbench")
-        >>> print(subsets)  # ['narrativeqa', 'qasper', 'multifieldqa_en', ...]
-    """
-    try:
-        benchmark_instance = create_benchmark_instance(benchmark_name)
-        
-        # Try to get available subsets - different benchmarks may have different ways
-        # to expose this information
-        if hasattr(benchmark_instance, 'get_available_subsets'):
-            return benchmark_instance.get_available_subsets()  # type: ignore
-        elif hasattr(benchmark_instance, 'subsets'):
-            return list(benchmark_instance.subsets)  # type: ignore
-        elif hasattr(benchmark_instance, 'AVAILABLE_SUBSETS'):
-            return list(benchmark_instance.AVAILABLE_SUBSETS)  # type: ignore
-        else:
-            # Benchmark doesn't expose subset information
-            return None
-            
-    except Exception as e:
-        # If we can't instantiate the benchmark or get subset info, return None
-        import logging
-        logging.warning(f"Could not get subsets for benchmark '{benchmark_name}': {e}")
-        return None 
-
-
-# =============================================================================
-# GPU Management and Validation Functions (Task 1.4)
-# =============================================================================
-
-def validate_gpu_availability(gpu_ids: List[int]) -> None:
-    """Validate that all specified GPUs are available and accessible.
-    
-    Args:
-        gpu_ids: List of GPU device IDs to validate
-        
-    Raises:
-        RuntimeError: If CUDA is not available
-        ValueError: If any GPU ID is invalid or inaccessible
-        
-    Example:
-        >>> validate_gpu_availability([0, 1])  # Validates GPUs 0 and 1
-    """
-    import torch
-    
-    # Check if CUDA is available
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA is not available on this system")
-    
-    device_count = torch.cuda.device_count()
-    if device_count == 0:
-        raise RuntimeError("No CUDA devices found")
-    
-    # Validate each GPU ID
-    for gpu_id in gpu_ids:
-        if not isinstance(gpu_id, int):
-            raise ValueError(f"GPU ID must be an integer, got {type(gpu_id)}: {gpu_id}")
-        
-        if gpu_id < 0:
-            raise ValueError(f"GPU ID must be non-negative, got: {gpu_id}")
-        
-        if gpu_id >= device_count:
-            raise ValueError(f"GPU ID {gpu_id} is not available. Only {device_count} GPU(s) found: {list(range(device_count))}")
-        
-        # Test basic GPU accessibility
-        try:
-            device = torch.device(f"cuda:{gpu_id}")
-            # Try to create a small tensor on the device
-            test_tensor = torch.tensor([1.0], device=device)
-            del test_tensor
-        except Exception as e:
-            raise ValueError(f"GPU {gpu_id} is not accessible: {e}")
-
-
-def create_gpu_pool(gpu_ids: List[int]) -> 'multiprocessing.Queue[int]':
-    """Create a multiprocessing queue with available GPU IDs for worker processes.
-    
-    Args:
-        gpu_ids: List of GPU device IDs to include in the pool
-        
-    Returns:
-        multiprocessing.Queue containing GPU IDs for workers to acquire
-        
-    Example:
-        >>> gpu_pool = create_gpu_pool([0, 1, 2])
-        >>> gpu_id = gpu_pool.get()  # Acquire a GPU
-        >>> gpu_pool.put(gpu_id)     # Release the GPU back to pool
-    """
-    import multiprocessing
-    
-    # Validate GPUs first
-    validate_gpu_availability(gpu_ids)
-    
-    # Create queue and populate with GPU IDs
-    gpu_queue: multiprocessing.Queue[int] = multiprocessing.Queue()
-    for gpu_id in gpu_ids:
-        gpu_queue.put(gpu_id)
-    
-    return gpu_queue
-
-
-def acquire_gpu_from_pool(gpu_pool: 'multiprocessing.Queue[int]', timeout: float = 30.0) -> int:
-    """Acquire a GPU ID from the pool for exclusive use by a worker process.
-    
-    Args:
-        gpu_pool: Multiprocessing queue containing available GPU IDs
-        timeout: Maximum time to wait for a GPU (seconds)
-        
-    Returns:
-        GPU device ID acquired from the pool
-        
-    Raises:
-        TimeoutError: If no GPU becomes available within timeout
-        
-    Example:
-        >>> gpu_id = acquire_gpu_from_pool(gpu_pool, timeout=60.0)
-        >>> # Use gpu_id for computation
-        >>> release_gpu_to_pool(gpu_pool, gpu_id)
-    """
-    import queue
-    
-    try:
-        gpu_id = gpu_pool.get(timeout=timeout)
-        return gpu_id
-    except queue.Empty:
-        raise TimeoutError(f"No GPU became available within {timeout} seconds")
-
-
-def release_gpu_to_pool(gpu_pool: 'multiprocessing.Queue[int]', gpu_id: int) -> None:
-    """Release a GPU ID back to the pool for other workers to use.
-    
-    Args:
-        gpu_pool: Multiprocessing queue to return the GPU to
-        gpu_id: GPU device ID to release
-        
-    Example:
-        >>> gpu_id = acquire_gpu_from_pool(gpu_pool)
-        >>> # Use gpu_id for computation
-        >>> release_gpu_to_pool(gpu_pool, gpu_id)
-    """
-    gpu_pool.put(gpu_id)
-
-
-def validate_gpu_for_model(gpu_id: int, model_name: str, check_memory: bool = True) -> Dict[str, Any]:
-    """Validate that a GPU can handle a specific model (minimal validation).
-    
-    Performs basic checks without loading the full model to avoid memory overhead.
-    
-    Args:
-        gpu_id: GPU device ID to validate
-        model_name: Name of the model to validate against
-        check_memory: Whether to check available GPU memory
-        
-    Returns:
-        Dictionary with validation results and GPU information
-        
-    Example:
-        >>> info = validate_gpu_for_model(0, "meta-llama/Llama-3.1-8B-Instruct")
-        >>> print(f"Available memory: {info['memory_available_gb']:.2f} GB")
-    """
-    import torch
-    
-    # Validate GPU accessibility
-    validate_gpu_availability([gpu_id])
-    
-    # Get GPU properties
-    device = torch.device(f"cuda:{gpu_id}")
-    props = torch.cuda.get_device_properties(gpu_id)
-    
-    # Get memory information
-    memory_total = props.total_memory
-    memory_reserved = torch.cuda.memory_reserved(gpu_id)
-    memory_allocated = torch.cuda.memory_allocated(gpu_id)
-    memory_available = memory_total - memory_reserved
-    
-    # Convert to GB for readability
-    memory_total_gb = memory_total / (1024 ** 3)
-    memory_available_gb = memory_available / (1024 ** 3)
-    memory_allocated_gb = memory_allocated / (1024 ** 3)
-    
-    validation_info = {
-        "gpu_id": gpu_id,
-        "gpu_name": props.name,
-        "memory_total_gb": memory_total_gb,
-        "memory_available_gb": memory_available_gb,
-        "memory_allocated_gb": memory_allocated_gb,
-        "compute_capability": f"{props.major}.{props.minor}",
-        "model_name": model_name,
-        "validation_passed": True
-    }
-    
-    # Basic memory check - warn if less than 2GB available
-    if check_memory and memory_available_gb < 2.0:
-        import logging
-        logging.warning(f"Low GPU memory on device {gpu_id}: {memory_available_gb:.2f} GB available")
-        validation_info["low_memory_warning"] = True
-    
-    return validation_info
-
-
-def set_cuda_visible_devices(gpu_id: int) -> None:
-    """Set CUDA_VISIBLE_DEVICES to limit a process to a specific GPU.
-    
-    This should be called at the beginning of worker processes to ensure
-    they only see their assigned GPU.
-    
-    Args:
-        gpu_id: GPU device ID to make visible to this process
-        
-    Example:
-        >>> set_cuda_visible_devices(1)  # Process will only see GPU 1 as device 0
-    """
-    import os
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-
-
-def cleanup_gpu_memory(gpu_id: Optional[int] = None) -> None:
-    """Clean up GPU memory by emptying CUDA cache.
-    
-    Args:
-        gpu_id: Specific GPU to clean up, or None for current device
-        
-    Example:
-        >>> cleanup_gpu_memory(0)  # Clean up GPU 0
-        >>> cleanup_gpu_memory()   # Clean up current device
-    """
-    import torch
-    
-    if torch.cuda.is_available():
-        if gpu_id is not None:
-            with torch.cuda.device(gpu_id):
-                torch.cuda.empty_cache()
-        else:
-            torch.cuda.empty_cache() 
+    return pending_stubs, completed_stubs 

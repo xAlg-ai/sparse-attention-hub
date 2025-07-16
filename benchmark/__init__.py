@@ -8,6 +8,17 @@ Benchmark package for evaluating various language model capabilities.
 # Import the base benchmark class
 from .base import Benchmark
 
+# Import registry functions
+from .benchmark_registry import (
+    register_benchmark,
+    get_registered_benchmarks,
+    get_available_benchmark_names,
+    create_benchmark_instance,
+    ensure_benchmarks_loaded,
+    validate_benchmark_config,
+    get_benchmark_subsets
+)
+
 # Import concrete benchmark implementations
 from .longbench import LongBench
 from .mock_benchmark import MockBenchmark
@@ -25,6 +36,13 @@ from . import zero_scrolls
 
 __all__ = [
     "Benchmark",
+    "register_benchmark",
+    "get_registered_benchmarks", 
+    "get_available_benchmark_names",
+    "create_benchmark_instance",
+    "ensure_benchmarks_loaded",
+    "validate_benchmark_config",
+    "get_benchmark_subsets",
     "LongBench",
     "MockBenchmark",
     "AIME2024",

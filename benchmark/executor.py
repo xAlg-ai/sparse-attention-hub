@@ -12,7 +12,6 @@ import signal
 import sys
 import time
 import traceback
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from queue import Empty
@@ -35,12 +34,14 @@ from .executor_config import (
     filter_existing_results,
     generate_benchmark_stubs,
     validate_gpu_availability,
-    ensure_benchmarks_loaded,
-    create_benchmark_instance,
     acquire_gpu_from_pool,
     release_gpu_to_pool,
     set_cuda_visible_devices,
     cleanup_gpu_memory,
+)
+from .benchmark_registry import (
+    ensure_benchmarks_loaded,
+    create_benchmark_instance
 )
 
 
@@ -230,7 +231,9 @@ def _benchmark_worker(
                 logger.info(f"Worker {worker_id}: Executing benchmark {stub.benchmark_name} on GPU {current_gpu_id}")
                 metrics = benchmark.run_benchmark(
                     adapter=adapter,
-                    result_dir=stub.result_dir
+                    result_dir=stub.result_dir,
+                    generation_kwargs=stub.generation_kwargs,
+                    request_kwargs=stub.request_kwargs
                 )
                 
                 execution_time = time.time() - start_time
@@ -373,7 +376,7 @@ class BenchmarkExecutor:
         enable_resumability: bool = True,
         result_file_validation: bool = True,
         required_result_files: Optional[List[str]] = None,
-        timeout_per_benchmark: float = 3600.0,  # 1 hour default
+        timeout_per_benchmark: float = 360000.0,  # 100 hours default
         verbose: bool = True
     ):
         """Initialize the BenchmarkExecutor.
@@ -414,9 +417,7 @@ class BenchmarkExecutor:
         # Load all available benchmarks
         ensure_benchmarks_loaded()
         
-        # Initialize execution state
-        self.execution_timestamp: Optional[str] = None
-        self.current_execution_dir: Optional[Path] = None
+
         
         self.logger.info(f"BenchmarkExecutor initialized:")
         self.logger.info(f"  GPU IDs: {self.gpu_ids}")
@@ -449,7 +450,7 @@ class BenchmarkExecutor:
         benchmark_configs: List[BenchmarkConfig],
         adapter_config: AdapterConfig,
         generation_kwargs: Optional[Dict[str, Any]] = None,
-        execution_timestamp: Optional[str] = None
+        request_kwargs: Optional[Dict[str, Any]] = None
     ) -> ExecutionResults:
         """Execute benchmark matrix with parallel GPU execution.
         
@@ -462,7 +463,7 @@ class BenchmarkExecutor:
             benchmark_configs: List of benchmark configurations
             adapter_config: Configuration for model adapter
             generation_kwargs: Optional generation parameters
-            execution_timestamp: Optional timestamp (auto-generated if None)
+            request_kwargs: Optional request processing parameters
             
         Returns:
             ExecutionResults containing comprehensive execution information
@@ -477,11 +478,7 @@ class BenchmarkExecutor:
             >>> print(f"Completed: {results.completed_count}/{results.total_count}")
         """
         # Initialize execution
-        self.execution_timestamp = execution_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.current_execution_dir = self.base_result_dir / f"execution_{self.execution_timestamp}"
-        
-        self.logger.info(f"Starting benchmark matrix execution: {self.execution_timestamp}")
-        self.logger.info(f"Execution directory: {self.current_execution_dir}")
+        self.logger.info("Starting benchmark matrix execution")
         
         try:
             # Step 1: Validate input parameters
@@ -497,6 +494,7 @@ class BenchmarkExecutor:
                 benchmark_configs=benchmark_configs,
                 adapter_config=adapter_config,
                 generation_kwargs=generation_kwargs,
+                request_kwargs=request_kwargs,
                 base_result_dir=str(self.base_result_dir)
             )
             
@@ -526,9 +524,7 @@ class BenchmarkExecutor:
                 self.logger.info("No pending benchmarks to execute. All experiments already completed!")
                 
                 execution_summary = {
-                    "execution_timestamp": self.execution_timestamp,
                     "total_combinations": total_combinations,
-                    "execution_directory": str(self.current_execution_dir),
                     "models": model_names,
                     "sparse_configs": [name for name, _ in sparse_attention_configs],
                     "benchmarks": [cfg.benchmark_name for cfg in benchmark_configs]
@@ -549,8 +545,7 @@ class BenchmarkExecutor:
                     progress=progress
                 )
             
-            # Step 5: Create execution directory
-            self.current_execution_dir.mkdir(parents=True, exist_ok=True)
+
             
             # Step 6: Execute pending benchmarks with worker processes
             self.logger.info(f"Executing {len(pending_stubs)} pending benchmarks with {self.max_concurrent_runs} workers...")
@@ -561,9 +556,7 @@ class BenchmarkExecutor:
             
             # Step 7: Aggregate results
             execution_summary = {
-                "execution_timestamp": self.execution_timestamp,
                 "total_combinations": total_combinations,
-                "execution_directory": str(self.current_execution_dir),
                 "models": model_names,
                 "sparse_configs": [name for name, _ in sparse_attention_configs],
                 "benchmarks": [cfg.benchmark_name for cfg in benchmark_configs],

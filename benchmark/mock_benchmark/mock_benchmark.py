@@ -7,10 +7,10 @@ from typing import Dict, Any, List
 import pandas as pd
 
 from ..base import Benchmark
-from ..executor_config import register_benchmark
+from ..benchmark_registry import register_benchmark
 
 
-@register_benchmark("mock_benchmark", aliases=["mock", "test_benchmark"])
+@register_benchmark("mock_benchmark")
 class MockBenchmark(Benchmark):
     """Mock benchmark for testing and demonstration purposes.
 

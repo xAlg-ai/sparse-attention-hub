@@ -4,9 +4,11 @@ from typing import Dict, Any, List
 import pandas as pd
 
 from ..base import Benchmark
+from ..benchmark_registry import register_benchmark
 from .calculate_metrics import calculate_metrics, calculate_metrics_e
 
 
+@register_benchmark("longbench")
 class LongBench(Benchmark):
     """LongBench benchmark for evaluating long context understanding.
 
