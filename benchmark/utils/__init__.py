@@ -24,6 +24,11 @@ from .gpu import (
     cleanup_gpu_memory
 )
 
+from .data import (
+    escape_dataframe_for_csv,
+    save_dataframe_to_csv
+)
+
 # Re-export all utilities for backward compatibility
 __all__ = [
     # Path utilities
@@ -39,5 +44,9 @@ __all__ = [
     "acquire_gpu_from_pool",
     "release_gpu_to_pool",
     "validate_gpu_for_model",
-    "cleanup_gpu_memory"
+    "cleanup_gpu_memory",
+    
+    # Data utilities
+    "escape_dataframe_for_csv",
+    "save_dataframe_to_csv"
 ] 

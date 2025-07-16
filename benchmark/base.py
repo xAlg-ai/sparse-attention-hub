@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import os
 import warnings
+import csv
 from pathlib import Path
 from datasets import load_dataset
 from tqdm import tqdm
@@ -14,6 +15,7 @@ import sys
 import dataclasses
 
 from sparse_attention_hub.adapters.base import Request, RequestResponse, ModelAdapter
+from .utils import save_dataframe_to_csv
 
 
 def make_serializable(obj: Any) -> Any:
@@ -278,7 +280,7 @@ class Benchmark(ABC):
         
         # Save results
         raw_results_path: Path = result_path / "raw_results.csv"
-        results_df.to_csv(raw_results_path, index=False)
+        save_dataframe_to_csv(results_df, str(raw_results_path), index=False)
         print(f"Saved raw results to {raw_results_path}")
         
         # Save metrics
