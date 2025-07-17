@@ -46,14 +46,8 @@ class RandomSamplingMasker(SamplingMasker):
     
     This masker implements random sampling of attention positions by randomly
     selecting a fraction of key positions for each query position. The sampling
-    is performed independently for each query, allowing for efficient sparse
-    attention patterns.
-    
-    The masker follows these steps:
-    1. Check if the previous mask is full - if so, return it unchanged
-    2. Generate random indices for each query position based on sampling_rate
-    3. Create a new mask using the random indices with data values set to sampling_rate
-    4. Merge the new mask with the previous mask
+    is performed independently for each query.
+
     
     Attributes:
         sampling_rate: The fraction of indices to sample for each query position.
