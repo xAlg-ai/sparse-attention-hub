@@ -119,7 +119,7 @@ class TestAdapterIntegration:
         )
 
         # Process request
-        response = adapter.process_request(request)
+        response = adapter.process_request(request, {}, {})
 
         # Verify response
         assert isinstance(response, RequestResponse)
@@ -223,7 +223,7 @@ class TestAdapterIntegration:
         )
 
         # Process request
-        response = adapter.process_request(request)
+        response = adapter.process_request(request, {}, {})
 
         # Verify response
         assert isinstance(response, RequestResponse)
@@ -507,7 +507,7 @@ class TestAdapterManual:
             """,
             questions="What county was the most affected by the flood?",
         )
-        response = adapter.process_request(request)
+        response = adapter.process_request(request, {}, {})
         assert isinstance(response.responses, str)
 
     def test_adapter_basic_process_request_with_multiple_questions(
@@ -538,7 +538,7 @@ class TestAdapterManual:
                 "What was the cause of the flood?",
             ],
         )
-        response = adapter.process_request(request)
+        response = adapter.process_request(request, {}, {})
         assert len(response.responses) == 2
 
     def test_enable_sparse_mode(self, sparse_attention_config_multi, model_name):
