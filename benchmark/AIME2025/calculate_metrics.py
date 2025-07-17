@@ -198,23 +198,3 @@ def analyze_errors(df: pd.DataFrame) -> dict:
                 error_types["format_issues"] += 1
     
     return error_types
-
-
-if __name__ == "__main__":
-    # Test the extraction functions
-    test_cases = [
-        "The answer is \\boxed{42}",
-        "Therefore, the solution is boxed{123}",
-        "The answer is 456",
-        "So the answer: 789",
-        "After solving, we get 321.",
-        "\\boxed{999} is the final answer",
-        "No clear answer here",
-    ]
-    
-    print("Testing answer extraction:")
-    for test in test_cases:
-        extracted = extract_numerical_answer(test)
-        print(f"Input: {test}")
-        print(f"Extracted: '{extracted}'")
-        print("---")
