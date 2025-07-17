@@ -445,13 +445,14 @@ def filter_existing_results(
         >>> print(f"Found {len(completed)} completed, {len(pending)} pending")
     """
     if required_files is None:
-        required_files = ["results.json"]
+        required_files = ["raw_results.csv"]
     
     pending_stubs: List[BenchmarkStub] = []
     completed_stubs: List[BenchmarkStub] = []
     
     for stub in stubs:
         result_path = Path(stub.result_dir)
+        print(f"Checking result directory: {result_path}", flush=True)
         
         # Check if result directory exists
         if not result_path.exists():
