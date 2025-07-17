@@ -90,7 +90,7 @@ class TestMaskerConfigCreation:
             TopPMaskerConfig,
         )
 
-        config = TopPMaskerConfig()  # TopPMaskerConfig has no parameters
+        config = TopPMaskerConfig(top_p=0.8)  # TopPMaskerConfig has no parameters
         assert config is not None
 
 
