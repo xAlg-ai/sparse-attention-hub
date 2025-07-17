@@ -41,7 +41,7 @@ def mock_adapter() -> Mock:
     """Create a mock adapter for testing."""
     adapter = Mock()
     
-    def mock_process_request(request):
+    def mock_process_request(request, generation_kwargs, request_kwargs):
         """Mock processing that returns responses based on questions."""
         if isinstance(request.questions, list):
             responses = [f"Response to {q}" for q in request.questions]
@@ -190,7 +190,7 @@ class TestBenchmarkBase:
     def test_process_all_requests_multiple_questions_per_context(self, mock_adapter, mock_dataset_df):
         """Test processing requests with multiple questions per context."""
         benchmark = MockBenchmark()
-        results_df = benchmark._process_all_requests(mock_adapter, mock_dataset_df)
+        results_df = benchmark._process_all_requests(mock_adapter, mock_dataset_df, {}, {})
         
         # Check that predicted_answer column was added
         assert "predicted_answer" in results_df.columns
@@ -210,7 +210,7 @@ class TestBenchmarkBase:
         single_response_adapter.process_request.return_value = Mock(responses="Single response")
         
         benchmark = MockBenchmark()
-        results_df = benchmark._process_all_requests(single_response_adapter, mock_dataset_df)
+        results_df = benchmark._process_all_requests(single_response_adapter, mock_dataset_df, {}, {})
         
         # Should handle single response for multiple questions
         context1_rows = results_df[results_df["context"] == "Context 1"]
@@ -224,7 +224,7 @@ class TestBenchmarkBase:
         failing_adapter.process_request.side_effect = Exception("Adapter failed")
         
         benchmark = MockBenchmark()
-        results_df = benchmark._process_all_requests(failing_adapter, mock_dataset_df)
+        results_df = benchmark._process_all_requests(failing_adapter, mock_dataset_df, {}, {})
         
         # Should handle errors gracefully and continue processing
         assert len(results_df) == 3
@@ -239,7 +239,7 @@ class TestBenchmarkBase:
             mock_torch.cuda.is_available.return_value = True
             
             benchmark = MockBenchmark()
-            benchmark._process_all_requests(mock_adapter, mock_dataset_df)
+            benchmark._process_all_requests(mock_adapter, mock_dataset_df, {}, {})
             
             # Should call empty_cache for each context group
             assert mock_torch.cuda.empty_cache.called

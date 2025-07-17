@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from typing import Dict, Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -77,7 +78,7 @@ class TestBenchmarkAdapterIntegration:
         )
         
         # Mock the process_request method to avoid actual model inference
-        def mock_process_request(request: Request, **kwargs) -> RequestResponse:
+        def mock_process_request(request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]) -> RequestResponse:
             if isinstance(request.questions, list):
                 return RequestResponse(responses=[f"Mock response {i}" for i in range(len(request.questions))])
             else:
@@ -132,7 +133,7 @@ class TestBenchmarkAdapterIntegration:
         )
         
         # Mock the process_request method
-        def mock_process_request(request: Request, **kwargs) -> RequestResponse:
+        def mock_process_request(request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]) -> RequestResponse:
             return RequestResponse(responses=["Dense response"] * len(request.questions))
         
         adapter.process_request = mock_process_request
@@ -186,7 +187,7 @@ class TestEndToEndBenchmarkWorkflow:
         # Create mock adapter
         mock_adapter = Mock()
         
-        def mock_process_request(request: Request) -> RequestResponse:
+        def mock_process_request(request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]) -> RequestResponse:
             # Simulate context-aware responses
             context_id = "ctx1" if "Context 1" in request.context else "ctx2"
             if isinstance(request.questions, list):
@@ -243,7 +244,7 @@ class TestEndToEndBenchmarkWorkflow:
         call_count = 0
         contexts_seen = set()
         
-        def counting_process_request(request: Request) -> RequestResponse:
+        def counting_process_request(request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]) -> RequestResponse:
             nonlocal call_count, contexts_seen
             call_count += 1
             contexts_seen.add(request.context)
@@ -317,7 +318,7 @@ class TestErrorHandlingIntegration:
     def test_adapter_failure_recovery(self, temp_result_dir):
         """Test benchmark recovery when adapter fails intermittently."""
         # Create adapter that fails on certain contexts
-        def failing_process_request(request: Request) -> RequestResponse:
+        def failing_process_request(request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]) -> RequestResponse:
             if "fail" in request.context.lower():
                 raise Exception("Simulated adapter failure")
             return RequestResponse(responses=["Success response"] * len(request.questions))

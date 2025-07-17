@@ -34,11 +34,18 @@ class ModelHubAdapterInterface(ABC):
     """
 
     @abstractmethod
-    def process_request(self, request: Request) -> RequestResponse:
+    def process_request(
+        self, 
+        request: Request, 
+        generation_kwargs: Dict[str, Any], 
+        request_kwargs: Dict[str, Any]
+    ) -> RequestResponse:
         """Processes request.
 
         Args:
             request: The request to process
+            generation_kwargs: Parameters for model inference/generation
+            request_kwargs: Parameters for request processing (e.g., max_context_length)
 
         Returns:
             response: The response to the request
