@@ -29,8 +29,8 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
 # ============================================================================
 
 # GPU Configuration
-GPUS = [4, 5]  # Use all available GPUs
-MAX_CONCURRENT_RUNS = 2  # One per GPU
+GPUS = [0,2,7]  # Use all available GPUs
+MAX_CONCURRENT_RUNS = 3  # One per GPU
 
 # Model List
 MODELS = [
@@ -48,37 +48,82 @@ SPARSE_CONFIGS = [
         SinkMaskerConfig(sink_size=4),
         LocalMaskerConfig(window_size=16)
     ])),
-    
-    ("streaming_balanced", ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=4),
-        LocalMaskerConfig(window_size=32)
-    ])),
-    
-    ("streaming_aggressive", ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=4),
-        LocalMaskerConfig(window_size=64)
-    ])),
-    
-    ("streaming_very_aggressive", ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=4),
-        LocalMaskerConfig(window_size=128)
-    ])),
 ]
 
 # Benchmark List
+# 1. InfiniteBench - using passkey task
+infinite_bench_config = BenchmarkConfig(
+    benchmark_name="infinite_bench",
+    subsets=["passkey"]
+)
+
+# 2. Ruler - using 4096 context length
+ruler_config = BenchmarkConfig(
+    benchmark_name="ruler",
+    subsets=["4096"]
+)
+
+# 3. Loogle - using shortdep_qa task
+loogle_config = BenchmarkConfig(
+    benchmark_name="loogle",
+    subsets=["shortdep_qa"]
+)
+
+# 4. ZeroScrolls - using gov_report task
+zero_scrolls_config = BenchmarkConfig(
+    benchmark_name="zero_scrolls",
+    subsets=["default"]
+)
+
+# 5. LongBenchv2 - using 0shot task
+longbenchv2_config = BenchmarkConfig(
+    benchmark_name="longbenchv2",
+    subsets=["0shot"]
+)
+
+# 6. AIME2024 - using single task
+aime2024_config = BenchmarkConfig(
+    benchmark_name="aime2024",
+    subsets=["aime2024"]
+)
+
+# 7. AIME2025 - using single task
+aime2025_config = BenchmarkConfig(
+    benchmark_name="aime2025",
+    subsets=["aime2025"]
+)
+
+# 8. LongBench (existing) - using narrativeqa task
+longbench_config = BenchmarkConfig(
+    benchmark_name="longbench",
+    subsets=["narrativeqa"]
+)
+
+# 9. Mock Benchmark (existing) - using single task
+mock_benchmark_config = BenchmarkConfig(
+    benchmark_name="mock_benchmark",
+    subsets=["reading_comprehension"]
+)
+
+# List of all sample configurations
 BENCHMARKS = [
-    BenchmarkConfig("longbench", [
-        "narrativeqa",  # Story understanding
-        "triviaqa",     # Factual QA
-    ]),
+    infinite_bench_config,
+    ruler_config,
+    loogle_config,
+    zero_scrolls_config,
+    longbenchv2_config,
+    aime2024_config,
+    aime2025_config,
+    longbench_config,
+    mock_benchmark_config
 ]
+
 
 # Adapter Configuration
 ADAPTER_CONFIG = AdapterConfig(
     adapter_name="huggingface",
     model_kwargs={
         "torch_dtype": torch.bfloat16,
-        "device_map": "auto",
     },
     tokenizer_kwargs={
         "padding_side": "left",
@@ -112,21 +157,6 @@ TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
 if __name__ == "__main__":
     print("🚀 Starting Minimalistic Benchmark Suite")
     print("=" * 50)
-    
-    # Validate GPU availability
-    if not torch.cuda.is_available():
-        print("⚠️  CUDA not available, using CPU only")
-        GPUS = []
-        MAX_CONCURRENT_RUNS = 1
-    else:
-        available_gpus = list(range(torch.cuda.device_count()))
-        if GPUS:
-            GPUS = [gpu for gpu in GPUS if gpu in available_gpus]
-            if not GPUS:
-                print(f"⚠️  No specified GPUs available, using all: {available_gpus}")
-                GPUS = available_gpus
-        else:
-            GPUS = available_gpus
     
     print(f"🔧 Configuration:")
     print(f"  - GPUs: {GPUS}")

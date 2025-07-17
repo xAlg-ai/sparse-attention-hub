@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Ruler benchmark module for evaluating retrieval and understanding capabilities.
+Ruler benchmark module for evaluating long context understanding.
 """
 
 from .calculate_metrics import calculate_metrics
+from .ruler import Ruler
 
-__all__ = ["calculate_metrics"]
+__all__ = ["calculate_metrics", "Ruler"]

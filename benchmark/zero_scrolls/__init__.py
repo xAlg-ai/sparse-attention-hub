@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Zero Scrolls benchmark module for evaluating long document understanding.
+ZeroScrolls benchmark module for evaluating long context understanding.
 """
 
-from .calculate_metrics import calculate_metrics
+from .zero_scrolls import ZeroScrolls
 
-__all__ = ["calculate_metrics"]
+__all__ = ["ZeroScrolls"]
