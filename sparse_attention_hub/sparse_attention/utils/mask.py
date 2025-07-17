@@ -294,13 +294,11 @@ class Mask:
             # For full masks, generate all indices with value 1.0
             total_size: int = int(np.prod(self.shape))
             indices: torch.Tensor = torch.arange(total_size, dtype=torch.long)
-            data: torch.Tensor = torch.ones(total_size, dtype=self.dtype)
+            data = torch.ones(total_size, dtype=self.dtype)
 
             # Create ptr array
             n_cols: int = self.shape[-1]
-            ptr: torch.Tensor = torch.arange(
-                0, total_size + 1, n_cols, dtype=torch.long
-            )
+            ptr = torch.arange(0, total_size + 1, n_cols, dtype=torch.long)
 
             return indices, ptr, data
         elif self.from_index:
@@ -308,11 +306,11 @@ class Mask:
                 raise RuntimeError("Sparse mask indices or ptr is None")
             if self.data is None:
                 # If no data is provided, assume 1.0 values
-                data: torch.Tensor = torch.ones(
+                data = torch.ones(
                     self.indices.numel(), dtype=self.dtype, device=self.indices.device
                 )
             else:
-                data: torch.Tensor = self.data
+                data = self.data
             return self.indices, self.ptr, data
         elif self.from_dense_mask:
             if self.mask is None:
@@ -322,14 +320,12 @@ class Mask:
             non_zero_indices: torch.Tensor = torch.nonzero(
                 self.mask.view(-1), as_tuple=False
             ).squeeze(-1)
-            data: torch.Tensor = self.mask.view(-1)[non_zero_indices]
+            data = self.mask.view(-1)[non_zero_indices]
 
             # Create ptr array with size equal to product of all dimensions except the last one, plus 1
             # Vectorized version: count nonzero per row and cumsum
-            counts: torch.Tensor = torch.count_nonzero(
-                self.mask.view(-1, self.shape[-1]), dim=1
-            )
-            ptr: torch.Tensor = torch.cat(
+            counts = torch.count_nonzero(self.mask.view(-1, self.shape[-1]), dim=1)
+            ptr = torch.cat(
                 [
                     torch.zeros(1, dtype=torch.long, device=self.mask.device),
                     torch.cumsum(counts, dim=0),
@@ -434,9 +430,9 @@ class Mask:
         if self.from_dense_mask:
             if self.mask is None:
                 raise RuntimeError("Dense mask is None")
-            mask: torch.Tensor = self.mask
+            mask = self.mask
         elif self.from_index:
-            mask: torch.Tensor = self.get_dense_mask()
+            mask = self.get_dense_mask()
         else:
             raise RuntimeError("Mask object is in an invalid state")
 
@@ -571,10 +567,8 @@ class Mask:
                 0, dtype=torch.long, device=device
             )
             final_data: torch.Tensor = torch.empty(0, dtype=self.dtype, device=device)
-            num_rows: int = int(np.prod(self.shape[:-1]))
-            final_ptr: torch.Tensor = torch.zeros(
-                num_rows + 1, dtype=torch.long, device=device
-            )
+            num_rows = int(np.prod(self.shape[:-1]))
+            final_ptr = torch.zeros(num_rows + 1, dtype=torch.long, device=device)
         elif self_indices.numel() == 0:
             final_indices = other_indices
             final_data = torch.clamp(other_data, 0.0, 1.0)
@@ -607,11 +601,11 @@ class Mask:
             final_indices = unique_indices
 
             # Reconstruct ptr array by counting elements per row
-            num_rows: int = int(np.prod(self.shape[:-1]))
-            n_cols: int = self.shape[-1]
+            num_rows = int(np.prod(self.shape[:-1]))
+            n_cols = self.shape[-1]
             row_indices: torch.Tensor = final_indices // n_cols
             row_counts: torch.Tensor = torch.bincount(row_indices, minlength=num_rows)
-            final_ptr: torch.Tensor = torch.cat(
+            final_ptr = torch.cat(
                 [
                     torch.zeros(1, dtype=torch.long, device=device),
                     torch.cumsum(row_counts, dim=0),

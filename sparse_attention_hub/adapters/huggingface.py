@@ -340,7 +340,7 @@ class ModelAdapterHF(ModelAdapter):
         if self.tokenizer is None:
             raise ValueError("Tokenizer not initialized")
 
-        max_new_tokens: int = kwargs.get("max_new_tokens", 50)
+        max_new_tokens: int = kwargs.get("max_new_tokens", 50)  # type: ignore
         context_length: int = context_outputs.past_key_values.get_seq_length()
 
         position_ids = torch.arange(

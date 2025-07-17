@@ -200,5 +200,5 @@ class ResearchMasker(ABC):
         )
 
         # Cast to help mypy understand the type
-        masker_class: Type[ResearchMasker] = cast(Type[ResearchMasker], masker_class)
+        masker_class = cast(Type[ResearchMasker], masker_class)
         return masker_class.create_from_config(config)
