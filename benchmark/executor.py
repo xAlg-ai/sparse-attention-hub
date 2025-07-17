@@ -406,7 +406,7 @@ class BenchmarkExecutor:
         self.base_result_dir = Path(base_result_dir).resolve()
         self.enable_resumability = enable_resumability
         self.result_file_validation = result_file_validation
-        self.required_result_files = required_result_files or ["results.json"]
+        self.required_result_files = required_result_files or ["raw_results.csv"]
         self.timeout_per_benchmark = timeout_per_benchmark
         self.verbose = verbose
         

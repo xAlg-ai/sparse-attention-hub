@@ -147,7 +147,7 @@ REQUEST_KWARGS = {
 
 # Execution Settings
 RESULT_DIR = "./benchmark_results"
-ENABLE_RESUMABILITY = False
+ENABLE_RESUMABILITY = True
 TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
 
 # ============================================================================
@@ -200,6 +200,7 @@ if __name__ == "__main__":
         max_concurrent_runs=MAX_CONCURRENT_RUNS,
         base_result_dir=RESULT_DIR,
         enable_resumability=ENABLE_RESUMABILITY,
+        required_result_files=["raw_results.csv"],
         timeout_per_benchmark=TIMEOUT_PER_BENCHMARK,
         verbose=True
     )
