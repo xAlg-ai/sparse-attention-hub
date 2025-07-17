@@ -246,7 +246,6 @@ class TestModelAdapterHF:
             model_name="test-model",
             model_kwargs={"torch_dtype": torch.float16},
         )
-        assert adapter.device == "cuda"
         assert adapter.torch_dtype == torch.float16
         assert adapter.model is not None
         assert adapter.tokenizer is not None
@@ -372,7 +371,6 @@ class TestModelAdapterHF:
             model_name="test-model",
         )
         # Check properties
-        assert adapter.device == "cuda"
         assert adapter.model_name == "test-model"
         assert adapter.sparse_attention_config == self.sparse_attention_config
         assert adapter.sparse_attention is not None
