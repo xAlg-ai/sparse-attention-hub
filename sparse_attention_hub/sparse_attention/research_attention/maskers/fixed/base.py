@@ -99,7 +99,12 @@ class TopKMasker(FixedMasker):
 class TopPMaskerConfig(FixedMaskerConfig):
     """Base configuration for top-P maskers."""
 
-    pass
+    top_p: float
+
+    def __post_init__(self):
+        """Validate top_p parameter."""
+        if not 0.0 <= self.top_p <= 1.0:
+            raise ValueError(f"top_p must be in range [0, 1], got {self.top_p}")
 
 
 class TopPMasker(FixedMasker):
@@ -108,6 +113,7 @@ class TopPMasker(FixedMasker):
     def __init__(self, config: TopPMaskerConfig) -> None:
         """Initialize top-P masker with configuration."""
         super().__init__(config)
+        self.top_p: float = config.top_p
 
     @abstractmethod
     def add_mask(
