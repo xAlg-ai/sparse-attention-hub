@@ -6,16 +6,17 @@
 :summary: Tests for OracleTopPMasker implementation.
 """
 
+import mock
 import pytest
 import torch
-import mock
-from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    OracleTopPMasker,
-    OracleTopPMaskerConfig,
-)
+
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed import (
     TopPMasker,
     TopPMaskerConfig,
+)
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
+    OracleTopPMasker,
+    OracleTopPMaskerConfig,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
@@ -146,7 +147,7 @@ class TestOracleTopPMaskerMethods:
         masker = OracleTopPMasker(config)
 
         def max_normalized(x):
-            _max_attention_score = x.max(dim = -1, keepdim = True)[0]
+            _max_attention_score = x.max(dim=-1, keepdim=True)[0]
             return x - _max_attention_score
 
         batch_size, num_heads, seq_len_queries, seq_len_keys = 2, 4, 3, 5
@@ -158,7 +159,9 @@ class TestOracleTopPMaskerMethods:
         scores = masker._compute_attention_scores(keys, queries)
 
         expected_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        assert scores.shape == expected_shape, f"Expected shape {expected_shape}, got {scores.shape}"
+        assert (
+            scores.shape == expected_shape
+        ), f"Expected shape {expected_shape}, got {scores.shape}"
 
         # Verify it's the correct computation
         expected_scores = torch.exp(max_normalized(queries @ keys.transpose(-2, -1)))
@@ -170,10 +173,13 @@ class TestOracleTopPMaskerMethods:
         masker = OracleTopPMasker(config)
 
         # Test with 2D tensor (2 queries, 5 keys)
-        scores = torch.tensor([
-            [0.1, 0.3, 0.2, 0.4, 0.1],  # Query 1
-            [0.2, 0.1, 0.5, 0.1, 0.1],  # Query 2
-        ], dtype=torch.float32)
+        scores = torch.tensor(
+            [
+                [0.1, 0.3, 0.2, 0.4, 0.1],  # Query 1
+                [0.2, 0.1, 0.5, 0.1, 0.1],  # Query 2
+            ],
+            dtype=torch.float32,
+        )
 
         thresholds = masker._compute_top_p_thresholds(scores, 0.8)
 
@@ -194,10 +200,10 @@ class TestOracleTopPMaskerMethods:
         masker = OracleTopPMasker(config)
 
         # Test with 4D tensor (batch=1, heads=1, queries=2, keys=3)
-        scores = torch.tensor([
-            [[[0.1, 0.3, 0.2],    # Query 1
-              [0.2, 0.1, 0.5]]]   # Query 2
-        ], dtype=torch.float32)
+        scores = torch.tensor(
+            [[[[0.1, 0.3, 0.2], [0.2, 0.1, 0.5]]]],  # Query 1  # Query 2
+            dtype=torch.float32,
+        )
 
         thresholds = masker._compute_top_p_thresholds(scores, 0.6)
 
@@ -314,13 +320,14 @@ class TestOracleTopPMaskerAddMask:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
         scores = torch.rand(batch_size, num_heads, seq_len_queries, seq_len_keys)
-        with mock.patch.object(masker, "_compute_attention_scores", return_value=scores):
+        with mock.patch.object(
+            masker, "_compute_attention_scores", return_value=scores
+        ):
             result = masker.add_mask(
                 keys=keys,
                 queries=queries,
@@ -330,19 +337,19 @@ class TestOracleTopPMaskerAddMask:
                 previous_mask=empty_previous_mask,
             )
 
-
         # Convert to dense to check pattern
         result_dense = result.get_dense_mask()
         assert result_dense.shape == mask_shape
 
-        expected_result = (torch.ones_like(scores[:,:,:,0]) * 0.6)
+        expected_result = torch.ones_like(scores[:, :, :, 0]) * 0.6
 
         thresholds = masker._compute_top_p_thresholds(scores, 0.6)
-        achieved_result = torch.sum(scores * (scores >= thresholds), dim=-1) / torch.sum(scores, dim=-1)
-        
+        achieved_result = torch.sum(
+            scores * (scores >= thresholds), dim=-1
+        ) / torch.sum(scores, dim=-1)
+
         assert torch.allclose(achieved_result, expected_result, rtol=0.1)
-        
-        
+
     def test_add_mask_edge_case_top_p_zero(self):
         """Test OracleTopPMasker with top_p = 0.0."""
         config = OracleTopPMaskerConfig(top_p=0.0)
@@ -399,7 +406,9 @@ class TestOracleTopPMaskerAddMask:
         result_dense = result.get_dense_mask()
         # With top_p=1.0, should select all positions
         total_active = torch.sum(result_dense[0, 0, 0] != 0).item()
-        assert total_active == seq_len_keys, f"Should have {seq_len_keys} active positions, got {total_active}"
+        assert (
+            total_active == seq_len_keys
+        ), f"Should have {seq_len_keys} active positions, got {total_active}"
 
 
 @pytest.mark.unit
@@ -424,9 +433,9 @@ class TestOracleTopPMaskerIntegration:
 
         # Test with different shapes
         test_shapes = [
-            (1, 1, 3, 5),   # Small
+            (1, 1, 3, 5),  # Small
             (2, 4, 8, 16),  # Medium
-            (4, 8, 16, 32), # Large
+            (4, 8, 16, 32),  # Large
         ]
 
         for batch_size, num_heads, seq_len_queries, seq_len_keys in test_shapes:
@@ -462,7 +471,9 @@ class TestOracleTopPMaskerIntegration:
 
         # Test on CPU
         keys_cpu = torch.randn(batch_size, num_heads, seq_len_keys, 16, device="cpu")
-        queries_cpu = torch.randn(batch_size, num_heads, seq_len_queries, 16, device="cpu")
+        queries_cpu = torch.randn(
+            batch_size, num_heads, seq_len_queries, 16, device="cpu"
+        )
         values_cpu = torch.randn(batch_size, num_heads, seq_len_keys, 16, device="cpu")
         attention_mask_cpu = torch.ones(batch_size, seq_len_keys, device="cpu")
 
@@ -497,4 +508,4 @@ class TestOracleTopPMaskerIntegration:
         # Results should be equivalent (after moving to same device)
         result_cpu_dense = result_cpu.get_dense_mask()
         result_gpu_dense = result_gpu.get_dense_mask().cpu()
-        assert torch.allclose(result_cpu_dense, result_gpu_dense) 
+        assert torch.allclose(result_cpu_dense, result_gpu_dense)

@@ -131,7 +131,7 @@ class TestSamplingMaskerValidation:
             RandomSamplingMaskerConfig(sampling_rate=0.5)
         )
         magic_pig_masker = MagicPig.create_from_config(
-            MagicPigConfig(sampling_rate=0.3, lsh_l=4, lsh_k=16)
+            MagicPigConfig(lsh_l=4, lsh_k=16)
         )
 
         # This should raise an error
@@ -156,7 +156,7 @@ class TestSamplingMaskerValidation:
         # Create config with two sampling maskers
         masker_configs = [
             RandomSamplingMaskerConfig(sampling_rate=0.5),
-            MagicPigConfig(sampling_rate=0.3, lsh_l=4, lsh_k=16),
+            MagicPigConfig(lsh_l=4, lsh_k=16),
         ]
         config = ResearchAttentionConfig(masker_configs=masker_configs)
 

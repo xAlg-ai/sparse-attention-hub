@@ -14,12 +14,7 @@ from ..base import MaskerConfig, ResearchMasker
 class SamplingMaskerConfig(MaskerConfig):
     """Base configuration for sampling maskers."""
 
-    sampling_rate: float  # Float in range [0,1] representing fraction of indices to sample
-
-    def __post_init__(self) -> None:
-        """Validate sampling_rate after initialization."""
-        if not (0.0 <= self.sampling_rate <= 1.0):
-            raise ValueError(f"sampling_rate must be in range [0,1], got {self.sampling_rate}")
+    pass
 
 
 class SamplingMasker(ResearchMasker):
