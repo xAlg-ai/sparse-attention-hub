@@ -43,7 +43,7 @@ class TestSamplingMaskerConfigCreation:
             SamplingMaskerConfig,
         )
 
-        config = SamplingMaskerConfig(sampling_rate=0.5)
+        config = SamplingMaskerConfig()
         assert config is not None
 
 

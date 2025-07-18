@@ -35,10 +35,10 @@ class ModelHubAdapterInterface(ABC):
 
     @abstractmethod
     def process_request(
-        self, 
-        request: Request, 
-        generation_kwargs: Dict[str, Any], 
-        request_kwargs: Dict[str, Any]
+        self,
+        request: Request,
+        generation_kwargs: Dict[str, Any],
+        request_kwargs: Dict[str, Any],
     ) -> RequestResponse:
         """Processes request.
 

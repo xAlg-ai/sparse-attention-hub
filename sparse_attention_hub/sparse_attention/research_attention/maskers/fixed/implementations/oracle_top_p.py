@@ -29,7 +29,9 @@ class OracleTopPMasker(TopPMasker):
     def __init__(self, config: OracleTopPMaskerConfig) -> None:
         """Initialize oracle top-P masker with configuration."""
         super().__init__(config)
-        assert isinstance(self.top_p, float) and self.top_p is not None, "top_p must be set as a float in config"
+        assert (
+            isinstance(self.top_p, float) and self.top_p is not None
+        ), "top_p must be set as a float in config"
         # self.top_p is now set in the base class
 
     def add_mask(
@@ -45,7 +47,6 @@ class OracleTopPMasker(TopPMasker):
         """Add oracle top-P mask to enable top-P attention pattern."""
         if previous_mask.is_full_mask():
             return previous_mask
-
 
         tensor_dims: AttentionTensorDimensions = self._extract_tensor_dimensions(
             keys, queries
@@ -71,8 +72,8 @@ class OracleTopPMasker(TopPMasker):
     ) -> torch.Tensor:
         """Compute exp(attention scores) between queries and keys."""
         raw_attention_scores = queries @ keys.transpose(-2, -1)
-        _max_attention_score = raw_attention_scores.max(dim = -1, keepdim = True)[0]
-        adjusted =  torch.exp(raw_attention_scores - _max_attention_score)
+        _max_attention_score = raw_attention_scores.max(dim=-1, keepdim=True)[0]
+        adjusted = torch.exp(raw_attention_scores - _max_attention_score)
         return adjusted
 
     def _compute_top_p_thresholds(
@@ -93,11 +94,16 @@ class OracleTopPMasker(TopPMasker):
         top_p_tensor = torch.full_like(normalized_cumsum[..., :1], top_p)
 
         # Find positions where normalized_cumsum >= top_p
-        threshold_positions = torch.searchsorted(normalized_cumsum, top_p_tensor, side="left")
+        threshold_positions = torch.searchsorted(
+            normalized_cumsum, top_p_tensor, side="left"
+        )
 
         # Prepare indices for advanced indexing (shape-agnostic)
         leading_shape = scores.shape[:-1]
-        idx_grids = torch.meshgrid(*[torch.arange(s, device=scores.device) for s in leading_shape], indexing='ij')
+        idx_grids = torch.meshgrid(
+            *[torch.arange(s, device=scores.device) for s in leading_shape],
+            indexing="ij",
+        )
         thresholds = sorted_scores[idx_grids + (threshold_positions.squeeze(-1),)]
 
         # Add trailing singleton dimension for broadcasting
@@ -119,7 +125,9 @@ class OracleTopPMasker(TopPMasker):
         masked_scores[previous_dense_mask != 0] = float("-inf")
 
         # Compute thresholds using vectorized operations
-        thresholds: torch.Tensor = self._compute_top_p_thresholds(masked_scores, self.top_p)
+        thresholds: torch.Tensor = self._compute_top_p_thresholds(
+            masked_scores, self.top_p
+        )
 
         # Create dense mask: scores >= thresholds
         dense_mask: torch.Tensor = masked_scores >= thresholds
@@ -131,11 +139,13 @@ class OracleTopPMasker(TopPMasker):
             dims.seq_len_queries,
             dims.seq_len_keys,
         )
-        return Mask.create_mask_from_dense_mask(mask_shape, dense_mask, dtype=previous_mask.dtype)
+        return Mask.create_mask_from_dense_mask(
+            mask_shape, dense_mask, dtype=previous_mask.dtype
+        )
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "OracleTopPMasker":
         """Create OracleTopPMasker instance from configuration."""
         if not isinstance(config, OracleTopPMaskerConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
-        return cls(config) 
+        return cls(config)

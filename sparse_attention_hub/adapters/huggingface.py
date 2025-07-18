@@ -16,6 +16,7 @@ from .base import ModelAdapter, Request, RequestResponse
 
 INT_MAX = 2**31 - 1
 
+
 class ModelAdapterHF(ModelAdapter):
     """ModelAdapter for HuggingFace integration. Provides concrete implementations for huggingface's
     transformer library.
@@ -75,7 +76,11 @@ class ModelAdapterHF(ModelAdapter):
         self._cleanup_attention_registration()
 
     def process_request(
-        self, request: Request, generation_kwargs: Dict[str, Any], request_kwargs: Dict[str, Any], **kwargs: Dict[str, Any]
+        self,
+        request: Request,
+        generation_kwargs: Dict[str, Any],
+        request_kwargs: Dict[str, Any],
+        **kwargs: Dict[str, Any],
     ) -> RequestResponse:
         """Processes request with optimized tokenization but independent question processing.
         Context is tokenized once but each question is processed independently to avoid KV cache contamination.
@@ -86,8 +91,8 @@ class ModelAdapterHF(ModelAdapter):
         Returns:
             response: The response to the request
         """
-        max_context_length: int = request_kwargs.get("max_context_length",INT_MAX)
-        
+        max_context_length: int = request_kwargs.get("max_context_length", INT_MAX)
+
         questions: List[str] = (
             request.questions
             if isinstance(request.questions, list)
@@ -98,7 +103,9 @@ class ModelAdapterHF(ModelAdapter):
         context, questions = self._preprocess_context_and_questions(context, questions)
 
         context_tokens = self.tokenizer.encode(context, return_tensors="pt")
-        context_tokens = context_tokens[:, :max_context_length] # truncate context to max_context_length
+        context_tokens = context_tokens[
+            :, :max_context_length
+        ]  # truncate context to max_context_length
         if self.device is not None:
             context_tokens = context_tokens.to(self.device)
         print(f"Context tokens: {context_tokens.shape}")

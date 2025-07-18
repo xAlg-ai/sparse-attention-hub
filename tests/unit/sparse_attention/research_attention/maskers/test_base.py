@@ -250,7 +250,7 @@ class TestConcreteMaskerCreation:
             MagicPigConfig,
         )
 
-        config = MagicPigConfig(sampling_rate=0.5, lsh_l=4, lsh_k=8)
+        config = MagicPigConfig(lsh_l=4, lsh_k=8)
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is MagicPig
         assert masker.config == config
