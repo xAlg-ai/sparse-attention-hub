@@ -20,14 +20,12 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
-from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
-    _get_num_key_value_groups,
-    repeat_kv,
-)
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
+    _get_num_key_value_groups,
     apply_inv_mask_sum,
     create_sampling_mask_with_per_head_budget,
+    repeat_kv,
 )
 
 from ..base import SamplingMasker, SamplingMaskerConfig
@@ -51,7 +49,7 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
 
     base_rate_sampling: Union[int, float]  # Base rate (0,1) if float
     epsilon: float  # Error bound (0,1)
-    delta: float   # Confidence bound (0,1)
+    delta: float  # Confidence bound (0,1)
     init_offset: int  # Start index
     local_offset: int  # End offset
 
@@ -60,7 +58,7 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
         if isinstance(self.base_rate_sampling, float):
             if not (0.0 < self.base_rate_sampling < 1.0):
                 raise ValueError(
-                    f"base_rate_sampling must be in (0,1) if float, got {self.base_rate_sampling}"
+                    f"base_rate_sampling must be in (0, 1) if float, got {self.base_rate_sampling}"
                 )
         elif isinstance(self.base_rate_sampling, int):
             if self.base_rate_sampling <= 0:
@@ -73,16 +71,20 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
             )
 
         if not (0.0 < self.epsilon < 1.0):
-            raise ValueError(f"epsilon must be in (0,1), got {self.epsilon}")
+            raise ValueError(f"epsilon must be in (0, 1), got {self.epsilon}")
 
         if not (0.0 < self.delta < 1.0):
-            raise ValueError(f"delta must be in (0,1), got {self.delta}")
+            raise ValueError(f"delta must be in (0, 1), got {self.delta}")
 
         if self.init_offset < 0:
-            raise ValueError(f"init_offset must be non-negative, got {self.init_offset}")
+            raise ValueError(
+                f"init_offset must be non-negative, got {self.init_offset}"
+            )
 
         if self.local_offset < 0:
-            raise ValueError(f"local_offset must be non-negative, got {self.local_offset}")
+            raise ValueError(
+                f"local_offset must be non-negative, got {self.local_offset}"
+            )
 
 
 @MaskerRegistry.register(AdaptiveSamplingMaskerConfig)
@@ -141,7 +143,9 @@ class AdaptiveSamplingMasker(SamplingMasker):
         # Pre-compute delta_ppf for efficiency
         self.delta_ppf = float(norm.ppf(1 - self.delta))
 
-    def _compute_exp_attention_scores(self, queries: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
+    def _compute_exp_attention_scores(
+        self, queries: torch.Tensor, keys: torch.Tensor
+    ) -> torch.Tensor:
         """Compute exponential attention scores with numerical stability."""
         ngroups = _get_num_key_value_groups(queries, keys)
         keys = repeat_kv(keys, ngroups)
@@ -154,30 +158,38 @@ class AdaptiveSamplingMasker(SamplingMasker):
         start_idx = self.init_offset
         end_idx = seq_len_keys - self.local_offset
         sampling_range = end_idx - start_idx
-        
+
         if sampling_range <= 0:
             raise ValueError(f"Invalid sampling range: {sampling_range}")
-        
+
         return start_idx, end_idx, sampling_range
 
     def _get_base_sample_count(self, sampling_range: int) -> int:
         """Get number of base samples based on configuration."""
         # Ensure at least 2 samples since it is used for std estimation
         if isinstance(self.base_rate_sampling, int):
-            return max(2, self.base_rate_sampling) 
-        return max(2, int(self.base_rate_sampling * sampling_range)) 
+            return max(2, self.base_rate_sampling)
+        return max(2, int(self.base_rate_sampling * sampling_range))
 
     def _get_std_estimate_using_base_sample(
-        self, expwts: torch.Tensor, batch_size: int, num_heads: int, 
-        seq_len_queries: int, seq_len_keys: int, start_idx: int, end_idx: int, 
-        num_base_samples: int, dtype: torch.dtype
+        self,
+        expwts: torch.Tensor,
+        batch_size: int,
+        num_heads: int,
+        seq_len_queries: int,
+        seq_len_keys: int,
+        start_idx: int,
+        end_idx: int,
+        num_base_samples: int,
+        dtype: torch.dtype,
     ) -> tuple[Mask, torch.Tensor]:
         """Get standard deviation estimate using base sampling and create base mask."""
         # Create base sampling indices
         base_row_wise_idx = torch.randint(
-            low=start_idx, high=end_idx,
+            low=start_idx,
+            high=end_idx,
             size=(batch_size, num_heads, seq_len_queries, num_base_samples),
-            device=expwts.device
+            device=expwts.device,
         )
 
         # Extract values and compute std
@@ -190,34 +202,40 @@ class AdaptiveSamplingMasker(SamplingMasker):
 
         # Create base sampling mask
         sampling_range = end_idx - start_idx
-        base_data = torch.full_like(base_row_wise_idx, num_base_samples / sampling_range, dtype=expwts.dtype)
+        base_data = torch.full_like(
+            base_row_wise_idx, num_base_samples / sampling_range, dtype=expwts.dtype
+        )
 
         base_mask = Mask.create_from_row_wise_idx(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
-            row_wise_idx=base_row_wise_idx, data=base_data,
-            type="index", dtype=dtype
+            row_wise_idx=base_row_wise_idx,
+            data=base_data,
+            type="index",
+            dtype=dtype,
         )
 
         return base_mask, std_estimate
 
     def _compute_adaptive_budget(
-        self, std_estimate: torch.Tensor, estimated_denominator: torch.Tensor, 
-        sampling_range: int
+        self,
+        std_estimate: torch.Tensor,
+        estimated_denominator: torch.Tensor,
+        sampling_range: int,
     ) -> torch.Tensor:
         """Compute adaptive budget based on statistical bounds."""
         epsilon_allowable_error = self.epsilon * estimated_denominator
         epsilon_allowable_error = torch.clamp(epsilon_allowable_error, min=1e-8)
-        
+
         budget_numerator = self.delta_ppf * std_estimate * sampling_range
         budget_squared = (budget_numerator / epsilon_allowable_error) ** 2
-        
+
         # Ensure budget is positive and within bounds
         budget = torch.clamp(
             budget_squared,
             min=1.0,  # Minimum 1 sample
-            max=float(sampling_range)  # Maximum sampling_range samples
+            max=float(sampling_range),  # Maximum sampling_range samples
         ).long()
-        
+
         return budget
 
     def add_mask(
@@ -257,7 +275,10 @@ class AdaptiveSamplingMasker(SamplingMasker):
         # Extract dimensions and compute attention scores
         dims = self._extract_tensor_dimensions(keys, queries)
         batch_size, num_heads, seq_len_queries, seq_len_keys = (
-            dims.batch_size, dims.num_heads, dims.seq_len_queries, dims.seq_len_keys
+            dims.batch_size,
+            dims.num_heads,
+            dims.seq_len_queries,
+            dims.seq_len_keys,
         )
 
         expwts = self._compute_exp_attention_scores(queries, keys)
@@ -269,21 +290,33 @@ class AdaptiveSamplingMasker(SamplingMasker):
 
         # Create base sampling mask and estimate std
         base_sampling_mask, std_estimate = self._get_std_estimate_using_base_sample(
-            expwts, batch_size, num_heads, seq_len_queries, seq_len_keys,
-            start_idx, end_idx, num_base_samples, previous_mask.dtype
+            expwts,
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            seq_len_keys,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            previous_mask.dtype,
         )
 
         # Compute denominators and budget
         sampled_denominator = apply_inv_mask_sum(expwts, base_sampling_mask)
         estimated_denominator = static_denominator + sampled_denominator
-        budget = self._compute_adaptive_budget(std_estimate, estimated_denominator, sampling_range)
+        budget = self._compute_adaptive_budget(
+            std_estimate, estimated_denominator, sampling_range
+        )
 
         # Create adaptive sampling mask
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
         adaptive_mask = create_sampling_mask_with_per_head_budget(
-            budgets=budget, sampling_probability=sampling_probabilities,
-            seq_len_keys=seq_len_keys, start_idx=start_idx, end_idx=end_idx,
-            dtype=previous_mask.dtype
+            budgets=budget,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=previous_mask.dtype,
         )
         # Merge masks
         return previous_mask.merge_mask(adaptive_mask, inplace=False)
@@ -303,4 +336,4 @@ class AdaptiveSamplingMasker(SamplingMasker):
         """
         if not isinstance(config, AdaptiveSamplingMaskerConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
-        return cls(config) 
+        return cls(config)

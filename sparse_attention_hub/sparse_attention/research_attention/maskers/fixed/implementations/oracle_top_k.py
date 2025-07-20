@@ -10,7 +10,10 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
-from sparse_attention_hub.sparse_attention.utils.kv_utils import _get_num_key_value_groups, repeat_kv
+from sparse_attention_hub.sparse_attention.utils.kv_utils import (
+    _get_num_key_value_groups,
+    repeat_kv,
+)
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
