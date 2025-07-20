@@ -20,6 +20,10 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
+    _get_num_key_value_groups,
+    repeat_kv,
+)
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
     apply_inv_mask_sum,
@@ -139,6 +143,8 @@ class AdaptiveSamplingMasker(SamplingMasker):
 
     def _compute_exp_attention_scores(self, queries: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
         """Compute exponential attention scores with numerical stability."""
+        ngroups = _get_num_key_value_groups(queries, keys)
+        keys = repeat_kv(keys, ngroups)
         raw_scores = torch.matmul(queries, keys.transpose(-2, -1))
         max_scores = torch.max(raw_scores, dim=-1, keepdim=True)[0]
         return torch.exp(raw_scores - max_scores)
@@ -273,16 +279,14 @@ class AdaptiveSamplingMasker(SamplingMasker):
         budget = self._compute_adaptive_budget(std_estimate, estimated_denominator, sampling_range)
 
         # Create adaptive sampling mask
-        sampling_probabilities = budget / sampling_range
+        sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
         adaptive_mask = create_sampling_mask_with_per_head_budget(
             budgets=budget, sampling_probability=sampling_probabilities,
             seq_len_keys=seq_len_keys, start_idx=start_idx, end_idx=end_idx,
             dtype=previous_mask.dtype
         )
-
         # Merge masks
-        combined_mask = base_sampling_mask.merge_mask(adaptive_mask, inplace=False)
-        return previous_mask.merge_mask(combined_mask, inplace=False)
+        return previous_mask.merge_mask(adaptive_mask, inplace=False)
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "AdaptiveSamplingMasker":

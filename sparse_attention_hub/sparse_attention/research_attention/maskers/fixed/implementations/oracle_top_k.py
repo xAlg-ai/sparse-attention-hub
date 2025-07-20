@@ -10,6 +10,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.kv_utils import _get_num_key_value_groups, repeat_kv
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
@@ -97,6 +98,8 @@ class OracleTopK(TopKMasker):
         self, keys: torch.Tensor, queries: torch.Tensor
     ) -> torch.Tensor:
         """Compute raw attention scores using query-key dot product."""
+        ngroups = _get_num_key_value_groups(queries, keys)
+        keys = repeat_kv(keys, ngroups)
         return torch.matmul(queries, keys.transpose(-2, -1))
 
     @classmethod
