@@ -15,12 +15,13 @@ import torch
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
     _compute_masked_exp_attention_weights,
+    apply_inv_mask_sum,
+    create_sampling_mask_with_per_head_budget,
     get_attention_denominator,
     get_attention_numerator,
     get_masked_attention_output,
-    apply_inv_mask_sum,
-    create_sampling_mask_with_per_head_budget,
 )
+
 
 @pytest.mark.unit
 class TestApplyInvMaskSum:
@@ -39,9 +40,9 @@ class TestApplyInvMaskSum:
     def test_full_mask(self, sample_tensor):
         """Test with full mask."""
         full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32)
-        
+
         result = apply_inv_mask_sum(sample_tensor, full_mask)
-        
+
         expected = sample_tensor.sum(dim=-1, keepdim=True)
         assert result.shape == (2, 4, 8, 1)
         torch.testing.assert_close(result, expected)
@@ -49,10 +50,12 @@ class TestApplyInvMaskSum:
     def test_empty_mask(self, sample_tensor):
         """Test with empty mask."""
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
-        
+
         result = apply_inv_mask_sum(sample_tensor, empty_mask)
-        
-        expected = torch.zeros(2, 4, 8, 1, device=sample_tensor.device, dtype=sample_tensor.dtype)
+
+        expected = torch.zeros(
+            2, 4, 8, 1, device=sample_tensor.device, dtype=sample_tensor.dtype
+        )
         assert result.shape == (2, 4, 8, 1)
         torch.testing.assert_close(result, expected)
 
@@ -61,15 +64,19 @@ class TestApplyInvMaskSum:
 
         dense_mask = torch.rand_like(big_sample_tensor)
         dense_mask = (dense_mask > 0.5).float() * dense_mask
-        mask_object = Mask.create_mask_from_dense_mask(dense_mask.shape, dense_mask, dtype=dense_mask.dtype)
+        mask_object = Mask.create_mask_from_dense_mask(
+            dense_mask.shape, dense_mask, dtype=dense_mask.dtype
+        )
 
         result = apply_inv_mask_sum(big_sample_tensor, mask_object)
 
-        non_zero_indices = dense_mask !=0
+        non_zero_indices = dense_mask != 0
         zero_indices = dense_mask == 0
         expected = big_sample_tensor.clone()
         expected[zero_indices] = 0
-        expected[non_zero_indices] = expected[non_zero_indices] / dense_mask[non_zero_indices]
+        expected[non_zero_indices] = (
+            expected[non_zero_indices] / dense_mask[non_zero_indices]
+        )
         expected = expected.sum(dim=-1, keepdim=True)
         assert result.shape == (2, 4, 8, 1)
         torch.testing.assert_close(result, expected)
@@ -77,22 +84,24 @@ class TestApplyInvMaskSum:
     def test_sparse_mask_no_indices(self, sample_tensor):
         """Test with sparse mask that has no active indices."""
         indices = torch.empty(0, dtype=torch.long)
-        ptr = torch.zeros(2*4*8+1, dtype=torch.long)  # 2*4*8 rows + 1
+        ptr = torch.zeros(2 * 4 * 8 + 1, dtype=torch.long)  # 2*4*8 rows + 1
         data = torch.empty(0, dtype=torch.float32)
         sparse_mask = Mask.create_mask_from_indices(
             (2, 4, 8, 16), indices, ptr, data, dtype=torch.float32
         )
-        
+
         result = apply_inv_mask_sum(sample_tensor, sparse_mask)
-        
-        expected = torch.zeros(2, 4, 8, 1, device=sample_tensor.device, dtype=sample_tensor.dtype)
+
+        expected = torch.zeros(
+            2, 4, 8, 1, device=sample_tensor.device, dtype=sample_tensor.dtype
+        )
         assert result.shape == (2, 4, 8, 1)
         torch.testing.assert_close(result, expected)
 
     def test_shape_mismatch(self, sample_tensor):
         """Test with shape mismatch."""
         wrong_shape_mask = Mask.create_full_mask((2, 4, 8, 8), dtype=torch.float32)
-        
+
         with pytest.raises(ValueError, match="input_tensor.shape must be"):
             apply_inv_mask_sum(sample_tensor, wrong_shape_mask)
 
@@ -100,21 +109,22 @@ class TestApplyInvMaskSum:
         """Test device consistency."""
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         sample_tensor = sample_tensor.to(device)
-        
+
         full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32)
-        
+
         result = apply_inv_mask_sum(sample_tensor, full_mask)
-        
+
         assert result.device == sample_tensor.device
 
     def test_dtype_consistency(self, sample_tensor):
         """Test dtype consistency."""
         sample_tensor = sample_tensor.to(torch.float64)
         full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float64)
-        
+
         result = apply_inv_mask_sum(sample_tensor, full_mask)
-        
+
         assert result.dtype == torch.float64
+
 
 @pytest.mark.unit
 class TestCreateSamplingMaskWithPerHeadBudget:
@@ -123,12 +133,16 @@ class TestCreateSamplingMaskWithPerHeadBudget:
     @pytest.fixture
     def sample_budgets(self):
         """Create sample budgets tensor."""
-        return torch.tensor([[[[2]], [[3]], [[1]], [[4]]]], dtype=torch.long)  # (1, 4, 1, 1)
+        return torch.tensor(
+            [[[[2]], [[3]], [[1]], [[4]]]], dtype=torch.long
+        )  # (1, 4, 1, 1)
 
     @pytest.fixture
     def sample_sampling_probabilities(self):
         """Create sample sampling probabilities tensor."""
-        return torch.tensor([[[[0.2]], [[0.3]], [[0.1]], [[0.4]]]], dtype=torch.float32)  # (1, 4, 1, 1)
+        return torch.tensor(
+            [[[[0.2]], [[0.3]], [[0.1]], [[0.4]]]], dtype=torch.float32
+        )  # (1, 4, 1, 1)
 
     def test_basic_functionality(self, sample_budgets, sample_sampling_probabilities):
         """Test basic functionality."""
@@ -143,7 +157,7 @@ class TestCreateSamplingMaskWithPerHeadBudget:
             seq_len_keys=seq_len_keys,
             start_idx=start_idx,
             end_idx=end_idx,
-            dtype=dtype
+            dtype=dtype,
         )
 
         mask = mask_object.get_dense_mask()
@@ -151,50 +165,59 @@ class TestCreateSamplingMaskWithPerHeadBudget:
         assert mask.shape == (1, 4, 1, 1024)
         assert mask.dtype == dtype
         # for this with sampling with replacement, this assert would hold mostly when seq_len_keys is large and budgets are small
-        torch.testing.assert_close((mask > 0).long().sum(dim=-1, keepdim=True), sample_budgets)
+        torch.testing.assert_close(
+            (mask > 0).long().sum(dim=-1, keepdim=True), sample_budgets
+        )
         mask_2d = mask.view(-1, seq_len_keys)
         sampling_probabilities_2d = sample_sampling_probabilities.view(-1, 1)
         for i in range(mask_2d.shape[0]):
-            torch.testing.assert_close(mask_2d[i][mask_2d[i] > 0], torch.full_like(mask_2d[i][mask_2d[i] > 0], sampling_probabilities_2d[i][0], dtype=dtype))
-        
+            torch.testing.assert_close(
+                mask_2d[i][mask_2d[i] > 0],
+                torch.full_like(
+                    mask_2d[i][mask_2d[i] > 0],
+                    sampling_probabilities_2d[i][0],
+                    dtype=dtype,
+                ),
+            )
+
     def test_sampling_range(self, sample_budgets, sample_sampling_probabilities):
         """Test with different sampling range."""
         seq_len_keys = 20
         start_idx = 10
         end_idx = 15
         dtype = torch.float32
-        
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=sample_budgets,
             sampling_probability=sample_sampling_probabilities,
             seq_len_keys=seq_len_keys,
             start_idx=start_idx,
             end_idx=end_idx,
-            dtype=dtype
+            dtype=dtype,
         )
-        
+
         assert isinstance(mask, Mask)
         assert mask.shape == (1, 4, 1, 20)
-        
+
         # Check that indices are within the sampling range
         mask = mask.get_dense_mask()
-        assert mask[:,:,:,:start_idx].sum() == 0
-        assert mask[:,:,:,end_idx:].sum() == 0
+        assert mask[:, :, :, :start_idx].sum() == 0
+        assert mask[:, :, :, end_idx:].sum() == 0
 
     def test_zero_budgets(self):
         """Test with zero budgets."""
         budgets = torch.zeros(1, 1, 4, 1, dtype=torch.long)
         sampling_probabilities = torch.zeros(1, 1, 4, 1, dtype=torch.float32)
-        
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=budgets,
             sampling_probability=sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         assert isinstance(mask, Mask)
         assert mask.shape == (1, 1, 4, 16)
         assert mask.is_empty()
@@ -202,20 +225,22 @@ class TestCreateSamplingMaskWithPerHeadBudget:
     def test_large_budgets(self):
         """Test with large budgets."""
         budgets = torch.tensor([[[[8]], [[12]], [[6]], [[10]]]], dtype=torch.long)
-        sampling_probabilities = torch.tensor([[[[0.5]], [[0.75]], [[0.375]], [[0.625]]]], dtype=torch.float32)
-        
+        sampling_probabilities = torch.tensor(
+            [[[[0.5]], [[0.75]], [[0.375]], [[0.625]]]], dtype=torch.float32
+        )
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=budgets,
             sampling_probability=sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         assert isinstance(mask, Mask)
         assert mask.shape == (1, 4, 1, 16)
-        
+
         # Check that we have the expected number of elements
         indices, ptr, data = mask.get_index_mask()
         expected_total = budgets.sum().item()
@@ -232,49 +257,51 @@ class TestCreateSamplingMaskWithPerHeadBudget:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         sample_budgets = sample_budgets.to(device)
         sample_sampling_probabilities = sample_sampling_probabilities.to(device)
-        
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=sample_budgets,
             sampling_probability=sample_sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         dense_mask = mask.get_dense_mask()
         assert dense_mask.device == sample_budgets.device
 
     def test_dtype_consistency(self, sample_budgets, sample_sampling_probabilities):
         """Test dtype consistency."""
         sample_sampling_probabilities = sample_sampling_probabilities.to(torch.float64)
-        
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=sample_budgets,
             sampling_probability=sample_sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float64
+            dtype=torch.float64,
         )
-        
+
         assert mask.dtype == torch.float64
 
     def test_batch_multiple_heads(self):
         """Test with multiple batches and heads."""
         batch_size, num_heads = 2, 3
         budgets = torch.randint(1, 5, (batch_size, num_heads, 4, 1), dtype=torch.long)
-        sampling_probabilities = torch.rand(batch_size, num_heads, 4, 1, dtype=torch.float32)
-        
+        sampling_probabilities = torch.rand(
+            batch_size, num_heads, 4, 1, dtype=torch.float32
+        )
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=budgets,
             sampling_probability=sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         assert isinstance(mask, Mask)
         assert mask.shape == (batch_size, num_heads, 4, 16)
 
@@ -282,19 +309,19 @@ class TestCreateSamplingMaskWithPerHeadBudget:
         """Test edge case with single element."""
         budgets = torch.tensor([[[[1]]]], dtype=torch.long)
         sampling_probabilities = torch.tensor([[[[0.1]]]], dtype=torch.float32)
-        
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=budgets,
             sampling_probability=sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         assert isinstance(mask, Mask)
         assert mask.shape == (1, 1, 1, 16)
-        
+
         # Should have exactly one element
         indices, ptr, data = mask.get_index_mask()
         assert indices.numel() == 1
@@ -302,23 +329,25 @@ class TestCreateSamplingMaskWithPerHeadBudget:
     def test_sampling_probability_consistency(self, sample_budgets):
         """Test that sampling probabilities are correctly assigned."""
         # Use different probabilities for each element
-        sampling_probabilities = torch.tensor([[[[0.1]], [[0.2]], [[0.3]], [[0.4]]]], dtype=torch.float32)
-        
+        sampling_probabilities = torch.tensor(
+            [[[[0.1]], [[0.2]], [[0.3]], [[0.4]]]], dtype=torch.float32
+        )
+
         mask = create_sampling_mask_with_per_head_budget(
             budgets=sample_budgets,
             sampling_probability=sampling_probabilities,
             seq_len_keys=16,
             start_idx=0,
             end_idx=16,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
-        
+
         indices, ptr, data = mask.get_index_mask()
-        
+
         # Check that data values match the sampling probabilities
         # Each row should have the same probability value
         expected_probs = sampling_probabilities.view(-1)  # [0.1, 0.2, 0.3, 0.4]
-        
+
         for i in range(len(expected_probs)):
             start_idx = ptr[i]
             end_idx = ptr[i + 1]

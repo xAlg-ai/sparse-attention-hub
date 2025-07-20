@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 
 
-def extract_weights_from_usa(
-    usa_module, layer_idx=0
-):
+def extract_weights_from_usa(usa_module, layer_idx=0):
     """
     Extract weights from USA module and format them for
     HashAttentionTopKMasker.
@@ -44,14 +42,8 @@ def extract_weights_from_usa(
         if isinstance(layer, nn.Linear)
     ]
 
-    print(
-        f"Found {len(k_linear_layers)} linear layers in key "
-        f"transformation"
-    )
-    print(
-        f"Found {len(q_linear_layers)} linear layers in query "
-        f"transformation"
-    )
+    print(f"Found {len(k_linear_layers)} linear layers in key " f"transformation")
+    print(f"Found {len(q_linear_layers)} linear layers in query " f"transformation")
 
     # Extract key matrices and biases
     for layer_idx_mlp in range(len(k_linear_layers)):
@@ -63,9 +55,7 @@ def extract_weights_from_usa(
             # Get the actual linear layer from the sequential module
             actual_layer = None
             layer_count = 0
-            for module in usa_module.learning_to_hash_transformation_k[
-                head_idx
-            ]:
+            for module in usa_module.learning_to_hash_transformation_k[head_idx]:
                 if isinstance(module, nn.Linear):
                     if layer_count == layer_idx_mlp:
                         actual_layer = module
@@ -100,9 +90,7 @@ def extract_weights_from_usa(
             # Get the actual linear layer from the sequential module
             actual_layer = None
             layer_count = 0
-            for module in usa_module.learning_to_hash_transformation_q[
-                head_idx
-            ]:
+            for module in usa_module.learning_to_hash_transformation_q[head_idx]:
                 if isinstance(module, nn.Linear):
                     if layer_count == layer_idx_mlp:
                         actual_layer = module

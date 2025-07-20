@@ -9,6 +9,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
+
 @pytest.mark.unit
 class TestAdaptiveSamplingMaskerConfig:
     """Test AdaptiveSamplingMaskerConfig validation."""
@@ -137,6 +138,7 @@ class TestAdaptiveSamplingMaskerConfig:
                 local_offset=-1,
             )
 
+
 @pytest.mark.unit
 class TestAdaptiveSamplingMasker:
     """Test AdaptiveSamplingMasker implementation."""
@@ -161,12 +163,14 @@ class TestAdaptiveSamplingMasker:
     def sample_tensors(self):
         """Create sample tensors for testing."""
         batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 32
-        
+
         keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
         values = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
-        attention_mask = torch.zeros(batch_size, num_heads, seq_len_queries, seq_len_keys)
-        
+        attention_mask = torch.zeros(
+            batch_size, num_heads, seq_len_queries, seq_len_keys
+        )
+
         return keys, queries, values, attention_mask
 
     def test_init(self, config):
@@ -183,9 +187,9 @@ class TestAdaptiveSamplingMasker:
     def test_compute_exp_attention_scores(self, masker, sample_tensors):
         """Test exponential attention scores computation."""
         keys, queries, _, _ = sample_tensors
-        
+
         exp_scores = masker._compute_exp_attention_scores(queries, keys)
-        
+
         assert exp_scores.shape == (2, 4, 8, 16)
         assert torch.all(exp_scores >= 0)  # Exponential should be non-negative
         assert torch.all(torch.isfinite(exp_scores))  # Should be finite
@@ -193,9 +197,9 @@ class TestAdaptiveSamplingMasker:
     def test_get_sampling_range(self, masker):
         """Test sampling range calculation."""
         seq_len_keys = 16
-        
+
         start_idx, end_idx, sampling_range = masker._get_sampling_range(seq_len_keys)
-        
+
         assert start_idx == 0
         assert end_idx == 16
         assert sampling_range == 16
@@ -210,9 +214,9 @@ class TestAdaptiveSamplingMasker:
             local_offset=3,
         )
         masker = AdaptiveSamplingMasker(config)
-        
+
         start_idx, end_idx, sampling_range = masker._get_sampling_range(16)
-        
+
         assert start_idx == 2
         assert end_idx == 13
         assert sampling_range == 11
@@ -227,7 +231,7 @@ class TestAdaptiveSamplingMasker:
             local_offset=10,
         )
         masker = AdaptiveSamplingMasker(config)
-        
+
         with pytest.raises(ValueError, match="Invalid sampling range"):
             masker._get_sampling_range(16)
 
@@ -248,7 +252,7 @@ class TestAdaptiveSamplingMasker:
             local_offset=0,
         )
         masker = AdaptiveSamplingMasker(config)
-        
+
         sampling_range = 16
         count = masker._get_base_sample_count(sampling_range)
         assert count == 5
@@ -257,16 +261,23 @@ class TestAdaptiveSamplingMasker:
         """Test standard deviation estimation using base sampling."""
         batch_size, num_heads, seq_len_queries, seq_len_keys = 2, 4, 8, 1024
         expwts = torch.randn(batch_size, num_heads, seq_len_queries, seq_len_keys)
-        
+
         start_idx, end_idx = 0, seq_len_keys
         num_base_samples = 5
         dtype = torch.float32
-        
+
         base_mask, std_estimate = masker._get_std_estimate_using_base_sample(
-            expwts, batch_size, num_heads, seq_len_queries, seq_len_keys,
-            start_idx, end_idx, num_base_samples, dtype
+            expwts,
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            seq_len_keys,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            dtype,
         )
-        
+
         assert isinstance(base_mask, Mask)
         assert base_mask.shape == (batch_size, num_heads, seq_len_queries, seq_len_keys)
         assert std_estimate.shape == (2, 4, 8, 1)
@@ -276,7 +287,7 @@ class TestAdaptiveSamplingMasker:
         dense_mask_2d = dense_mask.view(-1, seq_len_keys)
         std_estimate_2d = std_estimate.view(-1, 1)
         expwts_2d = expwts.view(-1, seq_len_keys)
-        
+
         for i in range(dense_mask_2d.shape[0]):
             true_std = torch.std(expwts_2d[i][dense_mask_2d[i] > 0])
             achieved_std = std_estimate_2d[i][0]
@@ -285,63 +296,72 @@ class TestAdaptiveSamplingMasker:
             print(f"row: {i}, true_std: {true_std}, achieved_std: {achieved_std}")
             torch.testing.assert_close(true_std, achieved_std, rtol=0.1, atol=0.05)
 
-    @pytest.mark.parametrize("epsilon, delta", [(0.2, 0.2), (0.25, 0.25), (0.5, 0.5), (0.2, 0.1)])
+    @pytest.mark.parametrize(
+        "epsilon, delta", [(0.2, 0.2), (0.25, 0.25), (0.5, 0.5), (0.2, 0.1)]
+    )
     def test_compute_adaptive_budget(self, masker, epsilon, delta):
         """Test adaptive budget computation."""
-        std_estimate = torch.ones(1,1) # 1
+        std_estimate = torch.ones(1, 1)  # 1
         sampling_range = 100000
         data = torch.randn(1, sampling_range)
         static_denominator = 10000
         true_denominator = data.sum(dim=-1, keepdim=True) + static_denominator
-        print(f"true_denominator: {true_denominator} = {data.sum(dim=-1, keepdim=True)} + {static_denominator}")
-        masker = AdaptiveSamplingMasker(AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.1,
-            epsilon=epsilon,
-            delta=delta,
-            init_offset=0,
-            local_offset=0,
-        ))
+        print(
+            f"true_denominator: {true_denominator} = {data.sum(dim=-1, keepdim=True)} + {static_denominator}"
+        )
+        masker = AdaptiveSamplingMasker(
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.1,
+                epsilon=epsilon,
+                delta=delta,
+                init_offset=0,
+                local_offset=0,
+            )
+        )
         # i.e. assuming that data comes from a N(0,1) distribution
-        budget = masker._compute_adaptive_budget(std_estimate, true_denominator, sampling_range)
+        budget = masker._compute_adaptive_budget(
+            std_estimate, true_denominator, sampling_range
+        )
         budget = int(budget.item())
         num_extreme_values = 0
         total_runs = 1000
         for i in range(total_runs):
             indices = torch.randperm(sampling_range)[:budget]
             data_sampled = data[:, indices]
-            estimated_sum = (data_sampled.sum(dim=-1) * (sampling_range / budget)).item() + static_denominator
+            estimated_sum = (
+                data_sampled.sum(dim=-1) * (sampling_range / budget)
+            ).item() + static_denominator
             true_sum = true_denominator.item()
-            extreme_value_present = (true_sum - estimated_sum) > true_sum * masker.epsilon
+            extreme_value_present = (
+                true_sum - estimated_sum
+            ) > true_sum * masker.epsilon
             num_extreme_values += float(extreme_value_present)
         empirical_delta = num_extreme_values / total_runs
-        print(f"budget: {budget}, empirical_delta: {empirical_delta} , masker.delta: {masker.delta}")
+        print(
+            f"budget: {budget}, empirical_delta: {empirical_delta} , masker.delta: {masker.delta}"
+        )
         torch.testing.assert_close(empirical_delta, masker.delta, rtol=0.2, atol=0.05)
 
-        
     def test_add_mask_early_exit(self, masker, sample_tensors):
         """Test early exit when previous mask is full."""
         keys, queries, values, attention_mask = sample_tensors
-        
+
         # Create a full mask
         full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32)
-        
-        result = masker.add_mask(
-            keys, queries, values, attention_mask, {}, full_mask
-        )
-        
+
+        result = masker.add_mask(keys, queries, values, attention_mask, {}, full_mask)
+
         assert result is full_mask
 
     def test_add_mask_basic(self, masker, sample_tensors):
         """Test basic add_mask functionality."""
         keys, queries, values, attention_mask = sample_tensors
-        
+
         # Create an empty mask
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
-        
-        result = masker.add_mask(
-            keys, queries, values, attention_mask, {}, empty_mask
-        )
-        
+
+        result = masker.add_mask(keys, queries, values, attention_mask, {}, empty_mask)
+
         assert isinstance(result, Mask)
         assert result.shape == (2, 4, 8, 16)
         assert not result.is_empty()
@@ -354,48 +374,46 @@ class TestAdaptiveSamplingMasker:
 
     def test_create_from_config_invalid(self):
         """Test create_from_config with invalid config type."""
-        from sparse_attention_hub.sparse_attention.research_attention.maskers.base import MaskerConfig
-        
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
+            MaskerConfig,
+        )
+
         invalid_config = MaskerConfig()
-        
+
         with pytest.raises(ValueError, match="Invalid config type"):
             AdaptiveSamplingMasker.create_from_config(invalid_config)
 
     def test_device_consistency(self, masker, sample_tensors):
         """Test that all tensors are on the same device."""
         keys, queries, values, attention_mask = sample_tensors
-        
+
         # Move to GPU if available
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         keys = keys.to(device)
         queries = queries.to(device)
         values = values.to(device)
         attention_mask = attention_mask.to(device)
-        
+
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
-        
-        result = masker.add_mask(
-            keys, queries, values, attention_mask, {}, empty_mask
-        )
-        
+
+        result = masker.add_mask(keys, queries, values, attention_mask, {}, empty_mask)
+
         # Check that result is on the same device
         assert result.get_dense_mask().device == keys.device
- 
+
     def test_numerical_stability(self, masker, sample_tensors):
         """Test numerical stability with extreme values."""
         keys, queries, values, attention_mask = sample_tensors
-        
+
         # Use very large values to test numerical stability
         keys = keys * 1000
         queries = queries * 1000
-        
+
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
-        
-        result = masker.add_mask(
-            keys, queries, values, attention_mask, {}, empty_mask
-        )
-        
+
+        result = masker.add_mask(keys, queries, values, attention_mask, {}, empty_mask)
+
         # Should not have NaN or infinite values
         dense_mask = result.get_dense_mask()
         assert torch.all(torch.isfinite(dense_mask))
-        assert not torch.any(torch.isnan(dense_mask)) 
+        assert not torch.any(torch.isnan(dense_mask))
