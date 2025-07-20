@@ -157,7 +157,8 @@ class Mask:
         Returns:
             Mask object with from_index=True
         """
-        # For multi-dimensional tensors, ptr should have size equal to the product of all dimensions except the last one, plus 1
+        # For multi-dimensional tensors, ptr should have size equal to the product
+        # of all dimensions except the last one, plus 1
         expected_ptr_size: int = int(np.prod(shape[:-1]) + 1)
         if ptr.numel() != expected_ptr_size:
             raise ValueError(
@@ -502,7 +503,11 @@ class Mask:
 
     def __repr__(self) -> str:
         """String representation of the Mask object."""
-        return f"Mask(shape={self.shape}, dtype={self.dtype}, from_dense_mask={self.from_dense_mask}, from_index={self.from_index}, is_full={self.is_full})"
+        return (
+            f"Mask(shape={self.shape}, dtype={self.dtype}, "
+            f"from_dense_mask={self.from_dense_mask}, from_index={self.from_index}, "
+            f"is_full={self.is_full})"
+        )
 
     def merge_mask(
         self,

@@ -40,9 +40,7 @@ class TestAdaptiveSamplingMaskerConfig:
 
     def test_invalid_float_base_rate_sampling(self):
         """Test invalid float base_rate_sampling values."""
-        with pytest.raises(
-            ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"
-        ):
+        with pytest.raises(ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0.0,
                 epsilon=0.1,
@@ -51,9 +49,7 @@ class TestAdaptiveSamplingMaskerConfig:
                 local_offset=0,
             )
 
-        with pytest.raises(
-            ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"
-        ):
+        with pytest.raises(ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=1.0,
                 epsilon=0.1,
