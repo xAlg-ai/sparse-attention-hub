@@ -39,7 +39,8 @@ def _get_num_key_value_groups(queries: torch.Tensor, kv_tensor: torch.Tensor) ->
 
     if num_attention_heads % num_key_value_heads != 0:
         raise ValueError(
-            f"num_attention_heads ({num_attention_heads}) must be divisible by num_key_value_heads ({num_key_value_heads})"
+            f"num_attention_heads ({num_attention_heads}) must be divisible by "
+            f"num_key_value_heads ({num_key_value_heads})"
         )
 
     return num_attention_heads // num_key_value_heads

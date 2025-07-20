@@ -47,7 +47,8 @@ class ResearchAttention(SparseAttention):
         )
         if sampling_masker_count > 1:
             raise ValueError(
-                "Only one sampling masker supported for efficiency; consider implementing all sampling logic in one masker"
+                "Only one sampling masker supported for efficiency; "
+                "consider implementing all sampling logic in one masker"
             )
 
         self.maskers = maskers
