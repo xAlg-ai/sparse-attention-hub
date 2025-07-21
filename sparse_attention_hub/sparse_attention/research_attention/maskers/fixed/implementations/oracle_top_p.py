@@ -10,6 +10,10 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.kv_utils import (
+    _get_num_key_value_groups,
+    repeat_kv,
+)
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopPMasker, TopPMaskerConfig
@@ -71,6 +75,8 @@ class OracleTopPMasker(TopPMasker):
         self, keys: torch.Tensor, queries: torch.Tensor
     ) -> torch.Tensor:
         """Compute exp(attention scores) between queries and keys."""
+        ngroups = _get_num_key_value_groups(queries, keys)
+        keys = repeat_kv(keys, ngroups)
         raw_attention_scores = queries @ keys.transpose(-2, -1)
         _max_attention_score = raw_attention_scores.max(dim=-1, keepdim=True)[0]
         adjusted = torch.exp(raw_attention_scores - _max_attention_score)

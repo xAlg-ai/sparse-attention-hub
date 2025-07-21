@@ -15,6 +15,11 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.kv_utils import (
+    _get_num_key_value_groups,
+    repeat_kv,
+)
+
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import SamplingMasker, SamplingMaskerConfig
@@ -307,6 +312,9 @@ class MagicPig(SamplingMasker):
         num_heads: int = queries.shape[1]
         seq_len_queries: int = queries.shape[2]
         seq_len_keys: int = keys.shape[2]
+
+        ngroups = _get_num_key_value_groups(queries, keys)
+        keys = repeat_kv(keys, ngroups)
 
         probabilities: torch.Tensor = self._compute_probabilities(keys, queries)
         matches: torch.Tensor = self._compute_lsh_matches(keys, queries)
