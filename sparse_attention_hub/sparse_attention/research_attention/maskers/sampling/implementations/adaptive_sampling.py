@@ -300,13 +300,13 @@ class AdaptiveSamplingMasker(SamplingMasker):
             num_base_samples,
             previous_mask.dtype,
         )
-
         # Compute denominators and budget
         sampled_denominator = apply_inv_mask_sum(expwts, base_sampling_mask)
         estimated_denominator = static_denominator + sampled_denominator
         budget = self._compute_adaptive_budget(
             std_estimate, estimated_denominator, sampling_range
         )
+        budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
 
         # Create adaptive sampling mask
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
