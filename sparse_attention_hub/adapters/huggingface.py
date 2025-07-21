@@ -111,22 +111,34 @@ class ModelAdapterHF(ModelAdapter):
         print(f"Context tokens: {context_tokens.shape}")
         responses: List[str] = []
 
-        for question in questions:
-            sparse_meta_data: Dict[str, Any] = {}
+        self.model.eval()
+        with torch.no_grad():
+            for question in questions:
+                sparse_meta_data: Dict[str, Any] = {}
 
-            question_tokens = self.tokenizer.encode(question, return_tensors="pt")
-            if self.device is not None:
-                question_tokens = question_tokens.to(self.device)
+                question_tokens = self.tokenizer.encode(question, return_tensors="pt")
+                if self.device is not None:
+                    question_tokens = question_tokens.to(self.device)
 
-            context_outputs = self.model(
-                context_tokens,
-                past_key_values=None,
-                use_cache=True,
-                sparse_meta_data=sparse_meta_data,
-            )
+                context_outputs = self.model(
+                    context_tokens,
+                    past_key_values=None,
+                    use_cache=True,
+                    sparse_meta_data=sparse_meta_data,
+                )
 
-            if self._sparse_attention_available:
-                with self.enable_sparse_mode():
+                if self._sparse_attention_available:
+                    with self.enable_sparse_mode():
+                        response_text = self._generate_response(
+                            question_tokens,
+                            context_outputs,
+                            sparse_meta_data,
+                            generation_kwargs,
+                            **kwargs,
+                        )
+                        responses.append(response_text)
+                else:
+                    # Dense-only mode: process questions with dense attention
                     response_text = self._generate_response(
                         question_tokens,
                         context_outputs,
@@ -135,16 +147,6 @@ class ModelAdapterHF(ModelAdapter):
                         **kwargs,
                     )
                     responses.append(response_text)
-            else:
-                # Dense-only mode: process questions with dense attention
-                response_text = self._generate_response(
-                    question_tokens,
-                    context_outputs,
-                    sparse_meta_data,
-                    generation_kwargs,
-                    **kwargs,
-                )
-                responses.append(response_text)
 
         if isinstance(request.questions, str):
             return RequestResponse(responses=responses[0])
