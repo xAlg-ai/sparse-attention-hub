@@ -642,3 +642,18 @@ class Mask:
                 data=final_data,
                 dtype=self.dtype,
             )
+
+    def get_density(self) -> float:
+        """
+        Get the sparsity of the mask.
+        """
+        if self.is_full:
+            return 1.0
+        elif self.is_empty():
+            return 0.0
+        elif self.from_dense_mask:
+            return float(torch.sum(self.mask > 0) / self.mask.numel())
+        elif self.from_index:
+            return float(len(self.indices)) / float(np.prod(self.shape))
+        else:
+            raise RuntimeError("Mask object is in an invalid state")
