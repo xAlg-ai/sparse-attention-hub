@@ -29,6 +29,9 @@ class ModelAdapterHF(ModelAdapter):
         model_kwargs: Optional[Dict[str, Any]] = None,
         tokenizer_kwargs: Optional[Dict[str, Any]] = None,
         device: Optional[str] = None,
+        recovery_enabled: bool = False,
+        recovery_interval: int = 400,
+        recovery_dense_attention: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
         """Initialize HuggingFace adapter.
@@ -39,12 +42,23 @@ class ModelAdapterHF(ModelAdapter):
             model_kwargs: Additional keyword arguments for model creation
             device: Device to run the model on TODO: support dynamic and multipledevice placement
             tokenizer_kwargs: Additional keyword arguments for tokenizer creation
+            recovery_enabled: Whether to enable recovery mechanism during generation
+            recovery_interval: Number of tokens after which to trigger recovery
+                (regenerate embeddings with full attention)
+            recovery_dense_attention: Override attention implementation for recovery
+                (if None, uses original implementation)
         """
         super().__init__(model_name, sparse_attention_config, **kwargs)
         self._registered_attention_name: Optional[str] = None
         self._custom_attention_fn: Optional[Callable] = None
+        self._original_implementations: Dict[str, str] = {}
         self.model_kwargs = model_kwargs or {}
         self.tokenizer_kwargs = tokenizer_kwargs or {}
+
+        # Recovery mechanism parameters
+        self.recovery_enabled = recovery_enabled
+        self.recovery_interval = recovery_interval
+        self.recovery_dense_attention = recovery_dense_attention
 
         # more useful parameters to store
         self.device = (
@@ -316,6 +330,9 @@ class ModelAdapterHF(ModelAdapter):
             ):
                 original_implementations[name] = module.config._attn_implementation
 
+        # Store original implementations as instance variable for use during generation
+        self._original_implementations = original_implementations
+
         # Ensure custom attention function is registered (reuse if already registered)
         custom_attention_name: str = self._ensure_attention_registered()
 
@@ -334,6 +351,9 @@ class ModelAdapterHF(ModelAdapter):
             for name, module in self.model.named_modules():
                 if name in original_implementations:
                     module.config._attn_implementation = original_implementations[name]
+
+            # Clean up instance variable
+            self._original_implementations = {}
 
     def _generate_response(
         self,
@@ -385,6 +405,16 @@ class ModelAdapterHF(ModelAdapter):
         if not isinstance(should_stop_token_ids, list):
             should_stop_token_ids = [should_stop_token_ids]
 
+        # Track newly generated tokens for recovery mechanism
+        new_tokens_generated = 0
+        generation_start_cache_length = context_outputs.past_key_values.get_seq_length()
+
+        if self.recovery_enabled:
+            print(f"Recovery enabled: regenerate embeddings every "
+                  f"{self.recovery_interval} new tokens")
+        else:
+            print("Recovery disabled: using sparse attention for answer generation")
+
         for i in range(max_new_tokens - 1):
             with torch.no_grad():
                 outputs = self.model(
@@ -396,11 +426,204 @@ class ModelAdapterHF(ModelAdapter):
                 # TODO: support other forms of decoding
                 new_id = outputs.logits[0, -1].argmax()
                 generated_ids.append(new_id)
+                new_tokens_generated += 1
 
                 if new_id.item() in should_stop_token_ids:
                     break
 
+                # Check if we need to regenerate embeddings (only if recovery is enabled)
+                if (self.recovery_enabled and
+                        new_tokens_generated >= self.recovery_interval and
+                        i < max_new_tokens - 2):  # Don't regenerate on the last token
+
+                    print(f"Regenerating embeddings for {new_tokens_generated} "
+                          f"newly generated tokens")
+                    self._regenerate_embeddings_for_new_tokens(
+                        context_outputs.past_key_values,
+                        generated_ids[-new_tokens_generated:],  # Last N generated tokens
+                        generation_start_cache_length,
+                        new_tokens_generated,
+                        sparse_meta_data,
+                        self._original_implementations
+                    )
+                    new_tokens_generated = 0  # Reset counter
+
         answer: str = self.tokenizer.decode(
             torch.stack(generated_ids), skip_special_tokens=True
         )
+
+        # Remove the generated tokens from the cache to restore original context state
+        current_cache_length = context_outputs.past_key_values.get_seq_length()
+        original_context_length = generation_start_cache_length
+
+        if current_cache_length > original_context_length:
+            print(f"Cleaning up generated tokens from cache "
+                  f"(keeping {original_context_length} tokens)")
+            for layer_idx in range(len(context_outputs.past_key_values.key_cache)):
+                if context_outputs.past_key_values.key_cache[layer_idx] is not None:
+                    key_cache = context_outputs.past_key_values.key_cache[layer_idx]
+                    context_outputs.past_key_values.key_cache[layer_idx] = (
+                        key_cache[:, :, :original_context_length]
+                    )
+                if context_outputs.past_key_values.value_cache[layer_idx] is not None:
+                    value_cache = context_outputs.past_key_values.value_cache[layer_idx]
+                    context_outputs.past_key_values.value_cache[layer_idx] = (
+                        value_cache[:, :, :original_context_length]
+                    )
+
+            # Handle quantized caches if present
+            if hasattr(context_outputs.past_key_values, "_quantized_key_cache"):
+                quantized_key_cache = context_outputs.past_key_values._quantized_key_cache
+                quantized_value_cache = context_outputs.past_key_values._quantized_value_cache
+                for layer_idx in range(len(quantized_key_cache)):
+                    if quantized_key_cache[layer_idx] is not None:
+                        quantized_key_cache[layer_idx] = (
+                            quantized_key_cache[layer_idx][:, :, :original_context_length]
+                        )
+                    if quantized_value_cache[layer_idx] is not None:
+                        quantized_value_cache[layer_idx] = (
+                            quantized_value_cache[layer_idx][:, :, :original_context_length]
+                        )
+
         return answer
+
+    def _reset_kv_cache_sliding_window(self, cache: Any, reset_interval: int) -> None:
+        """Reset KV cache but keep the first (current_length - reset_interval) tokens.
+
+        Example: If cache has 600 tokens and reset_interval=400, keep tokens 0-199 (first 200 tokens).
+
+        Args:
+            cache: The KV cache to reset.
+            reset_interval: Number of tokens to remove from the end of the cache.
+        """
+        current_length = cache.get_seq_length()
+        keep_length = current_length - reset_interval
+
+        if keep_length <= 0:
+            # If we would keep nothing, just clear the cache
+            cache.key_cache = []
+            cache.value_cache = []
+            if hasattr(cache, "_quantized_key_cache"):
+                cache._quantized_key_cache = []
+                cache._quantized_value_cache = []
+            return
+
+        # Keep only the first keep_length tokens (from 0 to keep_length-1)
+        for layer_idx in range(len(cache.key_cache)):
+            if cache.key_cache[layer_idx] is not None:
+                cache.key_cache[layer_idx] = (
+                    cache.key_cache[layer_idx][:, :, :keep_length]
+                )
+            if cache.value_cache[layer_idx] is not None:
+                cache.value_cache[layer_idx] = (
+                    cache.value_cache[layer_idx][:, :, :keep_length]
+                )
+
+        # Handle quantized caches if present
+        if hasattr(cache, "_quantized_key_cache"):
+            for layer_idx in range(len(cache._quantized_key_cache)):
+                if cache._quantized_key_cache[layer_idx] is not None:
+                    cache._quantized_key_cache[layer_idx] = (
+                        cache._quantized_key_cache[layer_idx][:, :, :keep_length]
+                    )
+                if cache._quantized_value_cache[layer_idx] is not None:
+                    cache._quantized_value_cache[layer_idx] = (
+                        cache._quantized_value_cache[layer_idx][:, :, :keep_length]
+                    )
+
+    def _regenerate_embeddings_for_new_tokens(
+        self,
+        cache: Any,
+        new_token_ids: List[torch.Tensor],
+        start_cache_length: int,
+        num_new_tokens: int,
+        sparse_meta_data: Dict[str, Any],
+        original_implementations: Dict[str, str]
+    ) -> None:
+        """Regenerate embeddings for newly generated tokens using full attention.
+
+        This removes the KV cache entries for the newly generated tokens and regenerates
+        them using full attention (dense mode), then continues with sparse attention.
+
+        Args:
+            cache: The KV cache to modify
+            new_token_ids: List of newly generated token IDs
+            start_cache_length: Cache length when generation started
+            num_new_tokens: Number of new tokens to regenerate embeddings for
+            sparse_meta_data: Sparse metadata dictionary
+            original_implementations: Dict mapping module names to their original
+                attention implementations
+        """
+        current_cache_length = cache.get_seq_length()
+
+        # Remove embeddings for the newly generated tokens (keep everything before them)
+        keep_length = current_cache_length - num_new_tokens
+
+        print(f"Removing embeddings for {num_new_tokens} tokens "
+              f"(keeping first {keep_length} tokens)")
+
+        # Truncate cache to remove new token embeddings
+        for layer_idx in range(len(cache.key_cache)):
+            if cache.key_cache[layer_idx] is not None:
+                cache.key_cache[layer_idx] = (
+                    cache.key_cache[layer_idx][:, :, :keep_length]
+                )
+            if cache.value_cache[layer_idx] is not None:
+                cache.value_cache[layer_idx] = (
+                    cache.value_cache[layer_idx][:, :, :keep_length]
+                )
+
+        # Handle quantized caches if present
+        if hasattr(cache, "_quantized_key_cache"):
+            for layer_idx in range(len(cache._quantized_key_cache)):
+                if cache._quantized_key_cache[layer_idx] is not None:
+                    cache._quantized_key_cache[layer_idx] = (
+                        cache._quantized_key_cache[layer_idx][:, :, :keep_length]
+                    )
+                if cache._quantized_value_cache[layer_idx] is not None:
+                    cache._quantized_value_cache[layer_idx] = (
+                        cache._quantized_value_cache[layer_idx][:, :, :keep_length]
+                    )
+        # Regenerate embeddings using full attention (one forward pass)
+        print(f"Regenerating embeddings using full attention for {num_new_tokens} tokens")
+
+        # Create input tensor for the new tokens
+        new_tokens_tensor = torch.stack(new_token_ids).unsqueeze(0).to(self.model.device)
+
+        # Create position IDs for the new tokens
+        position_ids = torch.arange(
+            keep_length, keep_length + num_new_tokens, device=self.model.device
+        ).unsqueeze(0)
+
+        # Temporarily disable sparse mode to force dense attention
+        print("Forcing dense attention for regeneration")
+
+        # Store current sparse implementations and switch to dense implementations
+        current_sparse_implementations: Dict[str, str] = {}
+        for name, module in self.model.named_modules():
+            has_config = hasattr(module, "config")
+            has_attn_impl = has_config and hasattr(module.config, "_attn_implementation")
+            if name in original_implementations and has_attn_impl:
+                current_sparse_implementations[name] = module.config._attn_implementation
+                # Use override if provided, otherwise use original implementation
+                dense_implementation = (
+                    self.recovery_dense_attention or original_implementations[name]
+                )
+                module.config._attn_implementation = dense_implementation
+        try:
+            # Regenerate embeddings with dense attention
+            with torch.no_grad():
+                self.model(
+                    input_ids=new_tokens_tensor,
+                    past_key_values=cache,
+                    position_ids=position_ids,
+                )
+
+            print(f"Successfully regenerated embeddings. Cache length: {cache.get_seq_length()}")
+
+        finally:
+            # Restore sparse attention implementations
+            for name, module in self.model.named_modules():
+                if name in current_sparse_implementations:
+                    module.config._attn_implementation = current_sparse_implementations[name]
+            print("Restored sparse attention mode")
