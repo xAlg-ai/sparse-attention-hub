@@ -9,6 +9,50 @@ from .kv_utils import _get_num_key_value_groups, repeat_kv
 from .mask import Mask
 
 
+def get_true_attention_output(
+    module: nn.Module,
+    queries: torch.Tensor,
+    keys: torch.Tensor,
+    values: torch.Tensor,
+    attention_mask: Optional[torch.Tensor],
+    scaling: float,
+    dropout: float,
+    **kwargs: Dict[str, Any],
+) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    """Get the true (dense) attention output from the module.
+
+    Args:
+        module: The attention module (used for dropout training flag).
+        queries: Query tensor of shape (..., seq_len_q, d_k).
+        keys: Key tensor of shape (..., seq_len_k, d_k).
+        values: Value tensor of shape (..., seq_len_k, d_v).
+        attention_mask: Optional mask tensor to apply to attention weights.
+        scaling: Scaling factor for attention logits.
+        dropout: Dropout probability for attention weights.
+        **kwargs: Additional keyword arguments (unused).
+
+    Returns:
+        Tuple containing:
+            - attention_output: Output tensor after applying attention.
+            - attention_weights: Softmax-normalized attention weights.
+    """
+    num_key_value_groups: int = _get_num_key_value_groups(queries, keys)
+    key_states = repeat_kv(keys, num_key_value_groups)
+    value_states = repeat_kv(values, num_key_value_groups)
+
+    attn_weights = torch.matmul(queries, key_states.transpose(2, 3)) * scaling
+    if attention_mask is not None:
+        causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+        attn_weights = attn_weights + causal_mask
+
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(queries.dtype)
+    attn_weights = nn.functional.dropout(attn_weights, p=dropout, training=module.training)
+    attn_output = torch.matmul(attn_weights, value_states)
+    attn_output = attn_output.transpose(1, 2).contiguous()
+
+    return attn_output, attn_weights
+    
+
 def apply_inv_mask_sum(input_tensor: torch.Tensor, mask: Mask) -> torch.Tensor:
     """Apply inverse mask to input tensor and sum along the last dimension.
 

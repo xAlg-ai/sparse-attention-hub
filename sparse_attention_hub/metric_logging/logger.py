@@ -36,7 +36,7 @@ class MicroMetricLogger:
 
     def __init__(self, 
                  log_path: Optional[str] = None,
-                 flush_every: int = 100,  # Flush every N events
+                 flush_every: int = 1000,  # Flush every N events
                  flush_interval: float = 60.0,  # Flush every N seconds
                  enabled_metrics: Union[List[str], str] = None):  # List of string identifiers to enable, or "all"
         if not self._initialized:
@@ -181,8 +181,7 @@ class MicroMetricLogger:
             return
             
         # Get current timestamp for filename
-        timestamp = datetime.now().strftime("%Y%m%d")
-        filename = f"metrics_{timestamp}.jsonl"
+        filename = f"micro_metrics.jsonl"
         filepath = os.path.join(self.log_path, filename)
         
         # Write events to file

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from queue import Empty
 from contextlib import contextmanager
+from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 
 # Set multiprocessing start method to 'spawn' for CUDA compatibility
 if multiprocessing.get_start_method(allow_none=True) != 'spawn':
@@ -233,12 +234,15 @@ def _benchmark_worker(
                     
                     # Execute benchmark
                     logger.info(f"Worker {worker_id}: Executing benchmark {stub.benchmark_name} on GPU {current_gpu_id}")
+                    metric_logger = MicroMetricLogger()
+                    metric_logger.configure_logging(log_path=stub.result_dir, enabled_metrics=["research_attention_density", "research_attention_output_error"])
                     metrics = benchmark.run_benchmark(
                         adapter=adapter,
                         result_dir=stub.result_dir,
                         generation_kwargs=stub.generation_kwargs,
                         request_kwargs=stub.request_kwargs
                     )
+                    metric_logger.flush()
                     
                     execution_time = time.time() - start_time
                     execution_success = True
