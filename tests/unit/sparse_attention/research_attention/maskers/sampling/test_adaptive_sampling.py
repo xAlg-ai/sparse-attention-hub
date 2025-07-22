@@ -40,7 +40,9 @@ class TestAdaptiveSamplingMaskerConfig:
 
     def test_invalid_float_base_rate_sampling(self):
         """Test invalid float base_rate_sampling values."""
-        with pytest.raises(ValueError, match="base_rate_sampling must be in \\(0,1\\)"):
+        with pytest.raises(
+            ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"
+        ):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0.0,
                 epsilon=0.1,
@@ -49,7 +51,9 @@ class TestAdaptiveSamplingMaskerConfig:
                 local_offset=0,
             )
 
-        with pytest.raises(ValueError, match="base_rate_sampling must be in \\(0,1\\)"):
+        with pytest.raises(
+            ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"
+        ):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=1.0,
                 epsilon=0.1,
@@ -60,7 +64,9 @@ class TestAdaptiveSamplingMaskerConfig:
 
     def test_invalid_int_base_rate_sampling(self):
         """Test invalid int base_rate_sampling values."""
-        with pytest.raises(ValueError, match="base_rate_sampling must be positive"):
+        with pytest.raises(
+            ValueError, match="base_rate_sampling must be positive if int"
+        ):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0,
                 epsilon=0.1,
@@ -69,7 +75,9 @@ class TestAdaptiveSamplingMaskerConfig:
                 local_offset=0,
             )
 
-        with pytest.raises(ValueError, match="base_rate_sampling must be positive"):
+        with pytest.raises(
+            ValueError, match="base_rate_sampling must be positive if int"
+        ):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=-1,
                 epsilon=0.1,
@@ -80,7 +88,7 @@ class TestAdaptiveSamplingMaskerConfig:
 
     def test_invalid_epsilon(self):
         """Test invalid epsilon values."""
-        with pytest.raises(ValueError, match="epsilon must be in \\(0,1\\)"):
+        with pytest.raises(ValueError, match="epsilon must be in \\(0, 1\\)"):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0.5,
                 epsilon=0.0,
@@ -89,7 +97,7 @@ class TestAdaptiveSamplingMaskerConfig:
                 local_offset=0,
             )
 
-        with pytest.raises(ValueError, match="epsilon must be in \\(0,1\\)"):
+        with pytest.raises(ValueError, match="epsilon must be in \\(0, 1\\)"):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0.5,
                 epsilon=1.0,
@@ -100,7 +108,7 @@ class TestAdaptiveSamplingMaskerConfig:
 
     def test_invalid_delta(self):
         """Test invalid delta values."""
-        with pytest.raises(ValueError, match="delta must be in \\(0,1\\)"):
+        with pytest.raises(ValueError, match="delta must be in \\(0, 1\\)"):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0.5,
                 epsilon=0.1,
@@ -109,7 +117,7 @@ class TestAdaptiveSamplingMaskerConfig:
                 local_offset=0,
             )
 
-        with pytest.raises(ValueError, match="delta must be in \\(0,1\\)"):
+        with pytest.raises(ValueError, match="delta must be in \\(0, 1\\)"):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=0.5,
                 epsilon=0.1,

@@ -2,4 +2,4 @@
 
 from .logger import MicroMetricLogger
 
-__all__ = ["MicroMetricLogger"] 
+__all__ = ["MicroMetricLogger"]

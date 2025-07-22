@@ -1,18 +1,19 @@
 """MicroMetricLogger implementation for sparse attention hub."""
 
+import inspect
 import json
 import os
 import time
 from collections import deque
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
-import inspect
 
 
 @dataclass
 class LogEvent:
     """Log event data structure."""
+
     timestamp: datetime
     metric: str  # Metric identifier string
     value: Union[None, Any]
@@ -25,7 +26,7 @@ class MicroMetricLogger:
 
     _instance: Optional["MicroMetricLogger"] = None
     _initialized: bool = False
-    
+
     # Class-level storage for registered metrics (works without initialization)
     _registered_metrics: Dict[str, type] = {}  # identifier -> dtype mapping
 
@@ -34,26 +35,28 @@ class MicroMetricLogger:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, 
-                 log_path: Optional[str] = None,
-                 flush_every: int = 1000,  # Flush every N events
-                 flush_interval: float = 60.0,  # Flush every N seconds
-                 enabled_metrics: Union[List[str], str] = None):  # List of string identifiers to enable, or "all"
+    def __init__(
+        self,
+        log_path: Optional[str] = None,
+        flush_every: int = 1000,  # Flush every N events
+        flush_interval: float = 60.0,  # Flush every N seconds
+        enabled_metrics: Union[List[str], str] = None,
+    ):  # List of string identifiers to enable, or "all"
         if not self._initialized:
             self.log_path = log_path
             self.flush_every = flush_every
             self.flush_interval = flush_interval
-            
+
             # Internal state
             self.log_queue: deque = deque(maxlen=10000)  # Circular buffer
             self.enabled_metrics: set = set()
             self.last_flush_time = time.time()
-            
+
             # Enable metrics if log_path is provided
             if self.log_path is not None:
                 self._ensure_log_directory()
                 self.enable_metrics(enabled_metrics)
-            
+
             MicroMetricLogger._initialized = True
 
     # main registration function
@@ -61,7 +64,7 @@ class MicroMetricLogger:
     @classmethod
     def register_metric(cls, identifier: str, dtype: type) -> None:
         """Register a metric with its string identifier and expected data type.
-        
+
         This works at class level and doesn't require initialization.
         """
         if identifier in cls._registered_metrics:
@@ -72,7 +75,6 @@ class MicroMetricLogger:
     def get_registered_metrics(cls) -> Dict[str, type]:
         """Get all registered metrics at class level."""
         return cls._registered_metrics.copy()
-
 
     # helper methods
 
@@ -88,19 +90,19 @@ class MicroMetricLogger:
             caller_frame = inspect.currentframe().f_back.f_back
             if caller_frame is None:
                 return "unknown"
-            
+
             # Get module name
             module = inspect.getmodule(caller_frame)
             module_name = module.__name__ if module else "unknown"
-            
+
             # Get function/class name
             function_name = caller_frame.f_code.co_name
-            
+
             # Try to get class name if it's a method
             class_name = None
-            if 'self' in caller_frame.f_locals:
-                class_name = caller_frame.f_locals['self'].__class__.__name__
-            
+            if "self" in caller_frame.f_locals:
+                class_name = caller_frame.f_locals["self"].__class__.__name__
+
             if class_name:
                 return f"{module_name}.{class_name}.{function_name}"
             else:
@@ -110,14 +112,13 @@ class MicroMetricLogger:
 
     def __del__(self):
         """Cleanup when logger is destroyed."""
-        self.flush()  # Final flush 
+        self.flush()  # Final flush
 
-
-    # api 
+    # api
 
     def enable_metrics(self, metrics: Union[List[str], str] = None) -> None:
         """Enable logging for specific metrics.
-        
+
         Args:
             metrics: List of metric identifiers to enable, or "all" for all registered metrics.
                     If None, enables no metrics (empty list).
@@ -129,7 +130,9 @@ class MicroMetricLogger:
             valid_metrics = set(metrics) & set(self._registered_metrics.keys())
             invalid_metrics = set(metrics) - set(self._registered_metrics.keys())
             if invalid_metrics:
-                print(f"Warning: Attempting to enable unregistered metrics: {invalid_metrics}")
+                print(
+                    f"Warning: Attempting to enable unregistered metrics: {invalid_metrics}"
+                )
             self.enabled_metrics = valid_metrics
         else:
             # Default to empty set
@@ -137,38 +140,44 @@ class MicroMetricLogger:
 
     def log(self, identifier: str, value: Any, metadata: Dict[str, Any] = None) -> None:
         """Log a metric value with optional metadata. Location is auto-inferred.
-        
+
         This only works if log_path is defined.
         """
         # Check if logging is configured
         if self.log_path is None:
-            print(f"Warning: Cannot log metric '{identifier}' - log_path not defined. Use configure_logging() first.")
+            print(
+                f"Warning: Cannot log metric '{identifier}' - log_path not defined. Use configure_logging() first."
+            )
             return
-            
+
         # Check if metric is enabled
         if identifier not in self.enabled_metrics:
-            print(f"Warning: Attempting to log metric '{identifier}' which is not enabled")
+            print(
+                f"Warning: Attempting to log metric '{identifier}' which is not enabled"
+            )
             return
-        
+
         # Create log event
         event = LogEvent(
             timestamp=datetime.now(),
             metric=identifier,
             value=value,
             metadata=metadata or {},
-            location=self._get_calling_location()
+            location=self._get_calling_location(),
         )
-        
+
         # Add to queue
         self.log_queue.append(event)
-        
+
         # Check if we should flush
         if len(self.log_queue) >= self.flush_every:
             self.flush()
 
-    def configure_logging(self, log_path: str, enabled_metrics: Union[List[str], str] = None) -> None:
+    def configure_logging(
+        self, log_path: str, enabled_metrics: Union[List[str], str] = None
+    ) -> None:
         """Configure logging with a log path and optionally enable metrics.
-        
+
         This must be called before logging can work.
         """
         self.log_path = log_path
@@ -179,11 +188,11 @@ class MicroMetricLogger:
         """Force flush the current queue to disk."""
         if not self.log_queue or self.log_path is None:
             return
-            
+
         # Get current timestamp for filename
         filename = f"micro_metrics.jsonl"
         filepath = os.path.join(self.log_path, filename)
-        
+
         # Write events to file
         with open(filepath, "a", encoding="utf-8") as f:
             while self.log_queue:
@@ -193,7 +202,7 @@ class MicroMetricLogger:
                 # Convert datetime to ISO format string
                 event_dict["timestamp"] = event_dict["timestamp"].isoformat()
                 f.write(json.dumps(event_dict) + "\n")
-        
+
         self.last_flush_time = time.time()
 
     def is_metric_enabled(self, identifier: str) -> bool:
