@@ -44,6 +44,8 @@ class OracleTopPMasker(TopPMasker):
         queries: torch.Tensor,
         values: torch.Tensor,
         attention_mask: torch.Tensor,
+        scaling: float,
+        dropout: float,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
         **kwargs: Dict[str, Any],
@@ -62,7 +64,7 @@ class OracleTopPMasker(TopPMasker):
 
         # Create oracle top-P attention mask
         oracle_mask: Mask = self._create_oracle_top_p_mask(
-            tensor_dims, keys, queries, previous_mask
+            tensor_dims, keys, queries, previous_mask, attention_mask, scaling
         )
         return previous_mask.merge_mask(oracle_mask, inplace=False)
 
@@ -71,13 +73,25 @@ class OracleTopPMasker(TopPMasker):
         effective_size: int = int(self.top_p * dims.seq_len_keys)
         return dims.seq_len_keys <= effective_size
 
-    def _compute_attention_scores(
-        self, keys: torch.Tensor, queries: torch.Tensor
+    def _compute_exp_attention_scores(
+        self,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        previous_dense_mask: torch.Tensor,
+        attention_mask: torch.Tensor,
+        scaling: float,
     ) -> torch.Tensor:
         """Compute exp(attention scores) between queries and keys."""
         ngroups = _get_num_key_value_groups(queries, keys)
         keys = repeat_kv(keys, ngroups)
-        raw_attention_scores = queries @ keys.transpose(-2, -1)
+        raw_attention_scores = torch.matmul(queries, keys.transpose(2, 3)) * scaling
+        if attention_mask is not None:
+            raw_attention_scores = (
+                raw_attention_scores + attention_mask[:, :, :, : keys.shape[-2]]
+            )
+        raw_attention_scores[previous_dense_mask != 0] = torch.finfo(
+            raw_attention_scores.dtype
+        ).min
         _max_attention_score = raw_attention_scores.max(dim=-1, keepdim=True)[0]
         adjusted = torch.exp(raw_attention_scores - _max_attention_score)
         return adjusted
@@ -101,19 +115,10 @@ class OracleTopPMasker(TopPMasker):
 
         # Find positions where normalized_cumsum >= top_p
         threshold_positions = torch.searchsorted(
-            normalized_cumsum, top_p_tensor, side="left"
+            normalized_cumsum, top_p_tensor, side="right"
         )
-
-        # Prepare indices for advanced indexing (shape-agnostic)
-        leading_shape = scores.shape[:-1]
-        idx_grids = torch.meshgrid(
-            *[torch.arange(s, device=scores.device) for s in leading_shape],
-            indexing="ij",
-        )
-        thresholds = sorted_scores[idx_grids + (threshold_positions.squeeze(-1),)]
-
-        # Add trailing singleton dimension for broadcasting
-        return thresholds.unsqueeze(-1)
+        thresholds = torch.gather(sorted_scores, dim=-1, index=threshold_positions)
+        return thresholds
 
     def _create_oracle_top_p_mask(
         self,
@@ -121,22 +126,22 @@ class OracleTopPMasker(TopPMasker):
         keys: torch.Tensor,
         queries: torch.Tensor,
         previous_mask: Mask,
+        attention_mask: torch.Tensor,
+        scaling: float,
     ) -> Mask:
         """Create oracle top-P attention mask using vectorized computation."""
-        # Get attention scores
-        scores: torch.Tensor = self._compute_attention_scores(keys, queries)
-        # Get previous dense mask and mask out already active positions
+        # Get attention scores after masking out already active positions
         previous_dense_mask: torch.Tensor = previous_mask.get_dense_mask()
-        masked_scores: torch.Tensor = scores.clone()
-        masked_scores[previous_dense_mask != 0] = float("-inf")
-
-        # Compute thresholds using vectorized operations
-        thresholds: torch.Tensor = self._compute_top_p_thresholds(
-            masked_scores, self.top_p
+        scores: torch.Tensor = self._compute_exp_attention_scores(
+            keys, queries, previous_dense_mask, attention_mask, scaling
         )
 
+        # Compute thresholds using vectorized operations
+        thresholds: torch.Tensor = self._compute_top_p_thresholds(scores, self.top_p)
+        thresholds = thresholds.to(queries.dtype)
+
         # Create dense mask: scores >= thresholds
-        dense_mask: torch.Tensor = masked_scores >= thresholds
+        dense_mask: torch.Tensor = scores >= thresholds
 
         # Create mask object
         mask_shape: tuple = (

@@ -144,12 +144,18 @@ class AdaptiveSamplingMasker(SamplingMasker):
         self.delta_ppf = float(norm.ppf(1 - self.delta))
 
     def _compute_exp_attention_scores(
-        self, queries: torch.Tensor, keys: torch.Tensor
+        self,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        scaling: float,
+        attention_mask: torch.Tensor,
     ) -> torch.Tensor:
         """Compute exponential attention scores with numerical stability."""
         ngroups = _get_num_key_value_groups(queries, keys)
         keys = repeat_kv(keys, ngroups)
-        raw_scores = torch.matmul(queries, keys.transpose(-2, -1))
+        raw_scores = torch.matmul(queries, keys.transpose(-2, -1)) * scaling
+        if attention_mask is not None:
+            raw_scores = raw_scores + attention_mask[:, :, :, : keys.shape[-2]]
         max_scores = torch.max(raw_scores, dim=-1, keepdim=True)[0]
         return torch.exp(raw_scores - max_scores)
 
@@ -244,6 +250,8 @@ class AdaptiveSamplingMasker(SamplingMasker):
         queries: torch.Tensor,
         values: torch.Tensor,
         attention_mask: torch.Tensor,
+        scaling: float,
+        dropout: float,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
         **kwargs: Dict[str, Any],
@@ -280,8 +288,10 @@ class AdaptiveSamplingMasker(SamplingMasker):
             dims.seq_len_queries,
             dims.seq_len_keys,
         )
-
-        expwts = self._compute_exp_attention_scores(queries, keys)
+        # Compute attention scores after removing attention_mask
+        expwts = self._compute_exp_attention_scores(
+            queries, keys, scaling, attention_mask
+        )
         static_denominator = apply_inv_mask_sum(expwts, previous_mask)
 
         # Get sampling parameters

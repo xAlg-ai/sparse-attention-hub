@@ -105,6 +105,8 @@ class ResearchAttention(SparseAttention):
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
+                scaling=scaling,
+                dropout=dropout,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=sparse_attention_mask,
                 **kwargs,

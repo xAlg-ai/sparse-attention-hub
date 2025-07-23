@@ -266,6 +266,8 @@ class MagicPig(SamplingMasker):
         queries: torch.Tensor,
         values: torch.Tensor,
         attention_mask: torch.Tensor,
+        scaling: float,
+        dropout: float,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
         **kwargs: Dict[str, Any],

@@ -190,7 +190,7 @@ class MicroMetricLogger:
             return
 
         # Get current timestamp for filename
-        filename = f"micro_metrics.jsonl"
+        filename = "micro_metrics.jsonl"
         filepath = os.path.join(self.log_path, filename)
 
         # Write events to file
