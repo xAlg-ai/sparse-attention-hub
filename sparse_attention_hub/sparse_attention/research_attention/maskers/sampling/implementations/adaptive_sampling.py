@@ -43,15 +43,19 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
             If float, must be in (0,1); if int, must be positive.
         epsilon: Float in range (0,1) representing the error bound.
         delta: Float in range (0,1) representing the confidence bound.
-        init_offset: Non-negative integer representing the start index for sampling.
-        local_offset: Non-negative integer representing the end offset for sampling.
+        init_offset: Union[int, float] representing the start index for sampling.
+            If int, must be non-negative; if float, must be in [0,1] and will be
+            multiplied by the number of keys to get the actual offset.
+        local_offset: Union[int, float] representing the end offset for sampling.
+            If int, must be non-negative; if float, must be in [0,1] and will be
+            multiplied by the number of keys to get the actual offset.
     """
 
     base_rate_sampling: Union[int, float]  # Base rate (0,1) if float
     epsilon: float  # Error bound (0,1)
     delta: float  # Confidence bound (0,1)
-    init_offset: int  # Start index
-    local_offset: int  # End offset
+    init_offset: Union[int, float]  # Start index
+    local_offset: Union[int, float]  # End offset
 
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
@@ -76,14 +80,34 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
         if not (0.0 < self.delta < 1.0):
             raise ValueError(f"delta must be in (0, 1), got {self.delta}")
 
-        if self.init_offset < 0:
+        if isinstance(self.init_offset, float):
+            if not (0.0 <= self.init_offset <= 1.0):
+                raise ValueError(
+                    f"init_offset must be in [0, 1] if float, got {self.init_offset}"
+                )
+        elif isinstance(self.init_offset, int):
+            if self.init_offset < 0:
+                raise ValueError(
+                    f"init_offset must be non-negative if int, got {self.init_offset}"
+                )
+        else:
             raise ValueError(
-                f"init_offset must be non-negative, got {self.init_offset}"
+                f"init_offset must be int or float, got {type(self.init_offset)}"
             )
 
-        if self.local_offset < 0:
+        if isinstance(self.local_offset, float):
+            if not (0.0 <= self.local_offset <= 1.0):
+                raise ValueError(
+                    f"local_offset must be in [0, 1] if float, got {self.local_offset}"
+                )
+        elif isinstance(self.local_offset, int):
+            if self.local_offset < 0:
+                raise ValueError(
+                    f"local_offset must be non-negative if int, got {self.local_offset}"
+                )
+        else:
             raise ValueError(
-                f"local_offset must be non-negative, got {self.local_offset}"
+                f"local_offset must be int or float, got {type(self.local_offset)}"
             )
 
 
@@ -102,8 +126,10 @@ class AdaptiveSamplingMasker(SamplingMasker):
         base_rate_sampling: The base sampling rate (int or float).
         epsilon: The error bound for statistical guarantees.
         delta: The confidence bound for statistical guarantees.
-        init_offset: Starting index for sampling range.
-        local_offset: Ending offset for sampling range.
+        init_offset: Starting index for sampling range (int or float).
+            If float, represents fraction of sequence length.
+        local_offset: Ending offset for sampling range (int or float).
+            If float, represents fraction of sequence length.
         delta_ppf: Pre-computed percentile point function for efficiency.
 
     Important Notes:
@@ -116,7 +142,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
     Example:
         >>> config = AdaptiveSamplingMaskerConfig(
         ...     base_rate_sampling=0.1, epsilon=0.1, delta=0.05,
-        ...     init_offset=0, local_offset=0
+        ...     init_offset=0.1, local_offset=0.2  # Use 10% from start, 20% from end
         ... )
         >>> masker = AdaptiveSamplingMasker(config)
         >>> # Use masker.add_mask() to apply adaptive sampling to attention masks
@@ -160,9 +186,29 @@ class AdaptiveSamplingMasker(SamplingMasker):
         return torch.exp(raw_scores - max_scores)
 
     def _get_sampling_range(self, seq_len_keys: int) -> tuple[int, int, int]:
-        """Get sampling range and validate it."""
-        start_idx = self.init_offset
-        end_idx = seq_len_keys - self.local_offset
+        """Get sampling range and validate it.
+        
+        Args:
+            seq_len_keys: Number of keys in the sequence.
+            
+        Returns:
+            Tuple of (start_idx, end_idx, sampling_range).
+            
+        Raises:
+            ValueError: If the computed sampling range is invalid.
+        """
+        # Compute start index
+        if isinstance(self.init_offset, float):
+            start_idx: int = int(self.init_offset * seq_len_keys)
+        else:
+            start_idx = self.init_offset
+            
+        # Compute end index
+        if isinstance(self.local_offset, float):
+            end_idx: int = seq_len_keys - int(self.local_offset * seq_len_keys)
+        else:
+            end_idx = seq_len_keys - self.local_offset
+            
         sampling_range = end_idx - start_idx
 
         if sampling_range <= 0:
