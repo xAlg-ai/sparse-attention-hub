@@ -9,8 +9,6 @@ from .efficient_attention.implementations import (
     HashAttention,
     HashAttentionConfig,
 )
-from .generator import SparseAttentionGen
-from .integrations import SparseAttentionHF
 from .metadata import SparseAttentionMetadata
 from .research_attention import ResearchAttention, ResearchAttentionConfig
 from .research_attention.maskers import ResearchMasker
@@ -22,10 +20,13 @@ from .research_attention.maskers.fixed import (
     HashAttentionTopKMasker,
     HashAttentionTopKMaskerConfig,
     LocalMasker,
+    LocalMaskerConfig,
     OracleTopK,
     PQCache,
     SinkMasker,
+    SinkMaskerConfig,
     TopKMasker,
+    TopKMaskerConfig,
     TopPMasker,
 )
 from .research_attention.maskers.sampling import (
@@ -53,18 +54,19 @@ __all__ = [
     "SamplingMasker",
     "FixedMasker",
     "TopKMasker",
+    "TopKMaskerConfig",
     "TopPMasker",
     "LocalMasker",
+    "LocalMaskerConfig",
     "CausalMasker",
     "SinkMasker",
+    "SinkMaskerConfig",
     "PQCache",
     "OracleTopK",
     "HashAttentionTopKMasker",
     "DoubleSparsityTopKMasker",
     "RandomSamplingMasker",
     "MagicPig",
-    "SparseAttentionGen",
-    "SparseAttentionHF",
     "SparseAttentionMetadata",
     "Mask",
 ]

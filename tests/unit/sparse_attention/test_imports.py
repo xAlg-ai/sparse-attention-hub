@@ -91,15 +91,23 @@ class TestSparseAttentionImports:
         assert RandomSamplingMasker is not None
         assert MagicPig is not None
 
-    def test_generator_and_integration_import(self):
-        """Test that generator and integration classes can be imported."""
-        from sparse_attention_hub.sparse_attention import (
-            SparseAttentionGen,
-            SparseAttentionHF,
+    def test_adapter_system_import(self):
+        """Test that adapter system classes can be imported."""
+        from sparse_attention_hub.adapters import (
+            ModelAdapter,
+            ModelAdapterHF,
+            ModelHubAdapterInterface,
+            Request,
+            RequestResponse,
+            SparseAttentionAdapterInterface,
         )
 
-        assert SparseAttentionGen is not None
-        assert SparseAttentionHF is not None
+        assert ModelAdapterHF is not None
+        assert ModelAdapter is not None
+        assert Request is not None
+        assert RequestResponse is not None
+        assert ModelHubAdapterInterface is not None
+        assert SparseAttentionAdapterInterface is not None
 
     def test_utility_classes_import(self):
         """Test that utility classes can be imported."""
@@ -137,8 +145,6 @@ class TestSparseAttentionImports:
             SinkMasker,
             SparseAttention,
             SparseAttentionConfig,
-            SparseAttentionGen,
-            SparseAttentionHF,
             SparseAttentionMetadata,
             TopKMasker,
             TopPMasker,
@@ -173,8 +179,6 @@ class TestSparseAttentionImports:
             DoubleSparsityTopKMasker,
             RandomSamplingMasker,
             MagicPig,
-            SparseAttentionGen,
-            SparseAttentionHF,
             Mask,
             SparseAttentionMetadata,
         ]
@@ -219,10 +223,11 @@ class TestSparseAttentionImports:
         # Test that submodules exist
         assert hasattr(sa, "efficient_attention")
         assert hasattr(sa, "research_attention")
-        assert hasattr(sa, "integrations")
         assert hasattr(sa, "utils")
+        # Note: integrations removed in Phase 5 deprecation (contains deprecated SparseAttentionHF)
 
-        # Test that research_attention has maskers
-        assert hasattr(sa.research_attention, "maskers")
-        assert hasattr(sa.research_attention.maskers, "fixed")
-        assert hasattr(sa.research_attention.maskers, "sampling")
+        # Test that research_attention can import maskers
+        from sparse_attention_hub.sparse_attention.research_attention import maskers
+
+        assert hasattr(maskers, "fixed")
+        assert hasattr(maskers, "sampling")

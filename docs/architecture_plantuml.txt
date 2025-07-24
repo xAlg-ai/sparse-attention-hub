@@ -45,18 +45,55 @@ class RRandomSampling extends SamplingMasker
 class RMagicPig extends SamplingMakser
 
 
+class SparseAttentionMetadata {
+  + layer_wise_state: Dict
+  + global_state_: Dict
+}
+
+' === Adapter System ===
+class Request {
+  + context: String
+  + questions: Union[String, List[String]]
+}
+
+class RequestResponse {
+  + responses: Union[String, List[String]]
+}
+
+abstract ModelHubAdapterInterface {
+  + process_request(Request): RequestResponse
+}
+
+abstract SparseAttentionAdapterInterface {
+  + get_custom_attention_function(SparseAttention): Callable
+}
+
+abstract ModelAdapter implements ModelHubAdapterInterface, SparseAttentionAdapterInterface {
+  + model_name: String
+  + sparse_attention_config: SparseAttentionConfig
+  + sparse_attention: SparseAttention
+  + enable_sparse_mode(): Generator
+}
+
+class ModelAdapterHF extends ModelAdapter {
+  + model: PreTrainedModel
+  + tokenizer: AutoTokenizer
+  + device: String
+  + process_request(Request): RequestResponse
+  + enable_sparse_mode(): Generator
+  + get_custom_attention_function(SparseAttention): Callable
+}
+
+' === Deprecated Classes (marked for removal) ===
+note top of SparseAttentionGen : DEPRECATED\nReplaced by ModelAdapterHF
 abstract SparseAttentionGen {
   + get_custom_attention_function()
   + __call__()
 }
 class SparseAttentionHF extends SparseAttentionGen {
 }
-class SparseAttentionMetadata {
-  + layer_wise_state: Dict
-  + global_state_: Dict
-}
 
-' === Model Hub ===
+note top of ModelHub : DEPRECATED\nReplaced by ModelAdapterHF
 abstract ModelHub {
   + api_token: String
   + addPreAttentionHooks(model, hook_generator, hook_name)
@@ -69,7 +106,7 @@ class ModelHubHF extends ModelHub{
   + method(type): type
 }
 
-' == Pipeline ==
+note top of Pipeline : DEPRECATED\nRemoved in new architecture
 abstract Pipeline {
 
 }
@@ -77,6 +114,7 @@ class PipelineHF extends Pipeline{
  
 }
 
+note top of SparseAttentionServer : DEPRECATED\nRemoved in new architecture
 class SparseAttentionServer {
   + port: String
   + execute(ModelHub, SparseAttentionStrategy)
@@ -163,10 +201,21 @@ class Tester {
 }
 
 ' ==  dependencies ==
+' Core sparse attention system
 SparseAttention *-- SparseAttentionMetaData
-SparseAttentionGen o-- SparseAttention
 ResearchAttention o-- ResearchMasker
+
+' New adapter system
+ModelAdapterHF o-- Request
+ModelAdapterHF o-- RequestResponse
+ModelAdapterHF *-- SparseAttention
+ModelAdapter o-- SparseAttentionConfig
+
+' Deprecated dependencies (marked for removal)
+SparseAttentionGen o-- SparseAttention
 SparseAttentionServer o-- Pipeline
+
+' Benchmarking and metrics (unchanged)
 BenchmarkExecutor o-- Benchmark
 BenchmarkExecutor *-- ResultStorage
 MicroMetricLogger o-- MicroMetric

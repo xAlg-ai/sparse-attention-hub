@@ -118,7 +118,6 @@ class ResearchAttention(SparseAttention):
             return_attention_weights=True,
             **kwargs,
         )
-
         return attention_output, attention_weights
 
     @classmethod

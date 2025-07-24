@@ -16,8 +16,8 @@ from sparse_attention_hub.sparse_attention.research_attention import ResearchAtt
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
     LocalMaskerConfig, SinkMaskerConfig, HashAttentionTopKMaskerConfig
 )
-from sparse_attention_hub.sparse_attention.integrations.hugging_face import SparseAttentionHF
-
+from sparse_attention_hub.adapters import ModelAdapterHF
+from sparse_attention_hub.adapters import Request
 
 def convert_usa_weights_to_hash_attention(
     usa_checkpoint_path: str, 
@@ -149,10 +149,10 @@ def main():
         hat_weights = create_dummy_weights()
     
     # Configure HashAttention
-    local_config = LocalMaskerConfig(window_size=2)
-    sink_config = SinkMaskerConfig(sink_size=2)
+    local_config = LocalMaskerConfig(window_size=4)
+    sink_config = SinkMaskerConfig(sink_size=4)
     hash_config = HashAttentionTopKMaskerConfig(
-        heavy_size=4,
+        heavy_size=12,
         hat_bits=32,
         hat_mlp_layers=3,
         hat_mlp_hidden_size=128,
@@ -164,110 +164,40 @@ def main():
         masker_configs=[local_config, sink_config, hash_config]
     )
     
-    print("✅ HashAttention config: Local(16) + Sink(16) + Hash(32 bits, 32 heavy)")
+    print("✅ HashAttention config: Local(4) + Sink(4) + Hash(12 bits, 32 heavy)")
     
     # Load model
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
     
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-        
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.bfloat16,
-            device_map=device,
-            attn_implementation="eager"
-        )
-        print(f"✅ Loaded {model_name}")
-        
-    except Exception as e:
-        print(f"❌ Failed to load model: {e}")
-        return
-    
-    # Create sparse attention integration
-    sparse_attention_hf = SparseAttentionHF.create_from_config(research_config)
-    print("✅ SparseAttentionHF created")
-    
+    adapter = ModelAdapterHF(model_name=model_name,
+                         sparse_attention_config=research_config,
+                         model_kwargs={"torch_dtype": torch.bfloat16, "device_map": "cuda"},
+                         device="cuda")
     # Prepare test input
-    test_text = """
-    HashAttention combines local attention, sink tokens, and hash-based selection 
-    for efficient sparse attention. This approach maintains performance while 
-    reducing computational costs. Summarize the key benefits briefly.
-    """
-    
-    inputs = tokenizer(test_text, return_tensors="pt", truncation=True, max_length=512)
-    input_ids = inputs["input_ids"].to(device)
-    attention_mask = inputs["attention_mask"].to(device)
-    
-    print(f"✅ Input prepared: {input_ids.shape[1]} tokens")
-    
-    # Generate with full attention
-    model.eval()
-    max_new_tokens = 30
-    
-    print("\n📊 Running comparisons...")
-    
-    start_time = time.time()
-    with torch.no_grad():
-        full_outputs = model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            max_new_tokens=max_new_tokens,
-            temperature=0.7,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-        )
-    full_time = time.time() - start_time
-    
-    # Generate with HashAttention
-    start_time = time.time()
-    with torch.no_grad():
-        with sparse_attention_hf(model) as sparse_model:
-            sparse_outputs = sparse_model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                max_new_tokens=max_new_tokens,
-                temperature=0.7,
-                do_sample=True,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-                sparse_meta_data = {}
-            )
-    sparse_time = time.time() - start_time
-    
-    # Results
-    full_generated_text = tokenizer.decode(full_outputs[0], skip_special_tokens=True)
-    sparse_generated_text = tokenizer.decode(sparse_outputs[0], skip_special_tokens=True)
-    
-    speedup = full_time / sparse_time if sparse_time > 0 else 0
-    
-    print(f"\n📊 Results:")
-    print(f"{'Method':<15} {'Time (s)':<10} {'Speedup':<10}")
-    print("-" * 35)
-    print(f"{'Full Attention':<15} {full_time:<10.3f} {'1.00x':<10}")
-    print(f"{'HashAttention':<15} {sparse_time:<10.3f} {speedup:<10.2f}x")
-    
-    # Attention efficiency
-    seq_len = input_ids.shape[1]
-    total_attention = seq_len * seq_len
-    sparse_attention = (16 + 16 + 32) * seq_len  # Local + Sink + Hash
-    sparsity_ratio = sparse_attention / total_attention
-    
-    print(f"\n🎯 Attention Efficiency:")
-    print(f"Full attention pairs: {total_attention:,}")
-    print(f"Sparse attention pairs: ~{sparse_attention:,}")
-    print(f"Sparsity ratio: {sparsity_ratio:.3f} ({sparsity_ratio*100:.1f}% of full)")
-    
-    print(f"\n📝 Generated Texts:")
-    print(f"Full: {tokenizer.decode(full_outputs[0][len(input_ids[0]):], skip_special_tokens=True)}")
-    print(f"Hash: {tokenizer.decode(sparse_outputs[0][len(input_ids[0]):], skip_special_tokens=True)}")
-    
-    print("\n✅ HashAttention example completed!")
+    test_context = """ 
+            The concept of attention mechanisms has revolutionized natural language processing and machine learning.
+            StreamingLLM addresses efficiency challenges by implementing sparse attention patterns that combine:
+            1. Sink tokens: The first few tokens contain crucial global information
+            2. Local attention: Recent tokens are most relevant for next token prediction
+            This approach maintains performance while reducing computational costs for long sequences.
+            """
+    test_questions = [
+            "Summarize the above in a single title with less than 10 words. Given only the title.",
+            "What are other attention mechanisms that are used in the field of LLMs?"
+    ]
+
+    request = Request(
+        context=test_context,
+        questions=test_questions,
+    )
+
+    print("Running Hash Attention on Question")
+    response=adapter.process_request(request)
+    response_text=response.responses
+    print("Hash Attention Response: ", response_text)
+
+
 
 
 if __name__ == "__main__":
     main()
-
