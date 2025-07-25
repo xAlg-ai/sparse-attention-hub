@@ -58,6 +58,8 @@ class MicroMetricLogger:
                 self.enable_metrics(enabled_metrics)
 
             MicroMetricLogger._initialized = True
+        else:
+            print(f"Warning: MicroMetricLogger already initialized with log_path: {self.log_path}")
 
     # main registration function
 
