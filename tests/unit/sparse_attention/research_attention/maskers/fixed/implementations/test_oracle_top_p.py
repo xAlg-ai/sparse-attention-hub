@@ -156,7 +156,13 @@ class TestOracleTopPMaskerMethods:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, dim)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, dim)
 
-        scores = masker._compute_attention_scores(keys, queries)
+        scores = masker._compute_exp_attention_scores(
+            keys,
+            queries,
+            previous_dense_mask=torch.zeros(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            attention_mask=None,
+            scaling=1.0,
+        )
 
         expected_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         assert (
@@ -225,7 +231,6 @@ class TestOracleTopPMaskerMethods:
         """Test _compute_top_p_thresholds with edge cases."""
         config = OracleTopPMaskerConfig(top_p=0.8)
         masker = OracleTopPMasker(config)
-
         # Test with all same values
         scores = torch.ones(2, 3, dtype=torch.float32)
         thresholds = masker._compute_top_p_thresholds(scores, 0.8)
@@ -270,6 +275,8 @@ class TestOracleTopPMaskerAddMask:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data={},
             previous_mask=full_previous_mask,
         )
@@ -288,7 +295,7 @@ class TestOracleTopPMaskerAddMask:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 32)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 32)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 32)
-        attention_mask = torch.ones(batch_size, seq_len_keys)
+        attention_mask = None
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
@@ -299,6 +306,8 @@ class TestOracleTopPMaskerAddMask:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data={},
             previous_mask=empty_previous_mask,
         )
@@ -326,13 +335,15 @@ class TestOracleTopPMaskerAddMask:
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
         scores = torch.rand(batch_size, num_heads, seq_len_queries, seq_len_keys)
         with mock.patch.object(
-            masker, "_compute_attention_scores", return_value=scores
+            masker, "_compute_exp_attention_scores", return_value=scores
         ):
             result = masker.add_mask(
                 keys=keys,
                 queries=queries,
                 values=values,
                 attention_mask=None,
+                scaling=1.0,
+                dropout=0.0,
                 sparse_meta_data={},
                 previous_mask=empty_previous_mask,
             )
@@ -360,7 +371,7 @@ class TestOracleTopPMaskerAddMask:
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
         values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        attention_mask = torch.ones(batch_size, seq_len_keys)
+        attention_mask = None
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
@@ -370,6 +381,8 @@ class TestOracleTopPMaskerAddMask:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data={},
             previous_mask=empty_previous_mask,
         )
@@ -399,6 +412,8 @@ class TestOracleTopPMaskerAddMask:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data={},
             previous_mask=empty_previous_mask,
         )
@@ -442,7 +457,7 @@ class TestOracleTopPMaskerIntegration:
             keys = torch.randn(batch_size, num_heads, seq_len_keys, 64)
             queries = torch.randn(batch_size, num_heads, seq_len_queries, 64)
             values = torch.randn(batch_size, num_heads, seq_len_keys, 64)
-            attention_mask = torch.ones(batch_size, seq_len_keys)
+            attention_mask = None
 
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
             empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
@@ -452,6 +467,8 @@ class TestOracleTopPMaskerIntegration:
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
+                scaling=1.0,
+                dropout=0.0,
                 sparse_meta_data={},
                 previous_mask=empty_previous_mask,
             )
@@ -475,7 +492,7 @@ class TestOracleTopPMaskerIntegration:
             batch_size, num_heads, seq_len_queries, 16, device="cpu"
         )
         values_cpu = torch.randn(batch_size, num_heads, seq_len_keys, 16, device="cpu")
-        attention_mask_cpu = torch.ones(batch_size, seq_len_keys, device="cpu")
+        attention_mask_cpu = None
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         empty_previous_mask_cpu = Mask.create_empty_mask(mask_shape, mask_type="index")
@@ -485,6 +502,8 @@ class TestOracleTopPMaskerIntegration:
             queries=queries_cpu,
             values=values_cpu,
             attention_mask=attention_mask_cpu,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data={},
             previous_mask=empty_previous_mask_cpu,
         )
@@ -493,7 +512,7 @@ class TestOracleTopPMaskerIntegration:
         keys_gpu = keys_cpu.cuda()
         queries_gpu = queries_cpu.cuda()
         values_gpu = values_cpu.cuda()
-        attention_mask_gpu = attention_mask_cpu.cuda()
+        attention_mask_gpu = None
         empty_previous_mask_gpu = Mask.create_empty_mask(mask_shape, mask_type="index")
 
         result_gpu = masker.add_mask(
@@ -501,6 +520,8 @@ class TestOracleTopPMaskerIntegration:
             queries=queries_gpu,
             values=values_gpu,
             attention_mask=attention_mask_gpu,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data={},
             previous_mask=empty_previous_mask_gpu,
         )

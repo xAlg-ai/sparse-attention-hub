@@ -88,7 +88,6 @@ class HashAttentionTopKMasker(TopKMasker):
             keys,
             queries,
             attention_mask,
-            previous_mask.get_dense_mask(),
             sparse_meta_data,
             previous_mask,
             layer_idx,

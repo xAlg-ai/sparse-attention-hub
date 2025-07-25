@@ -196,7 +196,7 @@ class TestAdaptiveSamplingMasker:
         """Test exponential attention scores computation."""
         keys, queries, _, _ = sample_tensors
 
-        exp_scores = masker._compute_exp_attention_scores(queries, keys)
+        exp_scores = masker._compute_exp_attention_scores(queries, keys, scaling=1.0, attention_mask=None)
 
         assert exp_scores.shape == (2, 4, 8, 16)
         assert torch.all(exp_scores >= 0)  # Exponential should be non-negative
@@ -357,7 +357,15 @@ class TestAdaptiveSamplingMasker:
         # Create a full mask
         full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32)
 
-        result = masker.add_mask(keys, queries, values, attention_mask, {}, full_mask)
+        result = masker.add_mask(keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
+            previous_mask=full_mask,
+        )
 
         assert result is full_mask
 
@@ -368,7 +376,15 @@ class TestAdaptiveSamplingMasker:
         # Create an empty mask
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
 
-        result = masker.add_mask(keys, queries, values, attention_mask, {}, empty_mask)
+        result = masker.add_mask(keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
+            previous_mask=empty_mask,
+        )
 
         assert isinstance(result, Mask)
         assert result.shape == (2, 4, 8, 16)
@@ -404,7 +420,15 @@ class TestAdaptiveSamplingMasker:
 
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
 
-        result = masker.add_mask(keys, queries, values, attention_mask, {}, empty_mask)
+        result = masker.add_mask(keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
+            previous_mask=empty_mask,
+        )
 
         # Check that result is on the same device
         assert result.get_dense_mask().device == keys.device
@@ -419,7 +443,15 @@ class TestAdaptiveSamplingMasker:
 
         empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32)
 
-        result = masker.add_mask(keys, queries, values, attention_mask, {}, empty_mask)
+        result = masker.add_mask(keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
+            previous_mask=empty_mask,
+        )
 
         # Should not have NaN or infinite values
         dense_mask = result.get_dense_mask()

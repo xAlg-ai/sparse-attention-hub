@@ -158,6 +158,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=full_previous_mask,
         )
@@ -195,6 +197,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=empty_previous_mask,
         )
@@ -241,6 +245,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=empty_previous_mask,
         )
@@ -277,6 +283,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=empty_previous_mask,
         )
@@ -318,6 +326,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
         )
@@ -360,6 +370,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=empty_previous_mask,
         )
@@ -401,6 +413,8 @@ class TestRandomSamplingMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=empty_previous_mask,
         )
@@ -424,6 +438,8 @@ class TestRandomSamplingMaskerImplementation:
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
+                scaling=1.0,
+                dropout=0.0,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=empty_previous_mask,
             )
@@ -736,6 +752,8 @@ class TestMagicPigImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
         )
@@ -784,6 +802,8 @@ class TestMagicPigImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
         )
@@ -833,6 +853,8 @@ class TestMagicPigImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=existing_mask,
         )
@@ -882,6 +904,8 @@ class TestMagicPigImplementation:
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
+                scaling=1.0,
+                dropout=0.0,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=previous_mask,
             )
@@ -927,6 +951,8 @@ class TestMagicPigImplementation:
             queries=queries,
             values=values,
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
         )
@@ -947,6 +973,8 @@ class TestMagicPigImplementation:
                 queries=queries_gpu,
                 values=values_gpu,
                 attention_mask=attention_mask_gpu,
+                scaling=1.0,
+                dropout=0.0,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=previous_mask_gpu,
             )
@@ -985,6 +1013,8 @@ class TestMagicPigImplementation:
             queries=queries.float(),
             values=values.float(),
             attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask_f32,
         )
@@ -1001,6 +1031,8 @@ class TestMagicPigImplementation:
                 queries=queries.half(),
                 values=values.half(),
                 attention_mask=attention_mask,
+                scaling=1.0,
+                dropout=0.0,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=previous_mask_f16,
             )
