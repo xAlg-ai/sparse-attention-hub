@@ -187,13 +187,13 @@ class AdaptiveSamplingMasker(SamplingMasker):
 
     def _get_sampling_range(self, seq_len_keys: int) -> tuple[int, int, int]:
         """Get sampling range and validate it.
-        
+
         Args:
             seq_len_keys: Number of keys in the sequence.
-            
+
         Returns:
             Tuple of (start_idx, end_idx, sampling_range).
-            
+
         Raises:
             ValueError: If the computed sampling range is invalid.
         """
@@ -202,13 +202,13 @@ class AdaptiveSamplingMasker(SamplingMasker):
             start_idx: int = int(self.init_offset * seq_len_keys)
         else:
             start_idx = self.init_offset
-            
+
         # Compute end index
         if isinstance(self.local_offset, float):
             end_idx: int = seq_len_keys - int(self.local_offset * seq_len_keys)
         else:
             end_idx = seq_len_keys - self.local_offset
-            
+
         sampling_range = end_idx - start_idx
 
         if sampling_range <= 0:

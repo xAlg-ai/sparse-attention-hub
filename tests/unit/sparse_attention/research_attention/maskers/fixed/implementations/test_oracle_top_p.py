@@ -159,7 +159,9 @@ class TestOracleTopPMaskerMethods:
         scores = masker._compute_exp_attention_scores(
             keys,
             queries,
-            previous_dense_mask=torch.zeros(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            previous_dense_mask=torch.zeros(
+                batch_size, num_heads, seq_len_queries, seq_len_keys
+            ),
             attention_mask=None,
             scaling=1.0,
         )

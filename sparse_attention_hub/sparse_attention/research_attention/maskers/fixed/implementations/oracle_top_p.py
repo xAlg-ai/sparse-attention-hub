@@ -119,7 +119,9 @@ class OracleTopPMasker(TopPMasker):
         )
         # if top_p is 1.0, then threshold_positions will be equal to sorted_scores.shape[-1]
         # which is not a valid index, so we clamp it to the last valid index
-        threshold_positions = torch.clamp(threshold_positions, max=sorted_scores.shape[-1] - 1)
+        threshold_positions = torch.clamp(
+            threshold_positions, max=sorted_scores.shape[-1] - 1
+        )
         thresholds = torch.gather(sorted_scores, dim=-1, index=threshold_positions)
         return thresholds
 

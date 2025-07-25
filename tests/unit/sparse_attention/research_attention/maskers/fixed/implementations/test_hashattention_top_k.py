@@ -250,7 +250,12 @@ class TestHashAttentionTopKMaskerManual:
                     keys=test_tensors["keys"],
                     queries=test_tensors["queries"],
                     attention_mask=None,
-                    previous_dense_mask=torch.zeros(test_tensors["batch_size"], test_tensors["num_heads"], test_tensors["seq_len_queries"], test_tensors["seq_len_keys"]),
+                    previous_dense_mask=torch.zeros(
+                        test_tensors["batch_size"],
+                        test_tensors["num_heads"],
+                        test_tensors["seq_len_queries"],
+                        test_tensors["seq_len_keys"],
+                    ),
                     sparse_meta_data=sparse_meta_data,
                     layer_idx=0,
                 )
