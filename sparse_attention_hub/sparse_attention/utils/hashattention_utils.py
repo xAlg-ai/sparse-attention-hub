@@ -1,118 +1,166 @@
 import torch
 import torch.nn as nn
+import pickle
+from typing import Dict, List, Optional
+
+""" This only works for 3 layered MLPs. Need to fix for other cases"""
 
 
-def extract_weights_from_usa(usa_module, layer_idx=0):
-    """
-    Extract weights from USA module and format them for
-    HashAttentionTopKMasker.
-
+def convert_usa_weights_to_hash_attention(
+    usa_checkpoint_path: str,
+    num_layers: int = 32,
+    num_heads: int = 32,
+    num_mlp_layers: int = 3,
+    device: str = "cpu",
+) -> Dict[int, Dict[str, List[torch.Tensor]]]:
+    """Convert USA module weights to HashAttentionTopKMasker format.
+    
     Args:
-        usa_module: USA module instance
-        layer_idx: Layer index for the weights dictionary
-
+        usa_checkpoint_path: Path to USA checkpoint file
+        num_layers: Number of layers in the model
+        num_heads: Number of attention heads
+        num_mlp_layers: Number of MLP layers (default: 3)
+        device: Device to load weights on
+        
     Returns:
-        Dictionary formatted for HashAttentionTopKMaskerConfig.hat_weights
+        Dictionary of layer-wise weights in HashAttention format
     """
-    num_heads = usa_module.num_heads
 
-    # Initialize weight structure
-    hat_weights = {
-        layer_idx: {
-            "key_matrix": [],
-            "key_bias": [],
+    print(f"Loading USA weights from {usa_checkpoint_path}")
+    usa_state_dict = torch.load(usa_checkpoint_path, map_location=device)
+
+    hat_weights = {}
+
+    for layer_idx in range(num_layers):
+        layer_weights = {
             "query_matrix": [],
             "query_bias": [],
+            "key_matrix": [],
+            "key_bias": [],
         }
-    }
 
-    # Extract weights for each MLP layer
-    # We need to stack weights across heads to get (H, d_in, d_out)
-    # tensors
-
-    # Get the number of linear layers (excluding activations)
-    k_linear_layers = [
-        layer
-        for layer in usa_module.learning_to_hash_transformation_k[0]
-        if isinstance(layer, nn.Linear)
-    ]
-    q_linear_layers = [
-        layer
-        for layer in usa_module.learning_to_hash_transformation_q[0]
-        if isinstance(layer, nn.Linear)
-    ]
-
-    print(f"Found {len(k_linear_layers)} linear layers in key " f"transformation")
-    print(f"Found {len(q_linear_layers)} linear layers in query " f"transformation")
-
-    # Extract key matrices and biases
-    for layer_idx_mlp in range(len(k_linear_layers)):
-        # Stack weights and biases across heads
-        key_weights = []
-        key_biases = []
+        # Collect weights for all heads in this layer
+        query_matrices_per_layer = [[] for _ in range(num_mlp_layers)]
+        query_biases_per_layer = [[] for _ in range(num_mlp_layers)]
+        key_matrices_per_layer = [[] for _ in range(num_mlp_layers)]
+        key_biases_per_layer = [[] for _ in range(num_mlp_layers)]
 
         for head_idx in range(num_heads):
-            # Get the actual linear layer from the sequential module
-            actual_layer = None
-            layer_count = 0
-            for module in usa_module.learning_to_hash_transformation_k[head_idx]:
-                if isinstance(module, nn.Linear):
-                    if layer_count == layer_idx_mlp:
-                        actual_layer = module
-                        break
-                    layer_count += 1
+            query_prefix = f"{layer_idx}.learning_to_hash_transformation_q.{head_idx}"
+            key_prefix = f"{layer_idx}.learning_to_hash_transformation_k.{head_idx}"
 
-            if actual_layer is not None:
-                key_weights.append(
-                    actual_layer.weight.detach().clone().T
-                )  # Transpose for correct shape
-                key_biases.append(actual_layer.bias.detach().clone())
+            # Extract weights from MLP layers (linear layers at indices 0, 2, 4, ...)
+            linear_indices = [i * 2 for i in range(num_mlp_layers)]
+            for i, linear_idx in enumerate(linear_indices):
+                # Query weights
+                weight_key = f"{query_prefix}.{linear_idx}.weight"
+                bias_key = f"{query_prefix}.{linear_idx}.bias"
 
-        # Stack to get (H, d_in, d_out) and (H, d_out) shapes
-        key_matrix = torch.stack(key_weights, dim=0)
-        key_bias = torch.stack(key_biases, dim=0)
+                if weight_key in usa_state_dict:
+                    weight = usa_state_dict[
+                        weight_key
+                    ].t()  # Transpose to (in_features, out_features)
+                    query_matrices_per_layer[i].append(weight)
 
-        hat_weights[layer_idx]["key_matrix"].append(key_matrix)
-        hat_weights[layer_idx]["key_bias"].append(key_bias)
+                    if bias_key in usa_state_dict:
+                        query_biases_per_layer[i].append(usa_state_dict[bias_key])
+                    else:
+                        query_biases_per_layer[i].append(
+                            torch.zeros(usa_state_dict[weight_key].shape[0])
+                        )
 
-        print(
-            f"Key layer {layer_idx_mlp}: weight shape {key_matrix.shape}, "
-            f"bias shape {key_bias.shape}"
-        )
+                # Key weights
+                weight_key = f"{key_prefix}.{linear_idx}.weight"
+                bias_key = f"{key_prefix}.{linear_idx}.bias"
 
-    # Extract query matrices and biases
-    for layer_idx_mlp in range(len(q_linear_layers)):
-        # Stack weights and biases across heads
-        query_weights = []
-        query_biases = []
+                if weight_key in usa_state_dict:
+                    weight = usa_state_dict[
+                        weight_key
+                    ].t()  # Transpose to (in_features, out_features)
+                    key_matrices_per_layer[i].append(weight)
 
-        for head_idx in range(num_heads):
-            # Get the actual linear layer from the sequential module
-            actual_layer = None
-            layer_count = 0
-            for module in usa_module.learning_to_hash_transformation_q[head_idx]:
-                if isinstance(module, nn.Linear):
-                    if layer_count == layer_idx_mlp:
-                        actual_layer = module
-                        break
-                    layer_count += 1
+                    if bias_key in usa_state_dict:
+                        key_biases_per_layer[i].append(usa_state_dict[bias_key])
+                    else:
+                        key_biases_per_layer[i].append(
+                            torch.zeros(usa_state_dict[weight_key].shape[0])
+                        )
 
-            if actual_layer is not None:
-                query_weights.append(
-                    actual_layer.weight.detach().clone().T
-                )  # Transpose for correct shape
-                query_biases.append(actual_layer.bias.detach().clone())
+        # Stack all heads for each layer
+        for i in range(num_mlp_layers):
+            if query_matrices_per_layer[i]:
+                layer_weights["query_matrix"].append(
+                    torch.stack(query_matrices_per_layer[i])
+                )
+                layer_weights["query_bias"].append(
+                    torch.stack(query_biases_per_layer[i])
+                )
+                layer_weights["key_matrix"].append(
+                    torch.stack(key_matrices_per_layer[i])
+                )
+                layer_weights["key_bias"].append(torch.stack(key_biases_per_layer[i]))
 
-        # Stack to get (H, d_in, d_out) and (H, d_out) shapes
-        query_matrix = torch.stack(query_weights, dim=0)
-        query_bias = torch.stack(query_biases, dim=0)
+        hat_weights[layer_idx] = layer_weights
 
-        hat_weights[layer_idx]["query_matrix"].append(query_matrix)
-        hat_weights[layer_idx]["query_bias"].append(query_bias)
+    print(f"✅ Converted weights for {num_layers} layers, {num_heads} heads, {num_mlp_layers} MLP layers")
+    return hat_weights
 
-        print(
-            f"Query layer {layer_idx_mlp}: weight shape {query_matrix.shape}, "
-            f"bias shape {query_bias.shape}"
-        )
 
+def create_hat_weights_file_from_usa(
+    usa_checkpoint_path: str,
+    target_hat_path: str,
+    num_layers: int = 32,
+    num_heads: int = 32,
+    num_mlp_layers: int = 3,
+    device: str = "cpu",
+) -> None:
+    """Create HAT weights file from USA checkpoint.
+    
+    Args:
+        usa_checkpoint_path: Path to USA checkpoint file
+        target_hat_path: Path where HAT weights file will be saved
+        num_layers: Number of layers in the model
+        num_heads: Number of attention heads
+        num_mlp_layers: Number of MLP layers
+        device: Device to load weights on
+    """
+    print(f"Creating HAT weights file from USA checkpoint...")
+    
+    # Convert USA weights to HAT format
+    hat_weights = convert_usa_weights_to_hash_attention(
+        usa_checkpoint_path=usa_checkpoint_path,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        num_mlp_layers=num_mlp_layers,
+        device=device,
+    )
+    
+    # Save to pickle file
+    with open(target_hat_path, 'wb') as f:
+        pickle.dump(hat_weights, f)
+    
+    print(f"✅ HAT weights saved to {target_hat_path}")
+
+
+def load_hat_weights(hat_weights_path: str, device: str = "cpu") -> Dict[int, Dict[str, List[torch.Tensor]]]:
+    """Load HAT weights from pickle file.
+    
+    Args:
+        hat_weights_path: Path to HAT weights pickle file
+        device: Device to load weights on
+        
+    Returns:
+        Dictionary of layer-wise weights in HashAttention format
+    """
+    print(f"Loading HAT weights from {hat_weights_path}")
+    
+    with open(hat_weights_path, 'rb') as f:
+        hat_weights = pickle.load(f)
+    
+    # Move weights to specified device
+    for layer_idx, layer_weights in hat_weights.items():
+        for key, value in layer_weights.items():
+            hat_weights[layer_idx][key] = [tensor.to(device) for tensor in value]
+    
+    print(f"✅ Loaded HAT weights for {len(hat_weights)} layers")
     return hat_weights

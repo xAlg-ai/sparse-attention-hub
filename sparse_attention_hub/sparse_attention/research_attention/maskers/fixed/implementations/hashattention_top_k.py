@@ -15,6 +15,7 @@ from sparse_attention_hub.sparse_attention.utils.kv_utils import (
     repeat_kv,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
+from sparse_attention_hub.sparse_attention.utils.hashattention_utils import load_hat_weights
 
 from ..base import TopKMasker, TopKMaskerConfig
 
@@ -27,7 +28,8 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     hat_mlp_layers: int
     hat_mlp_hidden_size: int
     hat_mlp_activation: str
-    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]]
+    hat_weights: Optional[Dict[int, Dict[str, List[torch.Tensor]]]] = None
+    hat_weight_file: Optional[str] = None
 
 
 @MaskerRegistry.register(HashAttentionTopKMaskerConfig)
@@ -49,7 +51,18 @@ class HashAttentionTopKMasker(TopKMasker):
         self.hat_mlp_layers = config.hat_mlp_layers
         self.hat_mlp_hidden_size = config.hat_mlp_hidden_size
         self.hat_mlp_activation = config.hat_mlp_activation
-        self.hat_weights = config.hat_weights
+        
+        # Validate that only one of hat_weights or hat_weight_file is provided
+        if config.hat_weights is not None and config.hat_weight_file is not None:
+            raise ValueError("Only one of hat_weights or hat_weight_file should be provided")
+        if config.hat_weights is None and config.hat_weight_file is None:
+            raise ValueError("Either hat_weights or hat_weight_file must be provided")
+        
+        # Load weights from file if hat_weight_file is provided
+        if config.hat_weight_file is not None:
+            self.hat_weights = load_hat_weights(config.hat_weight_file)
+        else:
+            self.hat_weights = config.hat_weights
 
     def add_mask(
         self,
@@ -65,6 +78,10 @@ class HashAttentionTopKMasker(TopKMasker):
     ) -> Mask:
         """Add hash attention top-K mask to enable hash-based attention selection."""
         layer_idx: int = self._validate_inputs(sparse_meta_data, kwargs)
+
+        # Ensure hat weights are on the same device as the keys
+        # This will move the weights to the GPU if they are on the CPU on the first call
+        self._ensure_hat_weights_on_device(keys.device)
 
         if previous_mask.is_full_mask():
             return previous_mask
@@ -338,6 +355,14 @@ class HashAttentionTopKMasker(TopKMasker):
             scores = scores + attention_mask[:, :, :, : keys.shape[-2]]
         scores[previous_dense_mask != 0] = torch.finfo(scores.dtype).min
         return scores
+
+    def _ensure_hat_weights_on_device(self, device: str) -> None:
+        """Move hat weights to the specified device."""
+        for layer_idx, layer_weights in self.hat_weights.items():
+            for key, value in layer_weights.items():
+                self.hat_weights[layer_idx][key] = [
+                    tensor.to(device) for tensor in value
+                ]
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "HashAttentionTopKMasker":
