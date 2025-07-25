@@ -1,18 +1,15 @@
 """Unit tests for MicroMetricLogger."""
 
 import json
-import os
-import tempfile
 import time
 from datetime import datetime
-from typing import Dict, Any
-from unittest.mock import patch, MagicMock
 
 import pytest
 
-from sparse_attention_hub.metric_logging import MicroMetricLogger, LogEvent
+from sparse_attention_hub.metric_logging import LogEvent, MicroMetricLogger
 
 
+@pytest.mark.unit
 class TestLogEvent:
     """Test cases for LogEvent dataclass."""
 
@@ -24,9 +21,9 @@ class TestLogEvent:
             metric="test_metric",
             value=42.0,
             metadata={"layer": 1, "head": 2},
-            location="test.module.function"
+            location="test.module.function",
         )
-        
+
         assert event.timestamp == timestamp
         assert event.metric == "test_metric"
         assert event.value == 42.0
@@ -40,9 +37,9 @@ class TestLogEvent:
             metric="test_metric",
             value=None,
             metadata={},
-            location="test.module.function"
+            location="test.module.function",
         )
-        
+
         assert event.value is None
 
     def test_log_event_minimal_metadata(self) -> None:
@@ -52,12 +49,13 @@ class TestLogEvent:
             metric="test_metric",
             value=42.0,
             metadata={},
-            location="test.module.function"
+            location="test.module.function",
         )
-        
+
         assert event.metadata == {}
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerSingleton:
     """Test cases for MicroMetricLogger singleton pattern."""
 
@@ -66,10 +64,10 @@ class TestMicroMetricLoggerSingleton:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger1 = MicroMetricLogger()
         logger2 = MicroMetricLogger()
-        
+
         assert logger1 is logger2
         assert id(logger1) == id(logger2)
 
@@ -78,15 +76,16 @@ class TestMicroMetricLoggerSingleton:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger1 = MicroMetricLogger(log_path="/tmp/test1")
         logger2 = MicroMetricLogger(log_path="/tmp/test2")
-        
+
         # Second initialization should not change the log_path
         assert logger1.log_path == "/tmp/test1"
         assert logger2.log_path == "/tmp/test1"  # Should be the same as logger1
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerRegistration:
     """Test cases for metric registration functionality."""
 
@@ -94,10 +93,10 @@ class TestMicroMetricLoggerRegistration:
         """Test metric registration."""
         # Reset registered metrics
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("attention_score", float)
         MicroMetricLogger.register_metric("sparsity_ratio", float)
-        
+
         registered = MicroMetricLogger.get_registered_metrics()
         assert "attention_score" in registered
         assert "sparsity_ratio" in registered
@@ -108,10 +107,12 @@ class TestMicroMetricLoggerRegistration:
         """Test warning when re-registering a metric."""
         # Reset registered metrics
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        MicroMetricLogger.register_metric("test_metric", int)  # Re-register with different type
-        
+        MicroMetricLogger.register_metric(
+            "test_metric", int
+        )  # Re-register with different type
+
         captured = capsys.readouterr()
         assert "Warning: Metric 'test_metric' is being re-registered" in captured.out
 
@@ -119,17 +120,18 @@ class TestMicroMetricLoggerRegistration:
         """Test that get_registered_metrics returns a copy."""
         # Reset registered metrics
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
         registered = MicroMetricLogger.get_registered_metrics()
-        
+
         # Modify the returned dict - should not affect the original
         registered["new_metric"] = str
-        
+
         original = MicroMetricLogger.get_registered_metrics()
         assert "new_metric" not in original
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerInitialization:
     """Test cases for MicroMetricLogger initialization."""
 
@@ -138,9 +140,9 @@ class TestMicroMetricLoggerInitialization:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger()
-        
+
         assert logger.log_path is None
         assert logger.flush_every == 1000
         assert logger.flush_interval == 60.0
@@ -153,14 +155,14 @@ class TestMicroMetricLoggerInitialization:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger(
             log_path="/tmp/test",
             flush_every=500,
             flush_interval=30.0,
-            enabled_metrics=["metric1", "metric2"]
+            enabled_metrics=["metric1", "metric2"],
         )
-        
+
         assert logger.log_path == "/tmp/test"
         assert logger.flush_every == 500
         assert logger.flush_interval == 30.0
@@ -170,14 +172,15 @@ class TestMicroMetricLoggerInitialization:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         log_dir = tmp_path / "logs"
-        logger = MicroMetricLogger(log_path=str(log_dir))
-        
+        _ = MicroMetricLogger(log_path=str(log_dir))
+
         assert log_dir.exists()
         assert log_dir.is_dir()
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerEnableMetrics:
     """Test cases for enabling metrics functionality."""
 
@@ -187,14 +190,14 @@ class TestMicroMetricLoggerEnableMetrics:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         # Register some metrics
         MicroMetricLogger.register_metric("metric1", float)
         MicroMetricLogger.register_metric("metric2", int)
-        
+
         logger = MicroMetricLogger()
         logger.enable_metrics("all")
-        
+
         assert logger.enabled_metrics == {"metric1", "metric2"}
 
     def test_enable_metrics_specific_list(self) -> None:
@@ -203,15 +206,15 @@ class TestMicroMetricLoggerEnableMetrics:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         # Register some metrics
         MicroMetricLogger.register_metric("metric1", float)
         MicroMetricLogger.register_metric("metric2", int)
         MicroMetricLogger.register_metric("metric3", str)
-        
+
         logger = MicroMetricLogger()
         logger.enable_metrics(["metric1", "metric3"])
-        
+
         assert logger.enabled_metrics == {"metric1", "metric3"}
 
     def test_enable_metrics_with_unregistered_warning(self, capsys) -> None:
@@ -220,13 +223,13 @@ class TestMicroMetricLoggerEnableMetrics:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         # Register only one metric
         MicroMetricLogger.register_metric("metric1", float)
-        
+
         logger = MicroMetricLogger()
         logger.enable_metrics(["metric1", "unregistered_metric"])
-        
+
         captured = capsys.readouterr()
         assert "Warning: Attempting to enable unregistered metrics" in captured.out
         assert logger.enabled_metrics == {"metric1"}
@@ -236,10 +239,10 @@ class TestMicroMetricLoggerEnableMetrics:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger()
         logger.enable_metrics(None)
-        
+
         assert logger.enabled_metrics == set()
 
     def test_enable_metrics_empty_list(self) -> None:
@@ -247,13 +250,14 @@ class TestMicroMetricLoggerEnableMetrics:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger()
         logger.enable_metrics([])
-        
+
         assert logger.enabled_metrics == set()
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerLogging:
     """Test cases for logging functionality."""
 
@@ -262,12 +266,15 @@ class TestMicroMetricLoggerLogging:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger()
         logger.log("test_metric", 42.0)
-        
+
         captured = capsys.readouterr()
-        assert "Warning: Cannot log metric 'test_metric' - log_path not defined" in captured.out
+        assert (
+            "Warning: Cannot log metric 'test_metric' - log_path not defined"
+            in captured.out
+        )
 
     def test_log_disabled_metric_warning(self, capsys, tmp_path) -> None:
         """Test warning when logging disabled metric."""
@@ -275,15 +282,18 @@ class TestMicroMetricLoggerLogging:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("metric1", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["metric1"])
         logger.log("metric2", 42.0)  # Log unenabled metric
-        
+
         captured = capsys.readouterr()
-        assert "Warning: Attempting to log metric 'metric2' which is not enabled" in captured.out
+        assert (
+            "Warning: Attempting to log metric 'metric2' which is not enabled"
+            in captured.out
+        )
 
     def test_log_enabled_metric(self, tmp_path) -> None:
         """Test successful logging of enabled metric."""
@@ -291,14 +301,14 @@ class TestMicroMetricLoggerLogging:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         logger.log("test_metric", 42.0, {"layer": 1, "head": 2})
-        
+
         assert len(logger.log_queue) == 1
         event = logger.log_queue[0]
         assert event.metric == "test_metric"
@@ -312,14 +322,14 @@ class TestMicroMetricLoggerLogging:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         logger.log("test_metric", 42.0, None)
-        
+
         assert len(logger.log_queue) == 1
         event = logger.log_queue[0]
         assert event.metadata == {}
@@ -330,20 +340,21 @@ class TestMicroMetricLoggerLogging:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path), flush_every=2)
         logger.enable_metrics(["test_metric"])
-        
+
         # Log 2 events - should trigger flush
         logger.log("test_metric", 1.0)
         logger.log("test_metric", 2.0)
-        
+
         # Queue should be empty after flush
         assert len(logger.log_queue) == 0
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerFlushing:
     """Test cases for flushing functionality."""
 
@@ -352,10 +363,10 @@ class TestMicroMetricLoggerFlushing:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.flush()  # Should not raise any error
-        
+
         # No file should be created
         log_file = tmp_path / "micro_metrics.jsonl"
         assert not log_file.exists()
@@ -365,7 +376,7 @@ class TestMicroMetricLoggerFlushing:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger = MicroMetricLogger()
         logger.flush()  # Should not raise any error
 
@@ -375,29 +386,29 @@ class TestMicroMetricLoggerFlushing:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         # Add some events to queue
         logger.log("test_metric", 42.0, {"layer": 1})
         logger.log("test_metric", 43.0, {"layer": 2})
-        
+
         # Flush
         logger.flush()
-        
+
         # Check file was created
         log_file = tmp_path / "micro_metrics.jsonl"
         assert log_file.exists()
-        
+
         # Check content
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             lines = f.readlines()
-        
+
         assert len(lines) == 2
-        
+
         # Parse first line
         event1 = json.loads(lines[0])
         assert event1["metric"] == "test_metric"
@@ -412,21 +423,21 @@ class TestMicroMetricLoggerFlushing:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         # Add events to queue
         logger.log("test_metric", 42.0)
         logger.log("test_metric", 43.0)
-        
+
         assert len(logger.log_queue) == 2
-        
+
         # Flush
         logger.flush()
-        
+
         # Queue should be empty
         assert len(logger.log_queue) == 0
 
@@ -436,24 +447,25 @@ class TestMicroMetricLoggerFlushing:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         initial_time = logger.last_flush_time
-        
+
         # Wait a bit
         time.sleep(0.01)
-        
+
         # Add event and flush
         logger.log("test_metric", 42.0)
         logger.flush()
-        
+
         assert logger.last_flush_time > initial_time
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerUtilityMethods:
     """Test cases for utility methods."""
 
@@ -463,13 +475,13 @@ class TestMicroMetricLoggerUtilityMethods:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("metric1", float)
         MicroMetricLogger.register_metric("metric2", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["metric1"])
-        
+
         assert logger.is_metric_enabled("metric1") is True
         assert logger.is_metric_enabled("metric2") is False
 
@@ -479,16 +491,16 @@ class TestMicroMetricLoggerUtilityMethods:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("metric1", float)
         MicroMetricLogger.register_metric("metric2", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["metric1", "metric2"])
-        
+
         enabled = logger.get_enabled_metrics()
         assert enabled == {"metric1", "metric2"}
-        
+
         # Should return a copy
         enabled.add("metric3")
         assert "metric3" not in logger.enabled_metrics
@@ -498,14 +510,14 @@ class TestMicroMetricLoggerUtilityMethods:
         # Reset singleton state
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger1 = MicroMetricLogger()
         assert logger1.is_logging_configured() is False
-        
+
         # Reset singleton state again for second test
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
-        
+
         logger2 = MicroMetricLogger(log_path="/tmp/test")
         assert logger2.is_logging_configured() is True
 
@@ -515,17 +527,18 @@ class TestMicroMetricLoggerUtilityMethods:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("metric1", float)
-        
+
         logger = MicroMetricLogger()
         logger.configure_logging(str(tmp_path), ["metric1"])
-        
+
         assert logger.log_path == str(tmp_path)
         assert logger.enabled_metrics == {"metric1"}
         assert tmp_path.exists()
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerLocationInference:
     """Test cases for automatic location inference."""
 
@@ -535,17 +548,17 @@ class TestMicroMetricLoggerLocationInference:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         def test_function() -> None:
             logger.log("test_metric", 42.0)
-        
+
         test_function()
-        
+
         assert len(logger.log_queue) == 1
         event = logger.log_queue[0]
         assert "test_function" in event.location
@@ -556,25 +569,26 @@ class TestMicroMetricLoggerLocationInference:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         class TestClass:
             def test_method(self) -> None:
                 logger.log("test_metric", 42.0)
-        
+
         test_obj = TestClass()
         test_obj.test_method()
-        
+
         assert len(logger.log_queue) == 1
         event = logger.log_queue[0]
         assert "TestClass" in event.location
         assert "test_method" in event.location
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerCleanup:
     """Test cases for cleanup functionality."""
 
@@ -584,28 +598,29 @@ class TestMicroMetricLoggerCleanup:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         # Add event to queue
         logger.log("test_metric", 42.0)
-        
+
         # Manually call __del__ (simulating object destruction)
         logger.__del__()
-        
+
         # Check that event was flushed to file
         log_file = tmp_path / "micro_metrics.jsonl"
         assert log_file.exists()
-        
-        with open(log_file, 'r') as f:
+
+        with open(log_file, "r") as f:
             lines = f.readlines()
-        
+
         assert len(lines) == 1
 
 
+@pytest.mark.unit
 class TestMicroMetricLoggerEdgeCases:
     """Test cases for edge cases and error handling."""
 
@@ -615,16 +630,16 @@ class TestMicroMetricLoggerEdgeCases:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         # Add more events than maxlen (10000)
         for i in range(10001):
             logger.log("test_metric", float(i))
-        
+
         # Queue should not exceed maxlen
         assert len(logger.log_queue) <= 10000
 
@@ -634,27 +649,27 @@ class TestMicroMetricLoggerEdgeCases:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         complex_metadata = {
             "nested": {"key": "value", "list": [1, 2, 3]},
             "array": [{"a": 1}, {"b": 2}],
             "boolean": True,
-            "null": None
+            "null": None,
         }
-        
+
         logger.log("test_metric", 42.0, complex_metadata)
         logger.flush()
-        
+
         # Check that complex metadata was serialized correctly
         log_file = tmp_path / "micro_metrics.jsonl"
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             event = json.loads(f.readline())
-        
+
         assert event["metadata"] == complex_metadata
 
     def test_log_with_none_value(self, tmp_path) -> None:
@@ -663,18 +678,18 @@ class TestMicroMetricLoggerEdgeCases:
         MicroMetricLogger._instance = None
         MicroMetricLogger._initialized = False
         MicroMetricLogger._registered_metrics.clear()
-        
+
         MicroMetricLogger.register_metric("test_metric", float)
-        
+
         logger = MicroMetricLogger(log_path=str(tmp_path))
         logger.enable_metrics(["test_metric"])
-        
+
         logger.log("test_metric", None, {"note": "null value"})
         logger.flush()
-        
+
         # Check that None value was handled correctly
         log_file = tmp_path / "micro_metrics.jsonl"
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             event = json.loads(f.readline())
-        
-        assert event["value"] is None 
+
+        assert event["value"] is None
