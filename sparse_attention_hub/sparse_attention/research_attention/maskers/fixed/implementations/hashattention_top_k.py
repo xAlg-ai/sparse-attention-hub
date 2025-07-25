@@ -57,6 +57,8 @@ class HashAttentionTopKMasker(TopKMasker):
         queries: torch.Tensor,
         values: torch.Tensor,
         attention_mask: torch.Tensor,
+        scaling: float,
+        dropout: float,
         sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         previous_mask: Mask,
         **kwargs: Dict[str, Any],
@@ -85,6 +87,7 @@ class HashAttentionTopKMasker(TopKMasker):
             effective_heavy_size,
             keys,
             queries,
+            attention_mask,
             sparse_meta_data,
             previous_mask,
             layer_idx,
@@ -143,6 +146,7 @@ class HashAttentionTopKMasker(TopKMasker):
         heavy_size: int,
         keys: torch.Tensor,
         queries: torch.Tensor,
+        attention_mask: torch.Tensor,
         sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         previous_mask: Mask,
         layer_idx: int,
@@ -150,7 +154,13 @@ class HashAttentionTopKMasker(TopKMasker):
     ) -> Mask:
         """Create hash attention top-K mask using hash-based scoring."""
         scores: torch.Tensor = self._compute_hashattention_score(
-            queries, keys, sparse_meta_data, layer_idx, **kwargs
+            queries,
+            keys,
+            attention_mask,
+            previous_mask.get_dense_mask(),
+            sparse_meta_data,
+            layer_idx,
+            **kwargs,
         )
         top_k_indices: torch.Tensor = self._get_topk_indices_from_inactive_positions(
             scores, previous_mask, heavy_size
@@ -303,6 +313,8 @@ class HashAttentionTopKMasker(TopKMasker):
         self,
         queries: torch.Tensor,
         keys: torch.Tensor,
+        attention_mask: torch.Tensor,
+        previous_dense_mask: torch.Tensor,
         sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
         layer_idx: int,
         **kwargs: Dict[str, Any],
@@ -319,7 +331,13 @@ class HashAttentionTopKMasker(TopKMasker):
         )
 
         # (B, H, #queries, hat_bits) x (B, H, hat_bits, #keys) -> (B, H, #queries, #keys)
-        return torch.matmul(query_signatures, key_signatures.transpose(-2, -1))
+        scores: torch.Tensor = torch.matmul(
+            query_signatures, key_signatures.transpose(-2, -1)
+        )
+        if attention_mask is not None:
+            scores = scores + attention_mask[:, :, :, : keys.shape[-2]]
+        scores[previous_dense_mask != 0] = torch.finfo(scores.dtype).min
+        return scores
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "HashAttentionTopKMasker":

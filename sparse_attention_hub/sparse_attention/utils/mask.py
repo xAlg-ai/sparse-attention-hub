@@ -392,15 +392,18 @@ class Mask:
         elif self.is_empty():
             return input_tensor
 
-        if self.from_dense_mask:
-            if self.mask is None:
-                raise RuntimeError("Dense mask is None")
-            return input_tensor * self.mask
-        elif self.from_index:
-            dense_mask = self.get_dense_mask()
-            return input_tensor * dense_mask
-        else:
-            raise RuntimeError("Mask object is in an invalid state")
+        # Always work with index representation for efficiency
+        indices: torch.Tensor
+        ptr: torch.Tensor
+        data: torch.Tensor
+        indices, ptr, data = self.get_index_mask()
+
+        # Apply mask using sparse operations
+        output: torch.Tensor = torch.zeros_like(input_tensor)
+        if indices.numel() > 0:
+            output.view(-1)[indices] = input_tensor.view(-1)[indices] * data
+
+        return output
 
     def apply_inv_mask(self, input_tensor: torch.Tensor) -> torch.Tensor:
         """
@@ -427,23 +430,17 @@ class Mask:
         elif self.is_empty():
             return input_tensor
 
-        if self.from_dense_mask:
-            if self.mask is None:
-                raise RuntimeError("Dense mask is None")
-            mask = self.mask
-        elif self.from_index:
-            mask = self.get_dense_mask()
-        else:
-            raise RuntimeError("Mask object is in an invalid state")
+        # Always work with index representation for efficiency
+        indices: torch.Tensor
+        ptr: torch.Tensor
+        data: torch.Tensor
+        indices, ptr, data = self.get_index_mask()
 
-        # Create output tensor
+        # Apply inverse mask using sparse operations
         output: torch.Tensor = torch.zeros_like(input_tensor)
-
-        # Apply inverse mask logic
-        non_zero_mask: torch.Tensor = mask != 0
-        output[non_zero_mask] = input_tensor[non_zero_mask] * (
-            1.0 / mask[non_zero_mask]
-        )
+        if indices.numel() > 0:
+            # For inverse mask: output[indices] = input[indices] * (1.0 / data)
+            output.view(-1)[indices] = input_tensor.view(-1)[indices] * (1.0 / data)
 
         return output
 
@@ -645,3 +642,18 @@ class Mask:
                 data=final_data,
                 dtype=self.dtype,
             )
+
+    def get_density(self) -> float:
+        """
+        Get the sparsity of the mask.
+        """
+        if self.is_full:
+            return 1.0
+        elif self.is_empty():
+            return 0.0
+        elif self.from_dense_mask:
+            return float(torch.sum(self.mask > 0) / self.mask.numel())
+        elif self.from_index:
+            return float(len(self.indices)) / float(np.prod(self.shape))
+        else:
+            raise RuntimeError("Mask object is in an invalid state")

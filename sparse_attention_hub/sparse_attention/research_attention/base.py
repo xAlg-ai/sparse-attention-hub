@@ -6,11 +6,19 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 from torch import nn
 
+from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
+
 from ..base import SparseAttention, SparseAttentionConfig
 from ..utils.mask import Mask
-from ..utils.mask_attention_utils import get_masked_attention_output
+from ..utils.mask_attention_utils import (
+    get_masked_attention_output,
+    get_true_attention_output,
+)
 from .maskers.base import MaskerConfig, ResearchMasker
 from .maskers.sampling.base import SamplingMasker
+
+MicroMetricLogger.register_metric("research_attention_density", float)
+MicroMetricLogger.register_metric("research_attention_output_error", float)
 
 
 @dataclass
@@ -97,9 +105,18 @@ class ResearchAttention(SparseAttention):
                 queries=queries,
                 values=values,
                 attention_mask=attention_mask,
+                scaling=scaling,
+                dropout=dropout,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=sparse_attention_mask,
                 **kwargs,
+            )
+
+        if MicroMetricLogger().is_metric_enabled("research_attention_density"):
+            MicroMetricLogger().log(
+                "research_attention_density",
+                sparse_attention_mask.get_density(),
+                metadata={"layer_idx": kwargs["layer_idx"]},
             )
 
         # Call compute_masked_attention_output on the result of the last mask
@@ -118,6 +135,27 @@ class ResearchAttention(SparseAttention):
             return_attention_weights=True,
             **kwargs,
         )
+
+        if MicroMetricLogger().is_metric_enabled("research_attention_output_error"):
+            true_attention_output, _ = get_true_attention_output(
+                module,
+                queries,
+                keys,
+                values,
+                attention_mask,
+                scaling,
+                dropout,
+                **kwargs,
+            )
+            error = torch.norm(true_attention_output - attention_output) / torch.norm(
+                true_attention_output
+            )
+            MicroMetricLogger().log(
+                "research_attention_output_error",
+                float(error.item()),
+                metadata={"layer_idx": kwargs["layer_idx"]},
+            )
+
         return attention_output, attention_weights
 
     @classmethod

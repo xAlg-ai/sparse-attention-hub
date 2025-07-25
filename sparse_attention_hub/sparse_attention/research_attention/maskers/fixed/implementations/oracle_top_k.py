@@ -10,6 +10,10 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.kv_utils import (
+    _get_num_key_value_groups,
+    repeat_kv,
+)
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
@@ -39,6 +43,8 @@ class OracleTopK(TopKMasker):
         queries: torch.Tensor,
         values: torch.Tensor,
         attention_mask: torch.Tensor,
+        scaling: float,
+        dropout: float,
         sparse_meta_data: Dict[Any, Any],
         previous_mask: Mask,
         **kwargs: Dict[str, Any],
@@ -60,7 +66,12 @@ class OracleTopK(TopKMasker):
 
         # Create oracle top-K mask
         oracle_mask: Mask = self._create_oracle_topk_mask(
-            tensor_dims, effective_heavy_size, keys, queries, previous_mask
+            tensor_dims,
+            effective_heavy_size,
+            keys,
+            queries,
+            attention_mask,
+            previous_mask,
         )
         return previous_mask.merge_mask(oracle_mask, inplace=False)
 
@@ -80,11 +91,12 @@ class OracleTopK(TopKMasker):
         heavy_size: int,
         keys: torch.Tensor,
         queries: torch.Tensor,
+        attention_mask: torch.Tensor,
         previous_mask: Mask,
     ) -> Mask:
         """Create oracle top-K mask using raw attention scores."""
         raw_attention_scores: torch.Tensor = self._compute_raw_attention_scores(
-            keys, queries
+            keys, queries, attention_mask, previous_mask.get_dense_mask()
         )
         top_k_indices: torch.Tensor = self._get_topk_indices_from_inactive_positions(
             raw_attention_scores, previous_mask, heavy_size
@@ -94,10 +106,20 @@ class OracleTopK(TopKMasker):
         )
 
     def _compute_raw_attention_scores(
-        self, keys: torch.Tensor, queries: torch.Tensor
+        self,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        attention_mask: torch.Tensor,
+        previous_dense_mask: torch.Tensor,
     ) -> torch.Tensor:
         """Compute raw attention scores using query-key dot product."""
-        return torch.matmul(queries, keys.transpose(-2, -1))
+        ngroups = _get_num_key_value_groups(queries, keys)
+        keys = repeat_kv(keys, ngroups)
+        scores: torch.Tensor = torch.matmul(queries, keys.transpose(-2, -1))
+        if attention_mask is not None:
+            scores = scores + attention_mask[:, :, :, : keys.shape[-2]]
+        scores[previous_dense_mask != 0] = torch.finfo(scores.dtype).min
+        return scores
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "OracleTopK":

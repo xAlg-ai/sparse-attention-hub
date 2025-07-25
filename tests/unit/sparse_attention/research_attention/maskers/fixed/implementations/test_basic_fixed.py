@@ -95,6 +95,8 @@ class TestLocalMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=full_previous_mask,
         )
@@ -129,6 +131,8 @@ class TestLocalMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
@@ -163,6 +167,8 @@ class TestLocalMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
@@ -216,6 +222,8 @@ class TestLocalMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
@@ -268,6 +276,8 @@ class TestLocalMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=previous_mask,
         )
@@ -318,6 +328,8 @@ class TestLocalMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
@@ -463,6 +475,8 @@ class TestSinkMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=full_previous_mask,
         )
@@ -484,6 +498,8 @@ class TestSinkMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=empty_previous_mask,
         )
@@ -507,6 +523,8 @@ class TestSinkMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=partial_previous_mask,
         )
@@ -536,6 +554,8 @@ class TestSinkMaskerImplementation:
             queries=queries,
             values=values,
             attention_mask=None,
+            scaling=1.0,
+            dropout=0.0,
             sparse_meta_data=None,
             previous_mask=partial_previous_mask,
         )

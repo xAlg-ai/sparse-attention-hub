@@ -1,0 +1,9 @@
+---
+description: Strong type annotations
+globs: *py
+alwaysApply: true
+---
+
+While writing python code, always use strong type annotations in the following places
+1. method signatures
+2. while declaring new variables in code

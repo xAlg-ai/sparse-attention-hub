@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
 import torch
 
@@ -14,7 +14,7 @@ from ..base import MaskerConfig, ResearchMasker
 class SamplingMaskerConfig(MaskerConfig):
     """Base configuration for sampling maskers."""
 
-    sampling_rate: Union[float, int]
+    pass
 
 
 class SamplingMasker(ResearchMasker):

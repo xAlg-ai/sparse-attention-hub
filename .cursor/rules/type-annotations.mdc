@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+while writing python code,
+
+Always use Type annotations for the generating code including but not limited to
+1. Method parameters and return types
+2. Class members
+3. actual code of the form b = f (a), use b: Type = f(a)
