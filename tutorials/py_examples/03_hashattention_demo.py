@@ -133,7 +133,7 @@ def main():
     print(f"Device: {device}")
     
     # Load weights
-    usa_checkpoint_path = "/data/apdesai/code/HashAttention-1.0/artifacts/llama3.1-8b-patch.32K.v1.pt"
+    usa_checkpoint_path = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.pt"
     
     if os.path.exists(usa_checkpoint_path):
         try:
@@ -192,7 +192,7 @@ def main():
     )
 
     print("Running Hash Attention on Question")
-    response=adapter.process_request(request)
+    response=adapter.process_request(request, generation_kwargs={"max_new_tokens": 50}, request_kwargs={})
     response_text=response.responses
     print("Hash Attention Response: ", response_text)
 

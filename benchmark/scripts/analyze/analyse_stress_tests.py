@@ -25,11 +25,28 @@ def parse_config_name(config_name: str) -> Dict[str, float]:
         config_name: Configuration name like "adaptive_sampling.sink_0.001_window_0.001_heavy_0.005_base_0.01_epsilon_0.01_delta_0.01"
                      or "oracle_top_k_0.5.sink_0.02_window_0.02"
                      or "oracle_top_p_0.9999.sink_0.001_window_0.001"
+                     or "hashattention.sink_0.001_window_0.001_top_k_0.17"
+                     or "adaptive_sampling_hat.sink_0.01_window_0.01_heavy_0.02_base_0.01_epsilon_0.5_delta_0.5"
         
     Returns:
         Dictionary with parsed parameters
     """
     # Extract parameters using regex for different configuration types
+    
+    # Pattern for adaptive_sampling_hat (must come before adaptive_sampling to avoid conflicts)
+    adaptive_hat_pattern = r"adaptive_sampling_hat\.sink_([\d.]+)_window_([\d.]+)_heavy_([\d.]+)_base_([\d.]+)_epsilon_([\d.]+)_delta_([\d.]+)"
+    adaptive_hat_match = re.match(adaptive_hat_pattern, config_name)
+    
+    if adaptive_hat_match:
+        return {
+            "config_type": "adaptive_sampling_hat",
+            "sink_size": float(adaptive_hat_match.group(1)),
+            "window_size": float(adaptive_hat_match.group(2)),
+            "heavy_size": float(adaptive_hat_match.group(3)),
+            "base_rate_sampling": float(adaptive_hat_match.group(4)),
+            "epsilon": float(adaptive_hat_match.group(5)),
+            "delta": float(adaptive_hat_match.group(6))
+        }
     
     # Pattern for adaptive_sampling
     adaptive_pattern = r"adaptive_sampling\.sink_([\d.]+)_window_([\d.]+)_heavy_([\d.]+)_base_([\d.]+)_epsilon_([\d.]+)_delta_([\d.]+)"
@@ -68,6 +85,18 @@ def parse_config_name(config_name: str) -> Dict[str, float]:
             "top_p": float(top_p_match.group(1)),
             "sink_size": float(top_p_match.group(2)),
             "window_size": float(top_p_match.group(3))
+        }
+    
+    # Pattern for hashattention
+    hashattention_pattern = r"hashattention\.sink_([\d.]+)_window_([\d.]+)_top_k_([\d.]+)"
+    hashattention_match = re.match(hashattention_pattern, config_name)
+    
+    if hashattention_match:
+        return {
+            "config_type": "hashattention",
+            "sink_size": float(hashattention_match.group(1)),
+            "window_size": float(hashattention_match.group(2)),
+            "hat_top_k": float(hashattention_match.group(3))
         }
     
     # If no pattern matches, return empty dict
@@ -169,6 +198,13 @@ def extract_sparse_config_params(config: Dict[str, Any]) -> Dict[str, Any]:
             params["top_k"] = masker_config["top_k"]
         elif "top_p" in masker_config:
             params["top_p"] = masker_config["top_p"]
+        elif "heavy_size" in masker_config and "hat_bits" in masker_config:
+            # HashAttention parameters (for both hashattention and adaptive_sampling_hat)
+            params["hat_heavy_size"] = masker_config["heavy_size"]
+            params["hat_bits"] = masker_config.get("hat_bits")
+            params["hat_mlp_layers"] = masker_config.get("hat_mlp_layers")
+            params["hat_mlp_hidden_size"] = masker_config.get("hat_mlp_hidden_size")
+            params["hat_mlp_activation"] = masker_config.get("hat_mlp_activation")
     
     return params
 
