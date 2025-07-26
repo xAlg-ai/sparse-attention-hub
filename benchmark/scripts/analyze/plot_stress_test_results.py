@@ -72,6 +72,27 @@ def create_interactive_scatter_plot(df: pd.DataFrame, output_path: str) -> None:
             config_info += f"<b>Top-K:</b> {row.get('top_k', 'N/A')}<br>"
         elif config_type == 'oracle_top_p':
             config_info += f"<b>Top-P:</b> {row.get('top_p', 'N/A')}<br>"
+        elif config_type == 'hashattention':
+            config_info += f"""
+        <b>Hash Top-K:</b> {row.get('hat_top_k', 'N/A')}<br>
+        <b>Hash Heavy Size:</b> {row.get('hat_heavy_size', 'N/A')}<br>
+        <b>Hash Bits:</b> {row.get('hat_bits', 'N/A')}<br>
+        <b>Hash MLP Layers:</b> {row.get('hat_mlp_layers', 'N/A')}<br>
+        <b>Hash MLP Hidden Size:</b> {row.get('hat_mlp_hidden_size', 'N/A')}<br>
+        <b>Hash MLP Activation:</b> {row.get('hat_mlp_activation', 'N/A')}<br>
+        """
+        elif config_type == 'adaptive_sampling_hat':
+            config_info += f"""
+        <b>Heavy Size:</b> {row.get('heavy_size', 'N/A')}<br>
+        <b>Base Rate:</b> {row.get('base_rate_sampling', 'N/A')}<br>
+        <b>Epsilon:</b> {row.get('epsilon', 'N/A')}<br>
+        <b>Delta:</b> {row.get('delta', 'N/A')}<br>
+        <b>Hash Heavy Size:</b> {row.get('hat_heavy_size', 'N/A')}<br>
+        <b>Hash Bits:</b> {row.get('hat_bits', 'N/A')}<br>
+        <b>Hash MLP Layers:</b> {row.get('hat_mlp_layers', 'N/A')}<br>
+        <b>Hash MLP Hidden Size:</b> {row.get('hat_mlp_hidden_size', 'N/A')}<br>
+        <b>Hash MLP Activation:</b> {row.get('hat_mlp_activation', 'N/A')}<br>
+        """
         
         config_info += f"""
         <b>Density:</b> {row.get('density', 'N/A'):.4f}<br>
@@ -86,11 +107,13 @@ def create_interactive_scatter_plot(df: pd.DataFrame, output_path: str) -> None:
     config_colors = {
         'adaptive_sampling': '#1f77b4',  # Blue
         'oracle_top_k': '#ff7f0e',       # Orange
-        'oracle_top_p': '#2ca02c'        # Green
+        'oracle_top_p': '#2ca02c',       # Green
+        'hashattention': '#d62728',      # Red
+        'adaptive_sampling_hat': '#9467bd'  # Purple
     }
     
     # Add scatter traces for each configuration type
-    for config_type in ['adaptive_sampling', 'oracle_top_k', 'oracle_top_p']:
+    for config_type in ['adaptive_sampling', 'oracle_top_k', 'oracle_top_p', 'hashattention', 'adaptive_sampling_hat']:
         config_data = df[df['config_type'] == config_type]
         
         if len(config_data) > 0:
@@ -164,7 +187,7 @@ def create_configuration_analysis_plots(df: pd.DataFrame, output_dir: str) -> No
         specs=[[{"secondary_y": False}] * len(config_types)]
     )
     
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']  # Blue, Orange, Green, Red, Purple
     
     for i, config_type in enumerate(config_types):
         config_data = df[df['config_type'] == config_type]
@@ -203,7 +226,9 @@ def create_configuration_analysis_plots(df: pd.DataFrame, output_dir: str) -> No
     config_colors = {
         'adaptive_sampling': '#1f77b4',  # Blue
         'oracle_top_k': '#ff7f0e',       # Orange
-        'oracle_top_p': '#2ca02c'        # Green
+        'oracle_top_p': '#2ca02c',       # Green
+        'hashattention': '#d62728',      # Red
+        'adaptive_sampling_hat': '#9467bd'  # Purple
     }
     
     for layer_idx, group in layer_groups:
@@ -237,7 +262,7 @@ def create_configuration_analysis_plots(df: pd.DataFrame, output_dir: str) -> No
     # 3. Configuration comparison plot
     fig3 = go.Figure()
     
-    for config_type in ['adaptive_sampling', 'oracle_top_k', 'oracle_top_p']:
+    for config_type in ['adaptive_sampling', 'oracle_top_k', 'oracle_top_p', 'hashattention', 'adaptive_sampling_hat']:
         config_data = df[df['config_type'] == config_type]
         
         if len(config_data) > 0:
