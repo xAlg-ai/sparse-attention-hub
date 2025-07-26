@@ -185,6 +185,10 @@ class AdaptiveSamplingMasker(SamplingMasker):
         max_scores = torch.max(raw_scores, dim=-1, keepdim=True)[0]
         return torch.exp(raw_scores - max_scores)
 
+    def should_return_full_mask(self, sampling_range: int) -> bool:
+        """Check if the masker should return a full mask."""
+        return sampling_range < 2
+
     def _get_sampling_range(self, seq_len_keys: int) -> tuple[int, int, int]:
         """Get sampling range and validate it.
 
@@ -210,10 +214,6 @@ class AdaptiveSamplingMasker(SamplingMasker):
             end_idx = seq_len_keys - self.local_offset
 
         sampling_range = end_idx - start_idx
-
-        if sampling_range <= 0:
-            raise ValueError(f"Invalid sampling range: {sampling_range}")
-
         return start_idx, end_idx, sampling_range
 
     def _get_base_sample_count(self, sampling_range: int) -> int:
@@ -334,6 +334,17 @@ class AdaptiveSamplingMasker(SamplingMasker):
             dims.seq_len_queries,
             dims.seq_len_keys,
         )
+
+        # Get sampling range
+        start_idx, end_idx, sampling_range = self._get_sampling_range(seq_len_keys)
+
+        # If sequence length is too small, return full mask
+        if self.should_return_full_mask(sampling_range):
+            return Mask.create_full_mask(
+                shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+                dtype=previous_mask.dtype,
+            )
+
         # Compute attention scores after removing attention_mask
         expwts = self._compute_exp_attention_scores(
             queries, keys, scaling, attention_mask
@@ -341,7 +352,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
         static_denominator = apply_inv_mask_sum(expwts, previous_mask)
 
         # Get sampling parameters
-        start_idx, end_idx, sampling_range = self._get_sampling_range(seq_len_keys)
+
         num_base_samples = self._get_base_sample_count(sampling_range)
 
         # Create base sampling mask and estimate std
