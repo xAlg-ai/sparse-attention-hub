@@ -5,12 +5,13 @@
 :date: 2025-06-29
 :summary: Tests for HashAttentionTopKMasker implementation.
 """
+import os
+import pickle
+import tempfile
+
 import mock
 import pytest
 import torch
-import tempfile
-import os
-import pickle
 
 
 @pytest.fixture
@@ -687,14 +688,16 @@ class TestHashAttentionTopKMaskerImplementation:
                     num_attended == 2
                 ), f"Head {h}, Query {q} with {activation_config.hat_mlp_activation} should attend to 2 keys, got {num_attended}"
 
-    def test_hash_attention_top_k_masker_config_with_hat_weight_file(self, sample_weights):
+    def test_hash_attention_top_k_masker_config_with_hat_weight_file(
+        self, sample_weights
+    ):
         """Test HashAttentionTopKMaskerConfig with hat_weight_file parameter."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMaskerConfig,
         )
 
         # Create a temporary file with sample weights
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.pkl', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".pkl", delete=False) as f:
             pickle.dump(sample_weights, f)
             temp_file_path = f.name
 
@@ -714,7 +717,9 @@ class TestHashAttentionTopKMaskerImplementation:
             # Clean up temporary file
             os.unlink(temp_file_path)
 
-    def test_hash_attention_top_k_masker_creation_with_hat_weight_file(self, sample_weights):
+    def test_hash_attention_top_k_masker_creation_with_hat_weight_file(
+        self, sample_weights
+    ):
         """Test HashAttentionTopKMasker creation with hat_weight_file."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
@@ -722,7 +727,7 @@ class TestHashAttentionTopKMaskerImplementation:
         )
 
         # Create a temporary file with sample weights
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.pkl', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".pkl", delete=False) as f:
             pickle.dump(sample_weights, f)
             temp_file_path = f.name
 
@@ -738,28 +743,37 @@ class TestHashAttentionTopKMaskerImplementation:
 
             masker = HashAttentionTopKMasker(config)
             assert isinstance(masker, HashAttentionTopKMasker)
-            
+
             # Compare structure and shapes instead of direct equality
             assert len(masker.hat_weights) == len(sample_weights)
             for layer_idx in sample_weights:
                 assert layer_idx in masker.hat_weights
                 for key in sample_weights[layer_idx]:
                     assert key in masker.hat_weights[layer_idx]
-                    assert len(masker.hat_weights[layer_idx][key]) == len(sample_weights[layer_idx][key])
+                    assert len(masker.hat_weights[layer_idx][key]) == len(
+                        sample_weights[layer_idx][key]
+                    )
                     for i, tensor in enumerate(sample_weights[layer_idx][key]):
-                        assert masker.hat_weights[layer_idx][key][i].shape == tensor.shape
+                        assert (
+                            masker.hat_weights[layer_idx][key][i].shape == tensor.shape
+                        )
         finally:
             # Clean up temporary file
             os.unlink(temp_file_path)
 
-    def test_hash_attention_top_k_masker_config_validation_both_provided(self, sample_weights):
+    def test_hash_attention_top_k_masker_config_validation_both_provided(
+        self, sample_weights
+    ):
         """Test that providing both hat_weights and hat_weight_file raises ValueError."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             HashAttentionTopKMasker,
             HashAttentionTopKMaskerConfig,
         )
 
-        with pytest.raises(ValueError, match="Only one of hat_weights or hat_weight_file should be provided"):
+        with pytest.raises(
+            ValueError,
+            match="Only one of hat_weights or hat_weight_file should be provided",
+        ):
             config = HashAttentionTopKMaskerConfig(
                 heavy_size=2,
                 hat_bits=4,
@@ -778,7 +792,9 @@ class TestHashAttentionTopKMaskerImplementation:
             HashAttentionTopKMaskerConfig,
         )
 
-        with pytest.raises(ValueError, match="Either hat_weights or hat_weight_file must be provided"):
+        with pytest.raises(
+            ValueError, match="Either hat_weights or hat_weight_file must be provided"
+        ):
             config = HashAttentionTopKMaskerConfig(
                 heavy_size=2,
                 hat_bits=4,

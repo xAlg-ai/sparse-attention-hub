@@ -10,12 +10,14 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerConfig,
     MaskerRegistry,
 )
+from sparse_attention_hub.sparse_attention.utils.hashattention_utils import (
+    load_hat_weights,
+)
 from sparse_attention_hub.sparse_attention.utils.kv_utils import (
     _get_num_key_value_groups,
     repeat_kv,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
-from sparse_attention_hub.sparse_attention.utils.hashattention_utils import load_hat_weights
 
 from ..base import TopKMasker, TopKMaskerConfig
 
@@ -51,13 +53,15 @@ class HashAttentionTopKMasker(TopKMasker):
         self.hat_mlp_layers = config.hat_mlp_layers
         self.hat_mlp_hidden_size = config.hat_mlp_hidden_size
         self.hat_mlp_activation = config.hat_mlp_activation
-        
+
         # Validate that only one of hat_weights or hat_weight_file is provided
         if config.hat_weights is not None and config.hat_weight_file is not None:
-            raise ValueError("Only one of hat_weights or hat_weight_file should be provided")
+            raise ValueError(
+                "Only one of hat_weights or hat_weight_file should be provided"
+            )
         if config.hat_weights is None and config.hat_weight_file is None:
             raise ValueError("Either hat_weights or hat_weight_file must be provided")
-        
+
         # Load weights from file if hat_weight_file is provided
         if config.hat_weight_file is not None:
             self.hat_weights = load_hat_weights(config.hat_weight_file)

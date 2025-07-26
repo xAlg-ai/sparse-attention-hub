@@ -1,7 +1,7 @@
-import torch
-import torch.nn as nn
 import pickle
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+import torch
 
 """ This only works for 3 layered MLPs. Need to fix for other cases"""
 
@@ -14,14 +14,14 @@ def convert_usa_weights_to_hash_attention(
     device: str = "cpu",
 ) -> Dict[int, Dict[str, List[torch.Tensor]]]:
     """Convert USA module weights to HashAttentionTopKMasker format.
-    
+
     Args:
         usa_checkpoint_path: Path to USA checkpoint file
         num_layers: Number of layers in the model
         num_heads: Number of attention heads
         num_mlp_layers: Number of MLP layers (default: 3)
         device: Device to load weights on
-        
+
     Returns:
         Dictionary of layer-wise weights in HashAttention format
     """
@@ -102,7 +102,9 @@ def convert_usa_weights_to_hash_attention(
 
         hat_weights[layer_idx] = layer_weights
 
-    print(f"✅ Converted weights for {num_layers} layers, {num_heads} heads, {num_mlp_layers} MLP layers")
+    print(
+        f"✅ Converted weights for {num_layers} layers, {num_heads} heads, {num_mlp_layers} MLP layers"
+    )
     return hat_weights
 
 
@@ -115,7 +117,7 @@ def create_hat_weights_file_from_usa(
     device: str = "cpu",
 ) -> None:
     """Create HAT weights file from USA checkpoint.
-    
+
     Args:
         usa_checkpoint_path: Path to USA checkpoint file
         target_hat_path: Path where HAT weights file will be saved
@@ -124,8 +126,8 @@ def create_hat_weights_file_from_usa(
         num_mlp_layers: Number of MLP layers
         device: Device to load weights on
     """
-    print(f"Creating HAT weights file from USA checkpoint...")
-    
+    print("Creating HAT weights file from USA checkpoint...")
+
     # Convert USA weights to HAT format
     hat_weights = convert_usa_weights_to_hash_attention(
         usa_checkpoint_path=usa_checkpoint_path,
@@ -134,33 +136,35 @@ def create_hat_weights_file_from_usa(
         num_mlp_layers=num_mlp_layers,
         device=device,
     )
-    
+
     # Save to pickle file
-    with open(target_hat_path, 'wb') as f:
+    with open(target_hat_path, "wb") as f:
         pickle.dump(hat_weights, f)
-    
+
     print(f"✅ HAT weights saved to {target_hat_path}")
 
 
-def load_hat_weights(hat_weights_path: str, device: str = "cpu") -> Dict[int, Dict[str, List[torch.Tensor]]]:
+def load_hat_weights(
+    hat_weights_path: str, device: str = "cpu"
+) -> Dict[int, Dict[str, List[torch.Tensor]]]:
     """Load HAT weights from pickle file.
-    
+
     Args:
         hat_weights_path: Path to HAT weights pickle file
         device: Device to load weights on
-        
+
     Returns:
         Dictionary of layer-wise weights in HashAttention format
     """
     print(f"Loading HAT weights from {hat_weights_path}")
-    
-    with open(hat_weights_path, 'rb') as f:
+
+    with open(hat_weights_path, "rb") as f:
         hat_weights = pickle.load(f)
-    
+
     # Move weights to specified device
     for layer_idx, layer_weights in hat_weights.items():
         for key, value in layer_weights.items():
             hat_weights[layer_idx][key] = [tensor.to(device) for tensor in value]
-    
+
     print(f"✅ Loaded HAT weights for {len(hat_weights)} layers")
     return hat_weights
