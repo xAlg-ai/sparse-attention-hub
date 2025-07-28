@@ -7,7 +7,7 @@ LSH-based similarity matching with probability-based sampling to create sparse a
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional
 
 import torch
 
@@ -36,10 +36,13 @@ class MagicPigConfig(SamplingMaskerConfig):
             similar items but also increase computational cost.
         lsh_k: Number of bits per LSH table. Higher values make each table more
             precise but reduce the probability of collisions.
+        center: bool, optional: If True, centers the keys and queries before LSH
+            by subtracting the mean of the keys.
     """
 
     lsh_l: int  # number of LSH tables
     lsh_k: int  # number of bits per LSH table
+    center: bool = True  # whether to center keys and queries before LSH
 
     def __post_init__(self) -> None:
         """Validate LSH parameters after initialization."""
@@ -60,6 +63,7 @@ class MagicPig(SamplingMasker):
     Attributes:
         lsh_l: Number of LSH tables used for hashing.
         lsh_k: Number of bits per LSH table.
+        center: Whether to center keys and queries before LSH (default is True).
 
     Important Notes:
         - Uses the Neyshabur & Srebro technique to transform inner product search to cosine similarity
@@ -86,6 +90,59 @@ class MagicPig(SamplingMasker):
         super().__init__(config)
         self.lsh_l = config.lsh_l
         self.lsh_k = config.lsh_k
+        self.center = config.center
+
+    def _center_KQ(
+            self,
+            keys: torch.Tensor,
+            queries: torch.Tensor,
+            sparse_meta_data: Dict[Any, Any],
+            layer_idx: int,
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Center K and Q tensors by subtracting the mean.
+
+        Args:
+            keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
+            queries: Query tensor with shape (batch_size, num_heads, seq_len_queries, head_dim).
+            sparse_meta_data: Metadata dictionary containing additional information.
+            layer_idx: Index of the layer for which centering is applied.
+        
+        Returns:
+            Tuple of (centered_keys, centered_queries) tensors.
+        """
+        self._initialize_key_mean_cache(sparse_meta_data, layer_idx)
+        if not self.center:
+            return keys, queries
+        
+        ## cache the key means if not already cached
+        if sparse_meta_data["key_mean"][layer_idx] is None:
+            sparse_meta_data["key_mean"][layer_idx] = keys.mean(dim=2, keepdim=True)
+
+        key_mean: torch.Tensor = sparse_meta_data["key_mean"][layer_idx]
+
+        centered_keys = keys - key_mean
+        centered_queries = queries - key_mean
+
+        return centered_keys, centered_queries
+
+    def _initialize_key_mean_cache(
+            self,
+            sparse_meta_data: Dict[Any, Any],
+            layer_idx: int,
+    ) -> None:
+        """Initialize the key mean cache for centering keys and queries.
+
+        This method checks if the key mean cache exists in the sparse_meta_data.
+        If not, it initializes it with zeros.
+
+        Args:
+            sparse_meta_data: Metadata dictionary containing additional information.
+            layer_idx: Index of the layer for which the cache is initialized.
+        """
+        if "key_mean" not in sparse_meta_data:
+            sparse_meta_data["key_mean"] = {}
+        if layer_idx not in sparse_meta_data["key_mean"]:
+            sparse_meta_data["key_mean"][layer_idx] = None
 
     def _transform_for_mips(
         self, keys: torch.Tensor, queries: torch.Tensor
@@ -130,21 +187,26 @@ class MagicPig(SamplingMasker):
         return keys_transformed, queries_transformed
 
     def _compute_probabilities(
-        self, keys: torch.Tensor, queries: torch.Tensor
+        self, keys: torch.Tensor, queries: torch.Tensor, sparse_meta_data: Dict[Any, Any], layer_idx: int
     ) -> torch.Tensor:
         """Compute LSH collision probabilities using cosine similarity.
 
         Args:
             keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
             queries: Query tensor with shape (batch_size, num_heads, seq_len_queries, head_dim).
+            sparse_meta_data: Dictionary containing sparse attention metadata.
+            layer_idx: Current layer index for accessing cached data.
 
         Returns:
             Collision probabilities tensor with shape (batch_size, num_heads, seq_len_queries, seq_len_keys).
         """
+        # Apply centering if enabled
+        keys_centered, queries_centered = self._center_KQ(keys, queries, sparse_meta_data, layer_idx)
+        
         # Transform for MIPS
         keys_transformed: torch.Tensor
         queries_transformed: torch.Tensor
-        keys_transformed, queries_transformed = self._transform_for_mips(keys, queries)
+        keys_transformed, queries_transformed = self._transform_for_mips(keys_centered, queries_centered)
 
         # Compute cosine similarities
         # Normalize the transformed vectors
@@ -174,21 +236,26 @@ class MagicPig(SamplingMasker):
         return collision_prob
 
     def _compute_lsh_matches(
-        self, keys: torch.Tensor, queries: torch.Tensor
+        self, keys: torch.Tensor, queries: torch.Tensor, sparse_meta_data: Dict[Any, Any], layer_idx: int
     ) -> torch.Tensor:
-        """Compute LSH matches using random signed projections.
+        """Compute LSH matches using bit-packed random signed projections.
 
         Args:
             keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
             queries: Query tensor with shape (batch_size, num_heads, seq_len_queries, head_dim).
+            sparse_meta_data: Dictionary containing sparse attention metadata.
+            layer_idx: Current layer index for caching projections and metadata.
 
         Returns:
             Binary matches tensor with shape (batch_size, num_heads, seq_len_queries, seq_len_keys).
         """
+        # Apply centering if enabled
+        keys_centered, queries_centered = self._center_KQ(keys, queries, sparse_meta_data, layer_idx)
+
         # Transform for MIPS
         keys_transformed: torch.Tensor
         queries_transformed: torch.Tensor
-        keys_transformed, queries_transformed = self._transform_for_mips(keys, queries)
+        keys_transformed, queries_transformed = self._transform_for_mips(keys_centered, queries_centered)
 
         batch_size: int = keys.shape[0]
         num_heads: int = keys.shape[1]
@@ -306,6 +373,8 @@ class MagicPig(SamplingMasker):
             - Similar key-query pairs have higher probability of being attended to
             - The resulting mask is merged with the previous mask using the merge_mask method
         """
+        layer_idx: int = self._validate_inputs(sparse_meta_data, kwargs)
+
         if previous_mask.is_full_mask():
             return previous_mask
 
@@ -317,8 +386,8 @@ class MagicPig(SamplingMasker):
         ngroups = _get_num_key_value_groups(queries, keys)
         keys = repeat_kv(keys, ngroups)
 
-        probabilities: torch.Tensor = self._compute_probabilities(keys, queries)
-        matches: torch.Tensor = self._compute_lsh_matches(keys, queries)
+        probabilities: torch.Tensor = self._compute_probabilities(keys, queries, sparse_meta_data, layer_idx)
+        matches: torch.Tensor = self._compute_lsh_matches(keys, queries, sparse_meta_data, layer_idx)
         dense_mask: torch.Tensor = matches * probabilities
 
         mask_shape: Tuple[int, int, int, int] = (
@@ -332,6 +401,21 @@ class MagicPig(SamplingMasker):
         )
 
         return previous_mask.merge_mask(this_mask, inplace=False)
+
+    def _validate_inputs(
+        self,
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
+        kwargs: Dict[str, Any],
+    ) -> int:
+        """Validate required inputs for hash attention computation and return layer_idx."""
+        if sparse_meta_data is None:
+            raise ValueError("sparse_meta_data cannot be None")
+
+        layer_idx: Optional[int] = kwargs.get("layer_idx")
+        if layer_idx is None:
+            raise ValueError("layer_idx must be provided in kwargs")
+
+        return layer_idx
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "MagicPig":

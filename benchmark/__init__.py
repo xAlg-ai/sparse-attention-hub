@@ -22,6 +22,7 @@ from .benchmark_registry import (
 # Import concrete benchmark implementations
 from .longbench import LongBench
 from .mock_benchmark import MockBenchmark
+from .loogle import Loogle
 
 # Import all benchmark submodules to make them available for import
 from . import AIME2024
@@ -45,6 +46,7 @@ __all__ = [
     "get_benchmark_subsets",
     "LongBench",
     "MockBenchmark",
+    "Loogle",
     "AIME2024",
     "AIME2025", 
     "infinite_bench",
