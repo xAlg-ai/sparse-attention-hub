@@ -122,7 +122,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     benchmark = Loogle(["shortdep_qa"])
-    base_result_dir = Path("./test_magicpig_projection_cache")
+    base_result_dir = Path("./test_magicpig_signatures")
     base_result_dir.mkdir(exist_ok=True)
     request_kwargs = {"max_requests": 2, "max_context_length": 16000}
 
