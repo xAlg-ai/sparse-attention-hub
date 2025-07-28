@@ -48,6 +48,8 @@ dependencies = [
     "psutil>=7.0.0",
     "plotly>=6.2.0",
     "pandas>=2.3.1",
+    "pynvml>=12.0.0",
+    "colorama>=0.4.6",
 ]
 
 [project.optional-dependencies]
