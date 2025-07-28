@@ -122,17 +122,13 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     benchmark = Loogle(["shortdep_qa"])
-    base_result_dir = Path("./test_magicpig")
+    base_result_dir = Path("./test_magicpig_projection_cache")
     base_result_dir.mkdir(exist_ok=True)
     request_kwargs = {"max_requests": 2, "max_context_length": 16000}
 
     # ## DEFINE YOUR PARAMETER SWEEP HERE ##
     # Simply add or remove dictionaries to test different combinations.
     param_grid = [
-        {'l': 32, 'k': 2, 'center': True},
-        {'l': 32, 'k': 2, 'center': False},
-        {'l': 96, 'k': 2, 'center': True},
-        {'l': 96, 'k': 2, 'center': False},
         {'l': 32, 'k': 4, 'center': True},
         {'l': 32, 'k': 4, 'center': False},
         {'l': 96, 'k': 4, 'center': True},
@@ -141,10 +137,6 @@ def main():
         {'l': 32, 'k': 8, 'center': False},
         {'l': 96, 'k': 8, 'center': True},
         {'l': 96, 'k': 8, 'center': False},
-        {'l': 32, 'k': 16, 'center': True},
-        {'l': 32, 'k': 16, 'center': False},
-        {'l': 96, 'k': 16, 'center': True},
-        {'l': 96, 'k': 16, 'center': False},
     ]
 
     # Generate configurations dynamically from the parameter grid

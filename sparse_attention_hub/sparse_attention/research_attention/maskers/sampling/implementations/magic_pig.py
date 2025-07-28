@@ -144,6 +144,25 @@ class MagicPig(SamplingMasker):
         if layer_idx not in sparse_meta_data["key_mean"]:
             sparse_meta_data["key_mean"][layer_idx] = None
 
+    def _initialize_projection_cache(
+            self,
+            sparse_meta_data: Dict[Any, Any],
+            layer_idx: int,
+    ) -> None:
+        """Initialize the projection cache for LSH matches.
+
+        This method checks if the projection cache exists in the sparse_meta_data.
+        If not, it initializes it with zeros.
+
+        Args:
+            sparse_meta_data: Metadata dictionary containing additional information.
+            layer_idx: Index of the layer for which the cache is initialized.
+        """
+        if "projections" not in sparse_meta_data:
+            sparse_meta_data["projections"] = {}
+        if layer_idx not in sparse_meta_data["projections"]:
+            sparse_meta_data["projections"][layer_idx] = None
+
     def _transform_for_mips(
         self, keys: torch.Tensor, queries: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -249,6 +268,9 @@ class MagicPig(SamplingMasker):
         Returns:
             Binary matches tensor with shape (batch_size, num_heads, seq_len_queries, seq_len_keys).
         """
+        self._initialize_projection_cache(sparse_meta_data, layer_idx)
+        self._initialize_key_signature_cache(sparse_meta_data, layer_idx)
+
         # Apply centering if enabled
         keys_centered, queries_centered = self._center_KQ(keys, queries, sparse_meta_data, layer_idx)
 
@@ -265,12 +287,15 @@ class MagicPig(SamplingMasker):
 
         # Generate random projection matrix
         total_bits: int = self.lsh_k * self.lsh_l
-        projection: torch.Tensor = torch.randn(
-            head_dim, total_bits, device=keys.device, dtype=keys.dtype
-        )
+
+        # get cached projection if available
+        if sparse_meta_data["projections"][layer_idx] is None:
+            sparse_meta_data["projections"][layer_idx] = torch.randn(
+                head_dim, total_bits, device=keys.device, dtype=keys.dtype
+            )
+        projection: torch.Tensor = sparse_meta_data["projections"][layer_idx]
 
         # Compute signatures
-        # Reshape for batch processing
         keys_flat: torch.Tensor = keys_transformed.view(
             -1, head_dim
         )  # (batch*heads*seq_len_keys, head_dim)
