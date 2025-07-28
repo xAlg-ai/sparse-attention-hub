@@ -108,11 +108,11 @@ def generate_magicpig_configs(param_grid, sink_size=8):
     """
     configs = []
     for params in param_grid:
-        l, k, center = params['l'], params['k'], params['center']
-        name = f"sink{sink_size}_L{l}_K{k}_center_{center}"
+        l, k, packing = params['l'], params['k'], params['packing']
+        name = f"sink{sink_size}_L{l}_K{k}_packing_{packing}"
         config_obj = ResearchAttentionConfig(masker_configs=[
             SinkMaskerConfig(sink_size=sink_size),
-            MagicPigConfig(lsh_l=l, lsh_k=k, center=center)
+            MagicPigConfig(lsh_l=l, lsh_k=k, packing=packing)
         ])
         configs.append({"name": name, "config": config_obj})
     return configs
@@ -122,21 +122,21 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     benchmark = Loogle(["shortdep_qa"])
-    base_result_dir = Path("./test_magicpig_signatures")
+    base_result_dir = Path("./test_magicpig_packing")
     base_result_dir.mkdir(exist_ok=True)
     request_kwargs = {"max_requests": 2, "max_context_length": 16000}
 
     # ## DEFINE YOUR PARAMETER SWEEP HERE ##
     # Simply add or remove dictionaries to test different combinations.
     param_grid = [
-        {'l': 32, 'k': 4, 'center': True},
-        {'l': 32, 'k': 4, 'center': False},
-        {'l': 96, 'k': 4, 'center': True},
-        {'l': 96, 'k': 4, 'center': False},
-        {'l': 32, 'k': 8, 'center': True},
-        {'l': 32, 'k': 8, 'center': False},
-        {'l': 96, 'k': 8, 'center': True},
-        {'l': 96, 'k': 8, 'center': False},
+        {'l': 32, 'k': 4, "packing": "int64"},
+        {'l': 32, 'k': 4, "packing": "float32"},
+        {'l': 96, 'k': 4, "packing": "int64"},
+        {'l': 96, 'k': 4, "packing": "float32"},
+        {'l': 32, 'k': 8, "packing": "int64"},
+        {'l': 32, 'k': 8, "packing": "float32"},
+        {'l': 96, 'k': 8, "packing": "int64"},
+        {'l': 96, 'k': 8, "packing": "float32"},
     ]
 
     # Generate configurations dynamically from the parameter grid
