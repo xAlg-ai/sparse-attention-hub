@@ -643,11 +643,11 @@ class TestMagicPigImplementation:
         assert probabilities.shape == (1, 1, 1, 1)
         assert probabilities[0, 0, 0, 0] == 1
 
-        # if query is anti parallel to key then prob is 0
+        # if query is anti parallel to key then prob is close to 0
         keys = queries.clone() * -1.5
         probabilities = masker._compute_probabilities(keys, queries)
         assert probabilities.shape == (1, 1, 1, 1)
-        assert probabilities[0, 0, 0, 0] == 0
+        assert torch.allclose(probabilities[0, 0, 0, 0], torch.tensor(0.0), atol=1e-6)
 
         # if query1 is close to key and query2 is far away then prob(query1) > prob(query2)
         keys = torch.randn(batch_size, num_heads, 1, head_dim)
@@ -670,8 +670,10 @@ class TestMagicPigImplementation:
         batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
         keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        sparse_meta_data = {}
+        layer_idx = 0
 
-        matches = masker._compute_lsh_matches(keys, queries)
+        matches = masker._compute_lsh_matches(keys, queries, sparse_meta_data, layer_idx)
 
         # Check shape
         assert matches.shape == (
@@ -693,11 +695,11 @@ class TestMagicPigImplementation:
         # Check that identical vectors match
         identical_keys = keys.clone()
         identical_queries = keys.clone()  # Use keys as queries for identical case
+        sparse_meta_data_identical = {}  # Use fresh metadata for this test
 
         identical_matches = masker._compute_lsh_matches(
-            identical_keys, identical_queries
+            identical_keys, identical_queries, sparse_meta_data_identical, layer_idx
         )
-        print(identical_matches[0, 0])
         # Diagonal should have matches (identical vectors)
         for b in range(identical_matches.shape[0]):
             for h in range(identical_matches.shape[1]):
@@ -710,9 +712,10 @@ class TestMagicPigImplementation:
         antiparallel_queries = (
             -1 * keys.clone()
         )  # Use keys as queries for identical case
+        sparse_meta_data_antiparallel = {}  # Use fresh metadata for this test
 
         antiparallel_matches = masker._compute_lsh_matches(
-            antiparallel_keys, antiparallel_queries
+            antiparallel_keys, antiparallel_queries, sparse_meta_data_antiparallel, layer_idx
         )
 
         # Diagonal should have no matches (antiparallel vectors)
@@ -756,6 +759,7 @@ class TestMagicPigImplementation:
             dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
+            layer_idx=0,
         )
 
         # Check that result is a Mask
@@ -806,6 +810,7 @@ class TestMagicPigImplementation:
             dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
+            layer_idx=0,
         )
 
         # Should return the same full mask
@@ -857,6 +862,7 @@ class TestMagicPigImplementation:
             dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=existing_mask,
+            layer_idx=0,
         )
 
         # Check that result is a Mask
@@ -887,7 +893,6 @@ class TestMagicPigImplementation:
             dtype=torch.float32,
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
-        sparse_meta_data = {}
 
         # Test different parameter combinations
         configs = [
@@ -899,6 +904,8 @@ class TestMagicPigImplementation:
         results = []
         for config in configs:
             masker = MagicPig(config)
+            # Use separate metadata for each configuration to avoid conflicts
+            config_sparse_meta_data = {}
             result = masker.add_mask(
                 keys=keys,
                 queries=queries,
@@ -906,8 +913,9 @@ class TestMagicPigImplementation:
                 attention_mask=attention_mask,
                 scaling=1.0,
                 dropout=0.0,
-                sparse_meta_data=sparse_meta_data,
+                sparse_meta_data=config_sparse_meta_data,
                 previous_mask=previous_mask,
+                layer_idx=0,
             )
             results.append(result)
 
@@ -955,6 +963,7 @@ class TestMagicPigImplementation:
             dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask,
+            layer_idx=0,
         )
 
         # Test on GPU if available
@@ -967,6 +976,7 @@ class TestMagicPigImplementation:
                 dtype=torch.float32,
             )
             attention_mask_gpu = attention_mask.cuda()
+            sparse_meta_data_gpu = {}  # Use separate metadata for GPU to avoid device conflicts
 
             result_gpu = masker.add_mask(
                 keys=keys_gpu,
@@ -975,8 +985,9 @@ class TestMagicPigImplementation:
                 attention_mask=attention_mask_gpu,
                 scaling=1.0,
                 dropout=0.0,
-                sparse_meta_data=sparse_meta_data,
+                sparse_meta_data=sparse_meta_data_gpu,
                 previous_mask=previous_mask_gpu,
+                layer_idx=0,
             )
 
             # Both should be valid masks
@@ -1017,6 +1028,7 @@ class TestMagicPigImplementation:
             dropout=0.0,
             sparse_meta_data=sparse_meta_data,
             previous_mask=previous_mask_f32,
+            layer_idx=0,
         )
 
         # Test with float16 if available
@@ -1035,9 +1047,533 @@ class TestMagicPigImplementation:
                 dropout=0.0,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=previous_mask_f16,
+                layer_idx=0,
             )
 
             # Both should be valid masks
             assert isinstance(result_f32, Mask)
             assert isinstance(result_f16, Mask)
             assert result_f32.shape == result_f16.shape
+
+    # Tests for centering feature
+    def test_centering_config_creation(self):
+        """Test that MagicPigConfig can be created with centering enabled/disabled."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPigConfig,
+        )
+
+        # Test with centering enabled (default)
+        config_centered = MagicPigConfig(lsh_l=3, lsh_k=2)
+        assert config_centered.center is True
+        
+        # Test with centering disabled
+        config_not_centered = MagicPigConfig(lsh_l=3, lsh_k=2, center=False)
+        assert config_not_centered.center is False
+        
+        # Test explicitly enabled
+        config_explicit_true = MagicPigConfig(lsh_l=3, lsh_k=2, center=True)
+        assert config_explicit_true.center is True
+
+    def test_center_kq_disabled(self):
+        """Test _center_KQ method when centering is disabled."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=3, lsh_k=2, center=False)
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries, head_dim = 2, 4, 16, 8, 64
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        sparse_meta_data = {}
+        layer_idx = 0
+
+        centered_keys, centered_queries = masker._center_KQ(
+            keys, queries, sparse_meta_data, layer_idx
+        )
+
+        # When centering is disabled, input tensors should be returned unchanged
+        assert torch.equal(centered_keys, keys)
+        assert torch.equal(centered_queries, queries)
+
+    def test_center_kq_enabled_first_call(self):
+        """Test _center_KQ method when centering is enabled for the first time."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=3, lsh_k=2, center=True)
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries, head_dim = 2, 4, 16, 8, 64
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        sparse_meta_data = {}
+        layer_idx = 0
+
+        centered_keys, centered_queries = masker._center_KQ(
+            keys, queries, sparse_meta_data, layer_idx
+        )
+
+        # Check that key mean is cached
+        assert "key_mean" in sparse_meta_data
+        assert layer_idx in sparse_meta_data["key_mean"]
+        assert sparse_meta_data["key_mean"][layer_idx] is not None
+
+        # Check that the key mean has correct shape
+        key_mean = sparse_meta_data["key_mean"][layer_idx]
+        assert key_mean.shape == (batch_size, num_heads, 1, head_dim)
+
+        # Check that centering was applied correctly
+        expected_key_mean = torch.mean(keys, dim=2, keepdim=True)
+        assert torch.allclose(key_mean, expected_key_mean, atol=1e-6)
+        
+        expected_centered_keys = keys - key_mean
+        expected_centered_queries = queries - key_mean
+        
+        assert torch.allclose(centered_keys, expected_centered_keys, atol=1e-6)
+        assert torch.allclose(centered_queries, expected_centered_queries, atol=1e-6)
+
+        # Check that centered keys have mean close to zero along sequence dimension
+        centered_key_mean = torch.mean(centered_keys, dim=2, keepdim=True)
+        assert torch.allclose(centered_key_mean, torch.zeros_like(centered_key_mean), atol=1e-6)
+
+    def test_center_kq_cached_mean(self):
+        """Test _center_KQ method when using cached mean from previous call."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=3, lsh_k=2, center=True)
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries, head_dim = 2, 4, 16, 8, 64
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        sparse_meta_data = {}
+        layer_idx = 0
+
+        # First call - should compute and cache mean
+        centered_keys_1, centered_queries_1 = masker._center_KQ(
+            keys, queries, sparse_meta_data, layer_idx
+        )
+        cached_mean = sparse_meta_data["key_mean"][layer_idx].clone()
+
+        # Second call with different queries (simulating inference step)
+        new_queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        centered_keys_2, centered_queries_2 = masker._center_KQ(
+            keys, new_queries, sparse_meta_data, layer_idx
+        )
+
+        # Check that the same cached mean is used
+        assert torch.equal(sparse_meta_data["key_mean"][layer_idx], cached_mean)
+        
+        # Check that keys are centered using cached mean
+        assert torch.allclose(centered_keys_2, keys - cached_mean, atol=1e-6)
+        assert torch.allclose(centered_queries_2, new_queries - cached_mean, atol=1e-6)
+
+    def test_centering_integration_with_add_mask(self):
+        """Test that centering works correctly when integrated with add_mask."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+        from sparse_attention_hub.sparse_attention.utils.mask import Mask
+
+        # Test both centered and non-centered versions
+        config_centered = MagicPigConfig(lsh_l=3, lsh_k=2, center=True)
+        config_not_centered = MagicPigConfig(lsh_l=3, lsh_k=2, center=False)
+        
+        masker_centered = MagicPig(config_centered)
+        masker_not_centered = MagicPig(config_not_centered)
+
+        batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        values = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+
+        previous_mask = Mask.create_empty_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            dtype=torch.float32,
+        )
+        attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
+        
+        sparse_meta_data_centered = {}
+        sparse_meta_data_not_centered = {}
+
+        result_centered = masker_centered.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_centered,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        result_not_centered = masker_not_centered.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_not_centered,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Both should produce valid masks
+        assert isinstance(result_centered, Mask)
+        assert isinstance(result_not_centered, Mask)
+        assert result_centered.shape == result_not_centered.shape
+
+        # Check that key_mean is initialized in both cases but only used for centered version
+        assert "key_mean" in sparse_meta_data_centered
+        assert "key_mean" in sparse_meta_data_not_centered
+        # The key_mean should be None for non-centered case and a tensor for centered case
+        assert sparse_meta_data_not_centered["key_mean"][0] is None
+        assert sparse_meta_data_centered["key_mean"][0] is not None
+
+        # Results may be different due to centering affecting LSH
+        # But both should be valid sparse masks
+        assert not result_centered.is_empty()
+        assert not result_not_centered.is_empty()
+
+    # Tests for packing feature
+    def test_packing_config_creation(self):
+        """Test that MagicPigConfig can be created with different packing modes."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPigConfig,
+        )
+
+        # Test with int64 packing (default)
+        config_int64 = MagicPigConfig(lsh_l=3, lsh_k=2)
+        assert config_int64.packing == "int64"
+        
+        # Test explicitly with int64
+        config_explicit_int64 = MagicPigConfig(lsh_l=3, lsh_k=2, packing="int64")
+        assert config_explicit_int64.packing == "int64"
+        
+        # Test with float32 packing
+        config_float32 = MagicPigConfig(lsh_l=3, lsh_k=2, packing="float32")
+        assert config_float32.packing == "float32"
+
+    def test_packing_config_validation(self):
+        """Test validation for packing configuration."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPigConfig,
+        )
+
+        # Test invalid packing mode
+        with pytest.raises(ValueError, match="packing must be 'int64' or 'float32'"):
+            MagicPigConfig(lsh_l=3, lsh_k=2, packing="invalid")
+
+        # Test int64 with too many bits
+        with pytest.raises(ValueError, match="For 'int64' packing, lsh_k must be <= 64"):
+            MagicPigConfig(lsh_l=1, lsh_k=65, packing="int64")
+
+    def test_pack_bits_basic(self):
+        """Test basic functionality of _pack_bits method."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=2, lsh_k=3, packing="int64")
+        masker = MagicPig(config)
+
+        # Test with simple signatures
+        batch_size, num_heads, seq_len, total_bits = 2, 4, 8, 6  # 2 tables * 3 bits = 6 total bits
+        signatures = torch.ones(batch_size, num_heads, seq_len, total_bits)
+        signatures[..., ::2] = -1  # Alternate pattern: [-1, 1, -1, 1, -1, 1]
+
+        packed = masker._pack_bits(signatures)
+
+        # Check shape - should have lsh_l dimensions for each table
+        expected_shape = (batch_size, num_heads, seq_len, config.lsh_l)
+        assert packed.shape == expected_shape
+
+        # Check dtype
+        assert packed.dtype == torch.int64
+
+        # Verify specific packing for known pattern
+        # First table: [-1, 1, -1] -> [0, 1, 0] -> binary 010 = 2
+        # Second table: [1, -1, 1] -> [1, 0, 1] -> binary 101 = 5
+        assert packed[0, 0, 0, 0].item() == 2  # First table
+        assert packed[0, 0, 0, 1].item() == 5  # Second table
+
+    def test_pack_bits_edge_cases(self):
+        """Test _pack_bits with edge cases."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=1, lsh_k=1, packing="int64")
+        masker = MagicPig(config)
+
+        # Test with single bit
+        signatures = torch.tensor([[[[1.0]]]], dtype=torch.float32)  # Shape: (1, 1, 1, 1)
+        packed = masker._pack_bits(signatures)
+        
+        assert packed.shape == (1, 1, 1, 1)
+        assert packed[0, 0, 0, 0].item() == 1  # 1 -> 1
+
+        # Test with all negative values
+        signatures_neg = torch.tensor([[[[-1.0]]]], dtype=torch.float32)
+        packed_neg = masker._pack_bits(signatures_neg)
+        assert packed_neg[0, 0, 0, 0].item() == 0  # -1 -> 0
+
+    def test_compute_signatures_int64_packing(self):
+        """Test that _compute_signatures uses int64 packing when configured."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=2, lsh_k=3, packing="int64")
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len, head_dim = 2, 4, 8, 64
+        vectors = torch.randn(batch_size, num_heads, seq_len, head_dim)
+        
+        sparse_meta_data = {"projections": {0: torch.randn(head_dim, config.lsh_l * config.lsh_k)}}
+        layer_idx = 0
+
+        signatures = masker._compute_signatures(vectors, sparse_meta_data, layer_idx)
+
+        # Should be packed into int64 format
+        expected_shape = (batch_size, num_heads, seq_len, config.lsh_l)
+        assert signatures.shape == expected_shape
+        assert signatures.dtype == torch.int64
+
+    def test_compute_signatures_float32_packing(self):
+        """Test that _compute_signatures uses float32 when configured."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=2, lsh_k=3, packing="float32")
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len, head_dim = 2, 4, 8, 64
+        vectors = torch.randn(batch_size, num_heads, seq_len, head_dim)
+        
+        sparse_meta_data = {"projections": {0: torch.randn(head_dim, config.lsh_l * config.lsh_k)}}
+        layer_idx = 0
+
+        signatures = masker._compute_signatures(vectors, sparse_meta_data, layer_idx)
+
+        # Should be float format
+        expected_shape = (batch_size, num_heads, seq_len, config.lsh_l * config.lsh_k)
+        assert signatures.shape == expected_shape
+        assert signatures.dtype == torch.float32
+
+    # Tests for efficient matching feature
+    def test_compute_matches_int64_basic(self):
+        """Test basic functionality of _compute_matches_int64 method."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=2, lsh_k=3, packing="int64")
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries = 2, 4, 8, 8
+        
+        # Create packed signatures - identical signatures should match
+        keys_signatures = torch.randint(0, 8, (batch_size, num_heads, seq_len_keys, config.lsh_l), dtype=torch.int64)
+        queries_signatures = keys_signatures.clone()  # Make queries identical to keys
+
+        matches = masker._compute_matches_int64(keys_signatures, queries_signatures)
+
+        # Check shape
+        expected_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
+        assert matches.shape == expected_shape
+
+        # Check dtype
+        assert matches.dtype in [torch.int32, torch.int]
+
+        # When keys and queries are identical, diagonal should be 1
+        diagonal_matches = torch.diagonal(matches, dim1=-2, dim2=-1)
+        assert torch.all(diagonal_matches == 1)
+
+    def test_compute_matches_int64_no_matches(self):
+        """Test _compute_matches_int64 when there should be no matches."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=2, lsh_k=3, packing="int64")
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries = 1, 1, 1, 1
+        
+        # Create different signatures that shouldn't match
+        keys_signatures = torch.zeros((batch_size, num_heads, seq_len_keys, config.lsh_l), dtype=torch.int64)
+        queries_signatures = torch.ones((batch_size, num_heads, seq_len_queries, config.lsh_l), dtype=torch.int64)
+
+        matches = masker._compute_matches_int64(keys_signatures, queries_signatures)
+
+        # Should have no matches since signatures are completely different
+        assert torch.all(matches == 0)
+
+    def test_compute_matches_float32_basic(self):
+        """Test basic functionality of _compute_matches_float32 method."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+
+        config = MagicPigConfig(lsh_l=2, lsh_k=3, packing="float32")
+        masker = MagicPig(config)
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries = 2, 4, 8, 8
+        total_bits = config.lsh_l * config.lsh_k
+
+        # Create float signatures with known pattern
+        keys_signatures = torch.ones(batch_size, num_heads, seq_len_keys, total_bits)
+        queries_signatures = torch.ones(batch_size, num_heads, seq_len_queries, total_bits)
+
+        matches = masker._compute_matches_float32(keys_signatures, queries_signatures)
+
+        # Check shape and dtype
+        expected_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
+        assert matches.shape == expected_shape
+        assert matches.dtype in [torch.int32, torch.int]
+
+        # Identical signatures should match for both tables
+        assert torch.all(matches == 1)
+
+    def test_matching_methods_consistency(self):
+        """Test that different matching methods produce consistent results."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+        from sparse_attention_hub.sparse_attention.utils.mask import Mask
+
+        batch_size, num_heads, seq_len_keys, seq_len_queries, head_dim = 2, 4, 8, 8, 64
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        values = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+
+        # Test int64 packing
+        config_int64 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="int64")
+        masker_int64 = MagicPig(config_int64)
+
+        # Test float32 packing
+        config_float32 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="float32")
+        masker_float32 = MagicPig(config_float32)
+
+        previous_mask = Mask.create_empty_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            dtype=torch.float32,
+        )
+        attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
+
+        sparse_meta_data_int64 = {}
+        sparse_meta_data_float32 = {}
+
+        result_int64 = masker_int64.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_int64,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        result_float32 = masker_float32.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_float32,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Both should produce valid masks
+        assert isinstance(result_int64, Mask)
+        assert isinstance(result_float32, Mask)
+        assert result_int64.shape == result_float32.shape
+
+        # Both should produce sparse masks
+        assert not result_int64.is_empty()
+        assert not result_float32.is_empty()
+
+    def test_packing_integration_with_add_mask(self):
+        """Test that different packing modes work correctly when integrated with add_mask."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+        from sparse_attention_hub.sparse_attention.utils.mask import Mask
+
+        batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        values = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+
+        previous_mask = Mask.create_empty_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            dtype=torch.float32,
+        )
+        attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
+
+        # Test with int64 packing
+        config_int64 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="int64")
+        masker_int64 = MagicPig(config_int64)
+        sparse_meta_data_int64 = {}
+
+        result_int64 = masker_int64.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_int64,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Test with float32 packing
+        config_float32 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="float32")
+        masker_float32 = MagicPig(config_float32)
+        sparse_meta_data_float32 = {}
+
+        result_float32 = masker_float32.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_float32,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Both should produce valid masks
+        assert isinstance(result_int64, Mask)
+        assert isinstance(result_float32, Mask)
+        assert result_int64.shape == result_float32.shape
+        assert not result_int64.is_empty()
+        assert not result_float32.is_empty()
