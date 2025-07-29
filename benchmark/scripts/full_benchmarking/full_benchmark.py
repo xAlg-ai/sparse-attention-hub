@@ -14,9 +14,11 @@ import sys
 import torch
 from pathlib import Path
 
+MACHINE_KEY= "apd10/code"
+
 # Add the project root to the path
-os.chdir("/home/apd10/code/sparse-attention-hub/")
-sys.path.insert(0, "/home/apd10/code/sparse-attention-hub/")
+os.chdir("/home/" + MACHINE_KEY + "/sparse-attention-hub/")
+sys.path.insert(0, "/home/" + MACHINE_KEY + "/sparse-attention-hub/")
 
 from benchmark.executor import BenchmarkExecutor
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
@@ -36,7 +38,6 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
 GPUS = [0]  # Use all available GPUs
 MAX_CONCURRENT_RUNS = 1  # One per GPU
 
-INTENDED_SPARSITY = 0.1
 
 # Model List
 MODELS = [
@@ -61,94 +62,159 @@ def get_hashattention_config_name(sink_size, window_size, top_k):
 def get_random_sampling_config_name(sink_size, window_size, sampling_rate):
     return f"random_sampling.sink_{sink_size}_window_{window_size}_sampling_rate_{sampling_rate}"
 
-# Sparse Attention Configurations
-SPARSE_CONFIGS = []
-# adaptive sampling + oracle top k + sink + window
-for (epsilon, delta) in [(0.01, 0.01), (0.05, 0.05), (0.1, 0.1), (0.25, 0.25), (0.3, 0.3), (0.4, 0.4), (0.5, 0.5)]:
-    for (sink_size, window_size) in [(0.001, 0.001), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02)]:
-        for heavy_size in [0.005, 0.01, 0.02, 0.05]:
-            for base_rate_sampling in [0.01, 0.05, 0.1]:
-                SPARSE_CONFIGS.append((get_adaptive_config_name(sink_size, window_size, heavy_size, base_rate_sampling, epsilon, delta), ResearchAttentionConfig(masker_configs=[
-                    SinkMaskerConfig(sink_size=sink_size),
-                    LocalMaskerConfig(window_size=window_size),
-                    OracleTopKConfig(heavy_size=heavy_size),
-                    AdaptiveSamplingMaskerConfig(base_rate_sampling=base_rate_sampling, epsilon=epsilon, delta=delta, init_offset=sink_size, local_offset=window_size)
-                ])))
-
-# oracle top p + sink + window
-for (sink_size, window_size) in [(0.001, 0.001), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02)]:
-    for top_p in [0.5, 0.75, 0.9, 0.95, 0.99]:
-        SPARSE_CONFIGS.append((get_oracle_top_p_config_name(sink_size, window_size, top_p), ResearchAttentionConfig(masker_configs=[
-            SinkMaskerConfig(sink_size=sink_size),
-            LocalMaskerConfig(window_size=window_size),
-            OracleTopPMaskerConfig(top_p=top_p)
-        ])))
-
-# oracle top p + sink + window
-for (sink_size, window_size) in [(0.001, 0.001), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02)]:
-    for top_k in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-        SPARSE_CONFIGS.append((get_oracle_top_k_config_name(sink_size, window_size, top_k), ResearchAttentionConfig(masker_configs=[
-            SinkMaskerConfig(sink_size=sink_size),
-            LocalMaskerConfig(window_size=window_size),
-            OracleTopKConfig(heavy_size=top_k)
-        ])))
-
+# HashAttention weights
 # usa_weight_file = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.pt"
-weight_file = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
-
+weight_file = "/home/" + MACHINE_KEY + "/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
 # from sparse_attention_hub.sparse_attention.utils.hashattention_utils import create_hat_weights_file_from_usa
 #create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
 
 
-# weight_dictionary = convert_usa_weights_to_hash_attention(weight_file, num_layers=32, num_heads=32, device="cpu")
+################################### BENCHMARK CONFIGS #####################################################
+#
+#
+##########################################################################################################
 
-# hashattention + sink + window
-for (sink_size, window_size) in [(0.001, 0.001), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02)]:
-    for top_k in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.25, 0.3, 0.4, 0.5]:
-        SPARSE_CONFIGS.append((get_hashattention_config_name(sink_size, window_size, top_k), ResearchAttentionConfig(masker_configs=[
-            SinkMaskerConfig(sink_size=sink_size),
-            LocalMaskerConfig(window_size=window_size),
-            HashAttentionTopKMaskerConfig(heavy_size=top_k, 
-                                        hat_bits=32, 
-                                        hat_mlp_layers=3, 
-                                        hat_mlp_hidden_size=128, 
-                                        hat_mlp_activation="silu",
-                                        hat_weight_file=weight_file,
-                                        hat_weights=None),
-        ])))
+# Sparse Attention Configurations
+SPARSE_CONFIGS = []
+# dense 
+SPARSE_CONFIGS.append(("dense", None))
+# ==================== 5 % configs =================
+
+# random sampling 5 %
+SPARSE_CONFIGS.append((get_random_sampling_config_name(0.02, 0.02, 0.01), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.02),
+    LocalMaskerConfig(window_size=0.02),
+    RandomSamplingMaskerConfig(sampling_rate=0.01)
+])))
+#adaptive sampling with oracle top k 5 %
+SPARSE_CONFIGS.append((get_adaptive_config_name(0.001, 0.001, 0.02, 0.01, 0.1, 0.1), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    OracleTopKConfig(heavy_size=0.02),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.01, epsilon=0.1, delta=0.1, init_offset=0.001, local_offset=0.001)
+])))
+# adative sampling with hat top k 5 %
+SPARSE_CONFIGS.append((get_adaptive_hat_config_name(0.01, 0.01, 0.02, 0.01, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.01),
+    LocalMaskerConfig(window_size=0.01),
+    HashAttentionTopKMaskerConfig(heavy_size=0.02, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.01, epsilon=0.25, delta=0.25, init_offset=0.001, local_offset=0.001)
+])))
+# hat top k 5 %
+SPARSE_CONFIGS.append((get_hashattention_config_name(0.005, 0.005, 0.04), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.005),
+    LocalMaskerConfig(window_size=0.005),
+    HashAttentionTopKMaskerConfig(heavy_size=0.04, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+])))
+
+# oracle top p 5 %
+SPARSE_CONFIGS.append((get_oracle_top_p_config_name(0.001, 0.001, 0.75), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    OracleTopPMaskerConfig(top_p=0.75)
+])))
+
+# oracle top k 5 %
+SPARSE_CONFIGS.append((get_oracle_top_k_config_name(0.005, 0.005, 0.04), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.005),
+    LocalMaskerConfig(window_size=0.005),
+    OracleTopKConfig(heavy_size=0.04)
+])))
+
+# ==================== 10 % configs =================
 
 
-# adaptive sampling + hat top k + sink + window
-for (epsilon, delta) in [(0.01, 0.01), (0.05, 0.05), (0.1, 0.1), (0.25, 0.25), (0.3, 0.3), (0.4, 0.4), (0.5, 0.5)]:
-    for (sink_size, window_size) in [(0.001, 0.001), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02)]:
-        for heavy_size in [0.005, 0.01, 0.02, 0.05, 0.1]:
-            for base_rate_sampling in [0.01, 0.05, 0.1]:
-                SPARSE_CONFIGS.append((get_adaptive_hat_config_name(sink_size, window_size, heavy_size, base_rate_sampling, epsilon, delta), ResearchAttentionConfig(masker_configs=[
-                    SinkMaskerConfig(sink_size=sink_size),
-                    LocalMaskerConfig(window_size=window_size),
-                    HashAttentionTopKMaskerConfig(heavy_size=heavy_size, 
-                                        hat_bits=32, 
-                                        hat_mlp_layers=3, 
-                                        hat_mlp_hidden_size=128, 
-                                        hat_mlp_activation="silu",
-                                        hat_weight_file=weight_file,
-                                        hat_weights=None),
-                    AdaptiveSamplingMaskerConfig(base_rate_sampling=base_rate_sampling, epsilon=epsilon, delta=delta, init_offset=sink_size, local_offset=window_size)
-                ])))
+# random sampling 10 %
+SPARSE_CONFIGS.append((get_random_sampling_config_name(0.001, 0.001, 0.1), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    RandomSamplingMaskerConfig(sampling_rate=0.1)
+])))
 
-# random sampling +  sink + window
-for (epsilon, delta) in [(0.01, 0.01), (0.05, 0.05), (0.1, 0.1), (0.25, 0.25), (0.3, 0.3), (0.4, 0.4), (0.5, 0.5)]:
-    for (sink_size, window_size) in [(0.001, 0.001), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02)]:
-        for sampling_rate in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
-                SPARSE_CONFIGS.append((get_random_sampling_config_name(sink_size, window_size, sampling_rate), ResearchAttentionConfig(masker_configs=[
-                    SinkMaskerConfig(sink_size=sink_size),
-                    LocalMaskerConfig(window_size=window_size),
-                    RandomSamplingMaskerConfig(sampling_rate=sampling_rate)
-                ])))
+#adaptive sampling with oracle top k 10 %
+SPARSE_CONFIGS.append((get_adaptive_config_name(0.001, 0.001, 0.05, 0.05, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    OracleTopKConfig(heavy_size=0.05),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=0.001, local_offset=0.001)
+])))
 
+# adative sampling with hat top k 10 %
+SPARSE_CONFIGS.append((get_adaptive_hat_config_name(0.001, 0.001, 0.05, 0.05, 0.4, 0.4), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    HashAttentionTopKMaskerConfig(heavy_size=0.05, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.4, delta=0.4, init_offset=0.001, local_offset=0.001)
+])))
+# hat top k 10 %
+SPARSE_CONFIGS.append((get_hashattention_config_name(0.001, 0.001, 0.09), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    HashAttentionTopKMaskerConfig(heavy_size=0.09, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+])))
 
-# 
-print("total number of configs: ", len(SPARSE_CONFIGS))
+# oracle top p 10 %
+SPARSE_CONFIGS.append((get_oracle_top_p_config_name(0.02, 0.02, 0.8), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.02),
+    LocalMaskerConfig(window_size=0.02),
+    OracleTopPMaskerConfig(top_p=0.8)
+])))
+
+# oracle top k 10 %
+SPARSE_CONFIGS.append((get_oracle_top_k_config_name(0.001, 0.001, 0.04), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.001),
+    LocalMaskerConfig(window_size=0.001),
+    OracleTopKConfig(heavy_size=0.1)
+])))
+
+# ==================== 20 % configs =================
+
+# random sampling 20 %
+SPARSE_CONFIGS.append((get_random_sampling_config_name(0.02, 0.02, 0.2), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.02),
+    LocalMaskerConfig(window_size=0.02),
+    RandomSamplingMaskerConfig(sampling_rate=0.2)
+])))
+
+#adaptive sampling with oracle top k 20 %
+SPARSE_CONFIGS.append((get_adaptive_config_name(0.02, 0.02, 0.05, 0.1, 0.3, 0.3), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.02),
+    LocalMaskerConfig(window_size=0.02),
+    OracleTopKConfig(heavy_size=0.05),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.1, epsilon=0.3, delta=0.3, init_offset=0.02, local_offset=0.02)
+])))
+
+# adative sampling with hat top k 20 %
+SPARSE_CONFIGS.append((get_adaptive_hat_config_name(0.005, 0.005, 0.1, 0.1, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.005),
+    LocalMaskerConfig(window_size=0.005),
+    HashAttentionTopKMaskerConfig(heavy_size=0.1, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.1, epsilon=0.25, delta=0.25, init_offset=0.005, local_offset=0.005)
+])))
+# hat top k 20 %
+SPARSE_CONFIGS.append((get_hashattention_config_name(0.005, 0.005, 0.19), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.005),
+    LocalMaskerConfig(window_size=0.005),
+    HashAttentionTopKMaskerConfig(heavy_size=0.19, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+])))
+
+# oracle top p 20 %
+SPARSE_CONFIGS.append((get_oracle_top_p_config_name(0.01, 0.01, 0.95), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.01),
+    LocalMaskerConfig(window_size=0.01),
+    OracleTopPMaskerConfig(top_p=0.95)
+])))
+
+# oracle top k 20 %
+SPARSE_CONFIGS.append((get_oracle_top_k_config_name(0.005, 0.005, 0.19), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.005),
+    LocalMaskerConfig(window_size=0.005),
+    OracleTopKConfig(heavy_size=0.19)
+])))
+
+SPARSE_CONFIGS = [("dense", None)]
+
+# ==========================================================================
 
 # Benchmark List
 # 1. InfiniteBench - using passkey task
@@ -164,12 +230,13 @@ ruler_config = BenchmarkConfig(
 )
 
 # 3. Loogle - using shortdep_qa task
-loogle_config = BenchmarkConfig(
+loogle_config_1 = BenchmarkConfig(
     benchmark_name="loogle",
-    #subsets=["shortdep_qa"],
-    subsets=["longdep_qa"],
-    #subsets=["shortdep_cloze"],
-    #subsets=["longdep_summarization"], 
+    subsets=["longdep_summarization", "longdep_qa"], 
+)
+loogle_config_2 = BenchmarkConfig(
+    benchmark_name="loogle",
+    subsets=["shortdep_qa", "shortdep_cloze"], 
 )
 
 # 4. ZeroScrolls - using gov_report task
@@ -212,7 +279,8 @@ mock_benchmark_config = BenchmarkConfig(
 BENCHMARKS = [
     #infinite_bench_config,
     #ruler_config,
-    loogle_config,
+    loogle_config_1,
+    loogle_config_2,
     #zero_scrolls_config,
     #longbenchv2_config,
     #aime2024_config,
@@ -236,7 +304,7 @@ ADAPTER_CONFIG = AdapterConfig(
 
 # Generation Parameters
 GENERATION_KWARGS = {
-    "max_new_tokens": 20,
+    "max_new_tokens": 100,
     "do_sample": False,
     "temperature": 1.0,
     "top_p": 1.0,
@@ -246,11 +314,11 @@ GENERATION_KWARGS = {
 # Request Parameters
 REQUEST_KWARGS = {
     "max_context_length": 32000,
-    "max_requests": 1
+    "max_requests": 25,
 }
 
 # Execution Settings
-RESULT_DIR = "./stress_test_adaptive.matrix/"
+RESULT_DIR = "./full_benchmark.matrix/"
 ENABLE_RESUMABILITY = True
 TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
 
