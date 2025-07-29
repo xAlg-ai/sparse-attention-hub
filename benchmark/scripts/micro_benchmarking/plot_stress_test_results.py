@@ -196,7 +196,7 @@ def create_configuration_analysis_plots(df: pd.DataFrame, output_dir: str, datas
         specs=[[{"secondary_y": False}] * len(config_types)]
     )
     
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']  # Blue, Orange, Green, Red, Purple
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']  # Blue, Orange, Green, Red, Purple, Brown
     
     for i, config_type in enumerate(config_types):
         config_data = df[df['config_type'] == config_type]
