@@ -7,7 +7,7 @@ LSH-based similarity matching with probability-based sampling to create sparse a
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple, Optional, Literal
+from typing import Any, Dict, Literal, Optional, Tuple
 
 import torch
 
@@ -56,9 +56,13 @@ class MagicPigConfig(SamplingMaskerConfig):
         if self.lsh_k <= 0:
             raise ValueError(f"lsh_k must be positive, got {self.lsh_k}")
         if self.packing not in ["int64", "float32"]:
-            raise ValueError(f"packing must be 'int64' or 'float32', got {self.packing}")
+            raise ValueError(
+                f"packing must be 'int64' or 'float32', got {self.packing}"
+            )
         if self.packing == "int64" and self.lsh_k > 64:
-            raise ValueError(f"For 'int64' packing, lsh_k must be <= 64, but got {self.lsh_k}")
+            raise ValueError(
+                f"For 'int64' packing, lsh_k must be <= 64, but got {self.lsh_k}"
+            )
         if self.seed is None:
             raise ValueError("seed cannot be None")
 
@@ -105,16 +109,22 @@ class MagicPig(SamplingMasker):
         self.center = config.center
         self.packing = config.packing
         self.seed = config.seed
-    
+
     def _pack_bits(self, signatures: torch.Tensor) -> torch.Tensor:
         """Packs binary signatures into int64 tensors."""
         binary_signatures = (signatures > 0).to(torch.int64)
-        reshaped_signatures = binary_signatures.view(*signatures.shape[:-1], self.lsh_l, self.lsh_k)
-        packer = 2**torch.arange(self.lsh_k, device=signatures.device, dtype=torch.int64)
+        reshaped_signatures = binary_signatures.view(
+            *signatures.shape[:-1], self.lsh_l, self.lsh_k
+        )
+        packer = 2 ** torch.arange(
+            self.lsh_k, device=signatures.device, dtype=torch.int64
+        )
         packed_signatures = (reshaped_signatures * packer).sum(dim=-1)
         return packed_signatures
 
-    def _compute_signatures(self, vectors: torch.Tensor, sparse_meta_data: Dict[Any, Any], layer_idx: int) -> torch.Tensor:
+    def _compute_signatures(
+        self, vectors: torch.Tensor, sparse_meta_data: Dict[Any, Any], layer_idx: int
+    ) -> torch.Tensor:
         """Computes signatures for given vectors, with optional packing."""
         total_bits: int = self.lsh_l * self.lsh_k
         batch_size, num_heads, seq_len, head_dim = vectors.shape
@@ -126,7 +136,7 @@ class MagicPig(SamplingMasker):
         signs = signs.view(batch_size, num_heads, seq_len, total_bits)
 
         # 2. Pack if using int64 method
-        if self.packing == 'int64':
+        if self.packing == "int64":
             return self._pack_bits(signs)
 
         # Otherwise, return signs as floats
@@ -300,9 +310,9 @@ class MagicPig(SamplingMasker):
         )
 
         if new_keys is None:
-            assert cached_signatures is not None, (
-                "cached_signatures should not be None when new_keys is None"
-            )
+            assert (
+                cached_signatures is not None
+            ), "cached_signatures should not be None when new_keys is None"
             return cached_signatures
 
         new_signatures: torch.Tensor = self._compute_signatures(
@@ -363,7 +373,9 @@ class MagicPig(SamplingMasker):
 
         # Normalize the already-transformed vectors
         keys_norm: torch.Tensor = torch.norm(keys_transformed, dim=-1, keepdim=True)
-        queries_norm: torch.Tensor = torch.norm(queries_transformed, dim=-1, keepdim=True)
+        queries_norm: torch.Tensor = torch.norm(
+            queries_transformed, dim=-1, keepdim=True
+        )
 
         keys_normalized: torch.Tensor = keys_transformed / (keys_norm + 1e-8)
         queries_normalized: torch.Tensor = queries_transformed / (queries_norm + 1e-8)
@@ -383,7 +395,9 @@ class MagicPig(SamplingMasker):
 
         return collision_prob
 
-    def _compute_matches_float32(self, keys_signatures: torch.Tensor, queries_signatures: torch.Tensor) -> torch.Tensor:
+    def _compute_matches_float32(
+        self, keys_signatures: torch.Tensor, queries_signatures: torch.Tensor
+    ) -> torch.Tensor:
         """Compute LSH matches using float32 signatures.
 
         Args:
@@ -431,11 +445,13 @@ class MagicPig(SamplingMasker):
 
         return matches
 
-    def _compute_matches_int64(self, keys_signatures: torch.Tensor, queries_signatures: torch.Tensor) -> torch.Tensor:
+    def _compute_matches_int64(
+        self, keys_signatures: torch.Tensor, queries_signatures: torch.Tensor
+    ) -> torch.Tensor:
         """Compute LSH matches using int64 packed signatures."""
         keys_expanded = keys_signatures.unsqueeze(2)
         queries_expanded = queries_signatures.unsqueeze(3)
-        table_matches = (queries_expanded == keys_expanded)
+        table_matches = queries_expanded == keys_expanded
         matches = torch.any(table_matches, dim=-1)
         return matches.int()
 
@@ -453,26 +469,33 @@ class MagicPig(SamplingMasker):
         if sparse_meta_data["projections"][layer_idx] is None:
             head_dim = keys_transformed.shape[-1]
             total_bits = self.lsh_k * self.lsh_l
-            
+
             # Set seed for reproducible projections (seed is guaranteed to be non-None by validation)
             generator = torch.Generator(device=keys_transformed.device)
-            generator.manual_seed(self.seed + layer_idx)  # Include layer_idx for different layers
+            generator.manual_seed(
+                self.seed + layer_idx
+            )  # Include layer_idx for different layers
             sparse_meta_data["projections"][layer_idx] = torch.randn(
-                head_dim, total_bits, device=keys_transformed.device, dtype=keys_transformed.dtype,
-                generator=generator
+                head_dim,
+                total_bits,
+                device=keys_transformed.device,
+                dtype=keys_transformed.dtype,
+                generator=generator,
             )
 
         keys_signatures: torch.Tensor = self._update_key_signatures(
             keys_transformed, sparse_meta_data, layer_idx
         )
-        queries_signatures: torch.Tensor = self._compute_signatures( # Re-using the generic signature computer
-            queries_transformed, sparse_meta_data, layer_idx
+        queries_signatures: torch.Tensor = (
+            self._compute_signatures(  # Re-using the generic signature computer
+                queries_transformed, sparse_meta_data, layer_idx
+            )
         )
 
         # Call the correct matching function based on the config
-        if self.packing == 'int64':
+        if self.packing == "int64":
             matches = self._compute_matches_int64(keys_signatures, queries_signatures)
-        else: # 'float32'
+        else:  # 'float32'
             matches = self._compute_matches_float32(keys_signatures, queries_signatures)
 
         return matches

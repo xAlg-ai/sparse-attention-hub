@@ -673,7 +673,9 @@ class TestMagicPigImplementation:
         sparse_meta_data = {}
         layer_idx = 0
 
-        matches = masker._compute_lsh_matches(keys, queries, sparse_meta_data, layer_idx)
+        matches = masker._compute_lsh_matches(
+            keys, queries, sparse_meta_data, layer_idx
+        )
 
         # Check shape
         assert matches.shape == (
@@ -715,7 +717,10 @@ class TestMagicPigImplementation:
         sparse_meta_data_antiparallel = {}  # Use fresh metadata for this test
 
         antiparallel_matches = masker._compute_lsh_matches(
-            antiparallel_keys, antiparallel_queries, sparse_meta_data_antiparallel, layer_idx
+            antiparallel_keys,
+            antiparallel_queries,
+            sparse_meta_data_antiparallel,
+            layer_idx,
         )
 
         # Diagonal should have no matches (antiparallel vectors)
@@ -976,7 +981,9 @@ class TestMagicPigImplementation:
                 dtype=torch.float32,
             )
             attention_mask_gpu = attention_mask.cuda()
-            sparse_meta_data_gpu = {}  # Use separate metadata for GPU to avoid device conflicts
+            sparse_meta_data_gpu = (
+                {}
+            )  # Use separate metadata for GPU to avoid device conflicts
 
             result_gpu = masker.add_mask(
                 keys=keys_gpu,
@@ -1065,11 +1072,11 @@ class TestMagicPigImplementation:
         # Test with centering enabled (default)
         config_centered = MagicPigConfig(lsh_l=3, lsh_k=2)
         assert config_centered.center is True
-        
+
         # Test with centering disabled
         config_not_centered = MagicPigConfig(lsh_l=3, lsh_k=2, center=False)
         assert config_not_centered.center is False
-        
+
         # Test explicitly enabled
         config_explicit_true = MagicPigConfig(lsh_l=3, lsh_k=2, center=True)
         assert config_explicit_true.center is True
@@ -1130,16 +1137,18 @@ class TestMagicPigImplementation:
         # Check that centering was applied correctly
         expected_key_mean = torch.mean(keys, dim=2, keepdim=True)
         assert torch.allclose(key_mean, expected_key_mean, atol=1e-6)
-        
+
         expected_centered_keys = keys - key_mean
         expected_centered_queries = queries - key_mean
-        
+
         assert torch.allclose(centered_keys, expected_centered_keys, atol=1e-6)
         assert torch.allclose(centered_queries, expected_centered_queries, atol=1e-6)
 
         # Check that centered keys have mean close to zero along sequence dimension
         centered_key_mean = torch.mean(centered_keys, dim=2, keepdim=True)
-        assert torch.allclose(centered_key_mean, torch.zeros_like(centered_key_mean), atol=1e-6)
+        assert torch.allclose(
+            centered_key_mean, torch.zeros_like(centered_key_mean), atol=1e-6
+        )
 
     def test_center_kq_cached_mean(self):
         """Test _center_KQ method when using cached mean from previous call."""
@@ -1171,7 +1180,7 @@ class TestMagicPigImplementation:
 
         # Check that the same cached mean is used
         assert torch.equal(sparse_meta_data["key_mean"][layer_idx], cached_mean)
-        
+
         # Check that keys are centered using cached mean
         assert torch.allclose(centered_keys_2, keys - cached_mean, atol=1e-6)
         assert torch.allclose(centered_queries_2, new_queries - cached_mean, atol=1e-6)
@@ -1187,7 +1196,7 @@ class TestMagicPigImplementation:
         # Test both centered and non-centered versions
         config_centered = MagicPigConfig(lsh_l=3, lsh_k=2, center=True)
         config_not_centered = MagicPigConfig(lsh_l=3, lsh_k=2, center=False)
-        
+
         masker_centered = MagicPig(config_centered)
         masker_not_centered = MagicPig(config_not_centered)
 
@@ -1201,7 +1210,7 @@ class TestMagicPigImplementation:
             dtype=torch.float32,
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
-        
+
         sparse_meta_data_centered = {}
         sparse_meta_data_not_centered = {}
 
@@ -1256,11 +1265,11 @@ class TestMagicPigImplementation:
         # Test with int64 packing (default)
         config_int64 = MagicPigConfig(lsh_l=3, lsh_k=2)
         assert config_int64.packing == "int64"
-        
+
         # Test explicitly with int64
         config_explicit_int64 = MagicPigConfig(lsh_l=3, lsh_k=2, packing="int64")
         assert config_explicit_int64.packing == "int64"
-        
+
         # Test with float32 packing
         config_float32 = MagicPigConfig(lsh_l=3, lsh_k=2, packing="float32")
         assert config_float32.packing == "float32"
@@ -1274,19 +1283,20 @@ class TestMagicPigImplementation:
         # Test with default seed (42)
         config_default_seed = MagicPigConfig(lsh_l=3, lsh_k=2)
         assert config_default_seed.seed == 42
-        
+
         # Test with custom seed specified
         config_with_seed = MagicPigConfig(lsh_l=3, lsh_k=2, seed=123)
         assert config_with_seed.seed == 123
-        
+
         # Test that None seed is rejected
         with pytest.raises(ValueError, match="seed cannot be None"):
             MagicPigConfig(lsh_l=3, lsh_k=2, seed=None)
-        
+
         # Test that seed is properly passed to masker
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
             MagicPig,
         )
+
         masker = MagicPig(config_with_seed)
         assert masker.seed == 123
 
@@ -1301,7 +1311,9 @@ class TestMagicPigImplementation:
             MagicPigConfig(lsh_l=3, lsh_k=2, packing="invalid")
 
         # Test int64 with too many bits
-        with pytest.raises(ValueError, match="For 'int64' packing, lsh_k must be <= 64"):
+        with pytest.raises(
+            ValueError, match="For 'int64' packing, lsh_k must be <= 64"
+        ):
             MagicPigConfig(lsh_l=1, lsh_k=65, packing="int64")
 
     def test_pack_bits_basic(self):
@@ -1315,7 +1327,12 @@ class TestMagicPigImplementation:
         masker = MagicPig(config)
 
         # Test with simple signatures
-        batch_size, num_heads, seq_len, total_bits = 2, 4, 8, 6  # 2 tables * 3 bits = 6 total bits
+        batch_size, num_heads, seq_len, total_bits = (
+            2,
+            4,
+            8,
+            6,
+        )  # 2 tables * 3 bits = 6 total bits
         signatures = torch.ones(batch_size, num_heads, seq_len, total_bits)
         signatures[..., ::2] = -1  # Alternate pattern: [-1, 1, -1, 1, -1, 1]
 
@@ -1345,9 +1362,11 @@ class TestMagicPigImplementation:
         masker = MagicPig(config)
 
         # Test with single bit
-        signatures = torch.tensor([[[[1.0]]]], dtype=torch.float32)  # Shape: (1, 1, 1, 1)
+        signatures = torch.tensor(
+            [[[[1.0]]]], dtype=torch.float32
+        )  # Shape: (1, 1, 1, 1)
         packed = masker._pack_bits(signatures)
-        
+
         assert packed.shape == (1, 1, 1, 1)
         assert packed[0, 0, 0, 0].item() == 1  # 1 -> 1
 
@@ -1368,8 +1387,10 @@ class TestMagicPigImplementation:
 
         batch_size, num_heads, seq_len, head_dim = 2, 4, 8, 64
         vectors = torch.randn(batch_size, num_heads, seq_len, head_dim)
-        
-        sparse_meta_data = {"projections": {0: torch.randn(head_dim, config.lsh_l * config.lsh_k)}}
+
+        sparse_meta_data = {
+            "projections": {0: torch.randn(head_dim, config.lsh_l * config.lsh_k)}
+        }
         layer_idx = 0
 
         signatures = masker._compute_signatures(vectors, sparse_meta_data, layer_idx)
@@ -1391,8 +1412,10 @@ class TestMagicPigImplementation:
 
         batch_size, num_heads, seq_len, head_dim = 2, 4, 8, 64
         vectors = torch.randn(batch_size, num_heads, seq_len, head_dim)
-        
-        sparse_meta_data = {"projections": {0: torch.randn(head_dim, config.lsh_l * config.lsh_k)}}
+
+        sparse_meta_data = {
+            "projections": {0: torch.randn(head_dim, config.lsh_l * config.lsh_k)}
+        }
         layer_idx = 0
 
         signatures = masker._compute_signatures(vectors, sparse_meta_data, layer_idx)
@@ -1414,9 +1437,11 @@ class TestMagicPigImplementation:
         masker = MagicPig(config)
 
         batch_size, num_heads, seq_len_keys, seq_len_queries = 2, 4, 8, 8
-        
+
         # Create packed signatures - identical signatures should match
-        keys_signatures = torch.randint(0, 8, (batch_size, num_heads, seq_len_keys, config.lsh_l), dtype=torch.int64)
+        keys_signatures = torch.randint(
+            0, 8, (batch_size, num_heads, seq_len_keys, config.lsh_l), dtype=torch.int64
+        )
         queries_signatures = keys_signatures.clone()  # Make queries identical to keys
 
         matches = masker._compute_matches_int64(keys_signatures, queries_signatures)
@@ -1443,10 +1468,14 @@ class TestMagicPigImplementation:
         masker = MagicPig(config)
 
         batch_size, num_heads, seq_len_keys, seq_len_queries = 1, 1, 1, 1
-        
+
         # Create different signatures that shouldn't match
-        keys_signatures = torch.zeros((batch_size, num_heads, seq_len_keys, config.lsh_l), dtype=torch.int64)
-        queries_signatures = torch.ones((batch_size, num_heads, seq_len_queries, config.lsh_l), dtype=torch.int64)
+        keys_signatures = torch.zeros(
+            (batch_size, num_heads, seq_len_keys, config.lsh_l), dtype=torch.int64
+        )
+        queries_signatures = torch.ones(
+            (batch_size, num_heads, seq_len_queries, config.lsh_l), dtype=torch.int64
+        )
 
         matches = masker._compute_matches_int64(keys_signatures, queries_signatures)
 
@@ -1468,7 +1497,9 @@ class TestMagicPigImplementation:
 
         # Create float signatures with known pattern
         keys_signatures = torch.ones(batch_size, num_heads, seq_len_keys, total_bits)
-        queries_signatures = torch.ones(batch_size, num_heads, seq_len_queries, total_bits)
+        queries_signatures = torch.ones(
+            batch_size, num_heads, seq_len_queries, total_bits
+        )
 
         matches = masker._compute_matches_float32(keys_signatures, queries_signatures)
 
@@ -1614,7 +1645,7 @@ class TestMagicPigImplementation:
         # Use a fixed seed for reproducibility
         seed = 42
         batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
-        
+
         # Create identical inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
@@ -1668,18 +1699,18 @@ class TestMagicPigImplementation:
         # The key test: with the same seed, both packing methods should produce identical results
         result_int64_dense = result_int64.get_dense_mask()
         result_float32_dense = result_float32.get_dense_mask()
-        
+
         # Check that the masks are exactly the same
-        assert torch.equal(result_int64_dense, result_float32_dense), (
-            "int64 and float32 packing should produce identical results with the same seed"
-        )
+        assert torch.equal(
+            result_int64_dense, result_float32_dense
+        ), "int64 and float32 packing should produce identical results with the same seed"
 
         # Verify that the projections used are identical
         proj_int64 = sparse_meta_data_int64["projections"][0]
         proj_float32 = sparse_meta_data_float32["projections"][0]
-        assert torch.equal(proj_int64, proj_float32), (
-            "Both packing methods should use identical projection matrices with the same seed"
-        )
+        assert torch.equal(
+            proj_int64, proj_float32
+        ), "Both packing methods should use identical projection matrices with the same seed"
 
     def test_seed_reproducibility(self):
         """Test that using the same seed produces reproducible results."""
@@ -1691,7 +1722,7 @@ class TestMagicPigImplementation:
 
         seed = 123
         batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
-        
+
         # Create identical inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
@@ -1740,13 +1771,13 @@ class TestMagicPigImplementation:
         # Results should be identical
         result1_dense = result1.get_dense_mask()
         result2_dense = result2.get_dense_mask()
-        assert torch.equal(result1_dense, result2_dense), (
-            "Same seed should produce identical results across multiple runs"
-        )
+        assert torch.equal(
+            result1_dense, result2_dense
+        ), "Same seed should produce identical results across multiple runs"
 
         # Projections should be identical
         proj1 = sparse_meta_data1["projections"][0]
         proj2 = sparse_meta_data2["projections"][0]
-        assert torch.equal(proj1, proj2), (
-            "Same seed should produce identical projection matrices"
-        )
+        assert torch.equal(
+            proj1, proj2
+        ), "Same seed should produce identical projection matrices"
