@@ -40,12 +40,14 @@ class MagicPigConfig(SamplingMaskerConfig):
             by subtracting the mean of the keys.
         packing: Literal["int64", "float32"]: The packing strategy for signatures.
              'int64' is more memory and compute-efficient.
+        seed: int, optional: Random seed for reproducible LSH projections. Defaults to 42.
     """
 
     lsh_l: int  # number of LSH tables
     lsh_k: int  # number of bits per LSH table
     center: bool = True  # whether to center keys and queries before LSH
     packing: Literal["int64", "float32"] = "int64"
+    seed: Optional[int] = 42  # random seed for reproducible projections
 
     def __post_init__(self) -> None:
         """Validate LSH parameters after initialization."""
@@ -57,6 +59,8 @@ class MagicPigConfig(SamplingMaskerConfig):
             raise ValueError(f"packing must be 'int64' or 'float32', got {self.packing}")
         if self.packing == "int64" and self.lsh_k > 64:
             raise ValueError(f"For 'int64' packing, lsh_k must be <= 64, but got {self.lsh_k}")
+        if self.seed is None:
+            raise ValueError("seed cannot be None")
 
 
 @MaskerRegistry.register(MagicPigConfig)
@@ -100,6 +104,7 @@ class MagicPig(SamplingMasker):
         self.lsh_k = config.lsh_k
         self.center = config.center
         self.packing = config.packing
+        self.seed = config.seed
     
     def _pack_bits(self, signatures: torch.Tensor) -> torch.Tensor:
         """Packs binary signatures into int64 tensors."""
@@ -448,8 +453,13 @@ class MagicPig(SamplingMasker):
         if sparse_meta_data["projections"][layer_idx] is None:
             head_dim = keys_transformed.shape[-1]
             total_bits = self.lsh_k * self.lsh_l
+            
+            # Set seed for reproducible projections (seed is guaranteed to be non-None by validation)
+            generator = torch.Generator(device=keys_transformed.device)
+            generator.manual_seed(self.seed + layer_idx)  # Include layer_idx for different layers
             sparse_meta_data["projections"][layer_idx] = torch.randn(
-                head_dim, total_bits, device=keys_transformed.device, dtype=keys_transformed.dtype
+                head_dim, total_bits, device=keys_transformed.device, dtype=keys_transformed.dtype,
+                generator=generator
             )
 
         keys_signatures: torch.Tensor = self._update_key_signatures(

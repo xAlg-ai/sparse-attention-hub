@@ -1265,6 +1265,31 @@ class TestMagicPigImplementation:
         config_float32 = MagicPigConfig(lsh_l=3, lsh_k=2, packing="float32")
         assert config_float32.packing == "float32"
 
+    def test_seed_config_creation(self):
+        """Test that MagicPigConfig can be created with seed parameter."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPigConfig,
+        )
+
+        # Test with default seed (42)
+        config_default_seed = MagicPigConfig(lsh_l=3, lsh_k=2)
+        assert config_default_seed.seed == 42
+        
+        # Test with custom seed specified
+        config_with_seed = MagicPigConfig(lsh_l=3, lsh_k=2, seed=123)
+        assert config_with_seed.seed == 123
+        
+        # Test that None seed is rejected
+        with pytest.raises(ValueError, match="seed cannot be None"):
+            MagicPigConfig(lsh_l=3, lsh_k=2, seed=None)
+        
+        # Test that seed is properly passed to masker
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+        )
+        masker = MagicPig(config_with_seed)
+        assert masker.seed == 123
+
     def test_packing_config_validation(self):
         """Test validation for packing configuration."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
@@ -1577,3 +1602,151 @@ class TestMagicPigImplementation:
         assert result_int64.shape == result_float32.shape
         assert not result_int64.is_empty()
         assert not result_float32.is_empty()
+
+    def test_packing_deterministic_with_seed(self):
+        """Test that int64 and float32 packing produce exactly the same results with the same seed."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+        from sparse_attention_hub.sparse_attention.utils.mask import Mask
+
+        # Use a fixed seed for reproducibility
+        seed = 42
+        batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
+        
+        # Create identical inputs
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        values = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+
+        previous_mask = Mask.create_empty_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            dtype=torch.float32,
+        )
+        attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
+
+        # Test with int64 packing and seed
+        config_int64 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="int64", seed=seed)
+        masker_int64 = MagicPig(config_int64)
+        sparse_meta_data_int64 = {}
+
+        result_int64 = masker_int64.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_int64,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Test with float32 packing and same seed
+        config_float32 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="float32", seed=seed)
+        masker_float32 = MagicPig(config_float32)
+        sparse_meta_data_float32 = {}
+
+        result_float32 = masker_float32.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data_float32,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Both should produce valid masks
+        assert isinstance(result_int64, Mask)
+        assert isinstance(result_float32, Mask)
+        assert result_int64.shape == result_float32.shape
+
+        # The key test: with the same seed, both packing methods should produce identical results
+        result_int64_dense = result_int64.get_dense_mask()
+        result_float32_dense = result_float32.get_dense_mask()
+        
+        # Check that the masks are exactly the same
+        assert torch.equal(result_int64_dense, result_float32_dense), (
+            "int64 and float32 packing should produce identical results with the same seed"
+        )
+
+        # Verify that the projections used are identical
+        proj_int64 = sparse_meta_data_int64["projections"][0]
+        proj_float32 = sparse_meta_data_float32["projections"][0]
+        assert torch.equal(proj_int64, proj_float32), (
+            "Both packing methods should use identical projection matrices with the same seed"
+        )
+
+    def test_seed_reproducibility(self):
+        """Test that using the same seed produces reproducible results."""
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+            MagicPig,
+            MagicPigConfig,
+        )
+        from sparse_attention_hub.sparse_attention.utils.mask import Mask
+
+        seed = 123
+        batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 8, 16, 64
+        
+        # Create identical inputs
+        keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+        values = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+
+        previous_mask = Mask.create_empty_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            dtype=torch.float32,
+        )
+        attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
+
+        # First run with seed
+        config1 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="int64", seed=seed)
+        masker1 = MagicPig(config1)
+        sparse_meta_data1 = {}
+
+        result1 = masker1.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data1,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Second run with same seed
+        config2 = MagicPigConfig(lsh_l=3, lsh_k=4, packing="int64", seed=seed)
+        masker2 = MagicPig(config2)
+        sparse_meta_data2 = {}
+
+        result2 = masker2.add_mask(
+            keys=keys,
+            queries=queries,
+            values=values,
+            attention_mask=attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data=sparse_meta_data2,
+            previous_mask=previous_mask,
+            layer_idx=0,
+        )
+
+        # Results should be identical
+        result1_dense = result1.get_dense_mask()
+        result2_dense = result2.get_dense_mask()
+        assert torch.equal(result1_dense, result2_dense), (
+            "Same seed should produce identical results across multiple runs"
+        )
+
+        # Projections should be identical
+        proj1 = sparse_meta_data1["projections"][0]
+        proj2 = sparse_meta_data2["projections"][0]
+        assert torch.equal(proj1, proj2), (
+            "Same seed should produce identical projection matrices"
+        )
