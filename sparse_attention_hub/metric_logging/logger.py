@@ -59,9 +59,10 @@ class MicroMetricLogger:
 
             MicroMetricLogger._initialized = True
         else:
-            print(
-                f"Warning: MicroMetricLogger already initialized with log_path: {self.log_path}"
-            )
+            if self.log_path and log_path and self.log_path != log_path:
+                print(
+                    f"Warning: MicroMetricLogger already initialized with log_path: {self.log_path}"
+                )
 
     # main registration function
 

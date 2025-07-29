@@ -25,11 +25,29 @@ def parse_config_name(config_name: str) -> Dict[str, float]:
         config_name: Configuration name like "adaptive_sampling.sink_0.001_window_0.001_heavy_0.005_base_0.01_epsilon_0.01_delta_0.01"
                      or "oracle_top_k_0.5.sink_0.02_window_0.02"
                      or "oracle_top_p_0.9999.sink_0.001_window_0.001"
+                     or "hashattention.sink_0.001_window_0.001_top_k_0.17"
+                     or "adaptive_sampling_hat.sink_0.01_window_0.01_heavy_0.02_base_0.01_epsilon_0.5_delta_0.5"
+                     or "random_sampling.sink_0.001_window_0.001_sampling_rate_0.01"
         
     Returns:
         Dictionary with parsed parameters
     """
     # Extract parameters using regex for different configuration types
+    
+    # Pattern for adaptive_sampling_hat (must come before adaptive_sampling to avoid conflicts)
+    adaptive_hat_pattern = r"adaptive_sampling_hat\.sink_([\d.]+)_window_([\d.]+)_heavy_([\d.]+)_base_([\d.]+)_epsilon_([\d.]+)_delta_([\d.]+)"
+    adaptive_hat_match = re.match(adaptive_hat_pattern, config_name)
+    
+    if adaptive_hat_match:
+        return {
+            "config_type": "adaptive_sampling_hat",
+            "sink_size": float(adaptive_hat_match.group(1)),
+            "window_size": float(adaptive_hat_match.group(2)),
+            "heavy_size": float(adaptive_hat_match.group(3)),
+            "base_rate_sampling": float(adaptive_hat_match.group(4)),
+            "epsilon": float(adaptive_hat_match.group(5)),
+            "delta": float(adaptive_hat_match.group(6))
+        }
     
     # Pattern for adaptive_sampling
     adaptive_pattern = r"adaptive_sampling\.sink_([\d.]+)_window_([\d.]+)_heavy_([\d.]+)_base_([\d.]+)_epsilon_([\d.]+)_delta_([\d.]+)"
@@ -70,6 +88,30 @@ def parse_config_name(config_name: str) -> Dict[str, float]:
             "window_size": float(top_p_match.group(3))
         }
     
+    # Pattern for hashattention
+    hashattention_pattern = r"hashattention\.sink_([\d.]+)_window_([\d.]+)_top_k_([\d.]+)"
+    hashattention_match = re.match(hashattention_pattern, config_name)
+    
+    if hashattention_match:
+        return {
+            "config_type": "hashattention",
+            "sink_size": float(hashattention_match.group(1)),
+            "window_size": float(hashattention_match.group(2)),
+            "hat_top_k": float(hashattention_match.group(3))
+        }
+    
+    # Pattern for random_sampling
+    random_sampling_pattern = r"random_sampling\.sink_([\d.]+)_window_([\d.]+)_sampling_rate_([\d.]+)"
+    random_sampling_match = re.match(random_sampling_pattern, config_name)
+    
+    if random_sampling_match:
+        return {
+            "config_type": "random_sampling",
+            "sink_size": float(random_sampling_match.group(1)),
+            "window_size": float(random_sampling_match.group(2)),
+            "sampling_rate": float(random_sampling_match.group(3))
+        }
+    
     # If no pattern matches, return empty dict
     return {"config_type": "unknown"}
 
@@ -104,37 +146,42 @@ def load_micro_metrics(metrics_path: Path) -> List[Dict[str, Any]]:
     return metrics
 
 
-def process_experiment_directory(exp_dir: Path) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def process_experiment_directory(exp_dir: Path) -> List[Tuple[List[Dict[str, Any]], Dict[str, Any], str]]:
     """Process a single experiment directory.
     
     Args:
         exp_dir: Path to experiment directory
         
     Returns:
-        Tuple of (metrics_data, config_data)
+        List of tuples (metrics_data, config_data, dataset_name) for each benchmark directory
     """
-    # Find the benchmark subdirectory (e.g., longbench_passage_retrieval_en)
+    # Find all benchmark subdirectories (e.g., longbench_passage_retrieval_en, longbench_passage_retrieval_zh)
     benchmark_dirs = [d for d in exp_dir.iterdir() if d.is_dir()]
     if not benchmark_dirs:
-        return [], {}
+        return []
     
-    benchmark_dir = benchmark_dirs[0]  # Take the first benchmark directory
+    results = []
     
-    # Load configuration
-    config_path = benchmark_dir / "config.json"
-    if not config_path.exists():
-        return [], {}
+    for benchmark_dir in benchmark_dirs:
+        dataset_name = benchmark_dir.name
+        
+        # Load configuration
+        config_path = benchmark_dir / "config.json"
+        if not config_path.exists():
+            continue
+        
+        config = load_config_file(config_path)
+        
+        # Load micro metrics
+        metrics_path = benchmark_dir / "micro_metrics.jsonl"
+        if not metrics_path.exists():
+            continue
+        
+        metrics = load_micro_metrics(metrics_path)
+        
+        results.append((metrics, config, dataset_name))
     
-    config = load_config_file(config_path)
-    
-    # Load micro metrics
-    metrics_path = benchmark_dir / "micro_metrics.jsonl"
-    if not metrics_path.exists():
-        return [], {}
-    
-    metrics = load_micro_metrics(metrics_path)
-    
-    return metrics, config
+    return results
 
 
 def extract_sparse_config_params(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -169,6 +216,16 @@ def extract_sparse_config_params(config: Dict[str, Any]) -> Dict[str, Any]:
             params["top_k"] = masker_config["top_k"]
         elif "top_p" in masker_config:
             params["top_p"] = masker_config["top_p"]
+        elif "heavy_size" in masker_config and "hat_bits" in masker_config:
+            # HashAttention parameters (for both hashattention and adaptive_sampling_hat)
+            params["hat_heavy_size"] = masker_config["heavy_size"]
+            params["hat_bits"] = masker_config.get("hat_bits")
+            params["hat_mlp_layers"] = masker_config.get("hat_mlp_layers")
+            params["hat_mlp_hidden_size"] = masker_config.get("hat_mlp_hidden_size")
+            params["hat_mlp_activation"] = masker_config.get("hat_mlp_activation")
+        elif "sampling_rate" in masker_config:
+            # Random sampling parameters
+            params["sampling_rate"] = masker_config["sampling_rate"]
     
     return params
 
@@ -244,44 +301,47 @@ def analyze_stress_tests(results_dir: str, output_dir: str) -> None:
             # Parse configuration name
             parsed_params = parse_config_name(config_name)
             
-            # Process experiment directory
-            metrics, config = process_experiment_directory(config_dir)
+            # Process experiment directory (now returns list of results for each benchmark)
+            benchmark_results = process_experiment_directory(config_dir)
             
-            if not metrics or not config:
+            if not benchmark_results:
                 continue
             
-            # Extract sparse attention parameters
-            sparse_params = extract_sparse_config_params(config)
-            
-            # Organize metrics by layer
-            layer_metrics = organize_metrics_by_layer(metrics)
-            
-            # Generate vector data
-            for layer_idx, layer_data in layer_metrics.items():
-                if "density" in layer_data and "error" in layer_data:
-                    vector_entry = {
-                        "model": model_name,
-                        "config": config_name,
-                        "layer_idx": layer_idx,
-                        "density": layer_data["density"],
-                        "error": layer_data["error"]
-                    }
-                    all_vector_data.append(vector_entry)
-            
-            # Generate metadata entry
-            metadata_entry = {
-                "model": model_name,
-                "config": config_name,
-                "layer_idx": "all",  # This will be expanded for each layer
-                **parsed_params,
-                **sparse_params
-            }
-            
-            # Add metadata for each layer
-            for layer_idx in layer_metrics.keys():
-                layer_metadata = metadata_entry.copy()
-                layer_metadata["layer_idx"] = layer_idx
-                all_metadata.append(layer_metadata)
+            # Process each benchmark result
+            for metrics, config, dataset_name in benchmark_results:
+                # Extract sparse attention parameters
+                sparse_params = extract_sparse_config_params(config)
+                
+                # Organize metrics by layer
+                layer_metrics = organize_metrics_by_layer(metrics)
+                
+                # Generate vector data
+                for layer_idx, layer_data in layer_metrics.items():
+                    if "density" in layer_data and "error" in layer_data:
+                        vector_entry = {
+                            "model": model_name,
+                            "config": config_name,
+                            "layer_idx": layer_idx,
+                            "density": layer_data["density"],
+                            "error": layer_data["error"]
+                        }
+                        all_vector_data.append(vector_entry)
+                
+                # Generate metadata entry
+                metadata_entry = {
+                    "model": model_name,
+                    "config": config_name,
+                    "dataset": dataset_name,
+                    "layer_idx": "all",  # This will be expanded for each layer
+                    **parsed_params,
+                    **sparse_params
+                }
+                
+                # Add metadata for each layer
+                for layer_idx in layer_metrics.keys():
+                    layer_metadata = metadata_entry.copy()
+                    layer_metadata["layer_idx"] = layer_idx
+                    all_metadata.append(layer_metadata)
     
     # Write vector.tsv
     vector_path = output_path / "vector.tsv"
@@ -331,7 +391,7 @@ def main():
     )
     parser.add_argument(
         "--output-dir", 
-        default="./analysis_output",
+        default="./sparse-attention-hub-share/docs/micro_tests/",
         help="Output directory for TSV files"
     )
     

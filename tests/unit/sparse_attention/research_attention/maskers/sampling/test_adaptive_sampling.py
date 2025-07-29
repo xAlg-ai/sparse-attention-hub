@@ -232,7 +232,7 @@ class TestAdaptiveSamplingMasker:
         assert sampling_range == 11
 
     def test_get_sampling_range_invalid(self):
-        """Test invalid sampling range."""
+        """Test invalid sampling range returns full mask."""
         config = AdaptiveSamplingMaskerConfig(
             base_rate_sampling=0.1,
             epsilon=0.1,
@@ -242,8 +242,12 @@ class TestAdaptiveSamplingMasker:
         )
         masker = AdaptiveSamplingMasker(config)
 
-        with pytest.raises(ValueError, match="Invalid sampling range"):
-            masker._get_sampling_range(16)
+        # Test that _get_sampling_range returns a negative sampling range
+        start_idx, end_idx, sampling_range = masker._get_sampling_range(16)
+        assert sampling_range == -4  # 6 - 10 = -4
+
+        # Test that should_return_full_mask returns True for negative sampling range
+        assert masker.should_return_full_mask(sampling_range) is True
 
     def test_get_base_sample_count_float(self, masker):
         """Test base sample count calculation with float."""
