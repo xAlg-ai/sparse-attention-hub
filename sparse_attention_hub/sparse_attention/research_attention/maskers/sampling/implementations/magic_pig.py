@@ -7,7 +7,7 @@ LSH-based similarity matching with probability-based sampling to create sparse a
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 
 import torch
 
@@ -36,10 +36,18 @@ class MagicPigConfig(SamplingMaskerConfig):
             similar items but also increase computational cost.
         lsh_k: Number of bits per LSH table. Higher values make each table more
             precise but reduce the probability of collisions.
+        center: bool, optional: If True, centers the keys and queries before LSH
+            by subtracting the mean of the keys.
+        packing: Literal["int64", "float32"]: The packing strategy for signatures.
+             'int64' is more memory and compute-efficient.
+        seed: int, optional: Random seed for reproducible LSH projections. Defaults to 42.
     """
 
     lsh_l: int  # number of LSH tables
     lsh_k: int  # number of bits per LSH table
+    center: bool = True  # whether to center keys and queries before LSH
+    packing: Literal["int64", "float32"] = "int64"
+    seed: Optional[int] = 42  # random seed for reproducible projections
 
     def __post_init__(self) -> None:
         """Validate LSH parameters after initialization."""
@@ -47,6 +55,16 @@ class MagicPigConfig(SamplingMaskerConfig):
             raise ValueError(f"lsh_l must be positive, got {self.lsh_l}")
         if self.lsh_k <= 0:
             raise ValueError(f"lsh_k must be positive, got {self.lsh_k}")
+        if self.packing not in ["int64", "float32"]:
+            raise ValueError(
+                f"packing must be 'int64' or 'float32', got {self.packing}"
+            )
+        if self.packing == "int64" and self.lsh_k > 64:
+            raise ValueError(
+                f"For 'int64' packing, lsh_k must be <= 64, but got {self.lsh_k}"
+            )
+        if self.seed is None:
+            raise ValueError("seed cannot be None")
 
 
 @MaskerRegistry.register(MagicPigConfig)
@@ -60,6 +78,8 @@ class MagicPig(SamplingMasker):
     Attributes:
         lsh_l: Number of LSH tables used for hashing.
         lsh_k: Number of bits per LSH table.
+        center: Whether to center keys and queries before LSH (default is True).
+        packing: Packing strategy for signatures, either 'int64' or 'float32'.
 
     Important Notes:
         - Uses the Neyshabur & Srebro technique to transform inner product search to cosine similarity
@@ -86,6 +106,221 @@ class MagicPig(SamplingMasker):
         super().__init__(config)
         self.lsh_l = config.lsh_l
         self.lsh_k = config.lsh_k
+        self.center = config.center
+        self.packing = config.packing
+        self.seed = config.seed
+
+    def _pack_bits(self, signatures: torch.Tensor) -> torch.Tensor:
+        """Packs binary signatures into int64 tensors."""
+        binary_signatures = (signatures > 0).to(torch.int64)
+        reshaped_signatures = binary_signatures.view(
+            *signatures.shape[:-1], self.lsh_l, self.lsh_k
+        )
+        packer = 2 ** torch.arange(
+            self.lsh_k, device=signatures.device, dtype=torch.int64
+        )
+        packed_signatures = (reshaped_signatures * packer).sum(dim=-1)
+        return packed_signatures
+
+    def _compute_signatures(
+        self, vectors: torch.Tensor, sparse_meta_data: Dict[Any, Any], layer_idx: int
+    ) -> torch.Tensor:
+        """Computes signatures for given vectors, with optional packing."""
+        total_bits: int = self.lsh_l * self.lsh_k
+        batch_size, num_heads, seq_len, head_dim = vectors.shape
+        vectors_flat: torch.Tensor = vectors.view(-1, head_dim)
+        projection = sparse_meta_data["projections"][layer_idx]
+
+        # 1. Compute signs (+1/-1)
+        signs = torch.sign(torch.matmul(vectors_flat, projection))
+        signs = signs.view(batch_size, num_heads, seq_len, total_bits)
+
+        # 2. Pack if using int64 method
+        if self.packing == "int64":
+            return self._pack_bits(signs)
+
+        # Otherwise, return signs as floats
+        return signs.float()
+
+    def _center_KQ(
+        self,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        layer_idx: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Center K and Q tensors by subtracting the mean.
+
+        Args:
+            keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
+            queries: Query tensor with shape (batch_size, num_heads, seq_len_queries, head_dim).
+            sparse_meta_data: Metadata dictionary containing additional information.
+            layer_idx: Index of the layer for which centering is applied.
+
+        Returns:
+            Tuple of (centered_keys, centered_queries) tensors.
+        """
+        self._initialize_key_mean_cache(sparse_meta_data, layer_idx)
+        if not self.center:
+            return keys, queries
+
+        ## cache the key means if not already cached
+        if sparse_meta_data["key_mean"][layer_idx] is None:
+            sparse_meta_data["key_mean"][layer_idx] = keys.mean(dim=2, keepdim=True)
+
+        key_mean: torch.Tensor = sparse_meta_data["key_mean"][layer_idx]
+
+        centered_keys = keys - key_mean
+        centered_queries = queries - key_mean
+
+        return centered_keys, centered_queries
+
+    def _initialize_key_mean_cache(
+        self,
+        sparse_meta_data: Dict[Any, Any],
+        layer_idx: int,
+    ) -> None:
+        """Initialize the key mean cache for centering keys and queries.
+
+        This method checks if the key mean cache exists in the sparse_meta_data.
+        If not, it initializes it with zeros.
+
+        Args:
+            sparse_meta_data: Metadata dictionary containing additional information.
+            layer_idx: Index of the layer for which the cache is initialized.
+        """
+        if "key_mean" not in sparse_meta_data:
+            sparse_meta_data["key_mean"] = {}
+        if layer_idx not in sparse_meta_data["key_mean"]:
+            sparse_meta_data["key_mean"][layer_idx] = None
+
+    def _initialize_projection_cache(
+        self,
+        sparse_meta_data: Dict[Any, Any],
+        layer_idx: int,
+    ) -> None:
+        """Initialize the projection cache for LSH matches.
+
+        This method checks if the projection cache exists in the sparse_meta_data.
+        If not, it initializes it with zeros.
+
+        Args:
+            sparse_meta_data: Metadata dictionary containing additional information.
+            layer_idx: Index of the layer for which the cache is initialized.
+        """
+        if "projections" not in sparse_meta_data:
+            sparse_meta_data["projections"] = {}
+        if layer_idx not in sparse_meta_data["projections"]:
+            sparse_meta_data["projections"][layer_idx] = None
+
+    def _initialize_key_signature_cache(
+        self,
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
+        layer_idx: int,
+    ) -> None:
+        """Initialize the key signature cache structure in sparse_meta_data."""
+        if "key_signature" not in sparse_meta_data:
+            sparse_meta_data["key_signature"] = {}
+        if layer_idx not in sparse_meta_data["key_signature"]:
+            sparse_meta_data["key_signature"][layer_idx] = None
+
+    def _determine_new_keys(
+        self,
+        keys: torch.Tensor,
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
+        layer_idx: int,
+    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+        """Determine which keys are new and need signature computation.
+
+        Returns:
+            (cached_signatures, new_keys):
+            - If cached_signatures is None, all keys are new
+            - If new_keys is None, no new keys to process (return cached_signatures)
+        """
+        cached_signatures: Optional[torch.Tensor] = sparse_meta_data["key_signature"][
+            layer_idx
+        ]
+
+        if cached_signatures is None:
+            return None, keys
+
+        cached_num_keys: int = cached_signatures.shape[2]
+        current_num_keys: int = keys.shape[2]
+
+        if current_num_keys < cached_num_keys:
+            raise ValueError(
+                f"Current number of keys ({current_num_keys}) is less than cached number of keys ({cached_num_keys})"
+            )
+        elif current_num_keys > cached_num_keys:
+            new_keys: torch.Tensor = keys[:, :, cached_num_keys:, :]
+            return cached_signatures, new_keys
+        else:
+            return cached_signatures, None
+
+    def _compute_key_signatures(
+        self, keys, sparse_meta_data: Dict[Any, Any], layer_idx: int
+    ) -> torch.Tensor:
+        total_bits: int = self.lsh_l * self.lsh_k
+        batch_size, num_heads, seq_len_keys, head_dim = keys.shape
+        keys_flat: torch.Tensor = keys.view(-1, head_dim)
+        projection = sparse_meta_data["projections"][layer_idx]
+        keys_signatures = torch.sign(
+            torch.matmul(keys_flat, projection)
+        )  # (batch_size * num_heads * seq_len_keys, total_bits)
+        # Reshape back to original dimensions
+        keys_signatures = keys_signatures.view(
+            batch_size, num_heads, seq_len_keys, total_bits
+        )
+
+        if self.signature_dtype == "int64":
+            keys_signatures = keys_signatures.to(torch.int64)
+
+        return keys_signatures
+
+    def _update_and_return_key_signatures(
+        self,
+        cached_signatures: torch.Tensor,
+        new_signatures: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        layer_idx: int,
+    ) -> torch.Tensor:
+        """Update the cache with new signatures and return the complete signature tensor."""
+        if cached_signatures is None:
+            sparse_meta_data["key_signature"][layer_idx] = new_signatures
+            return new_signatures
+        else:
+            concatenated_signatures: torch.Tensor = torch.cat(
+                [cached_signatures, new_signatures], dim=2
+            )
+            sparse_meta_data["key_signature"][layer_idx] = concatenated_signatures
+            return concatenated_signatures
+
+    def _update_key_signatures(
+        self,
+        keys: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        layer_idx: int,
+    ) -> torch.Tensor:
+        self._initialize_key_signature_cache(sparse_meta_data, layer_idx)
+
+        cached_signatures: Optional[torch.Tensor]
+        new_keys: Optional[torch.Tensor]
+        cached_signatures, new_keys = self._determine_new_keys(
+            keys, sparse_meta_data, layer_idx
+        )
+
+        if new_keys is None:
+            assert (
+                cached_signatures is not None
+            ), "cached_signatures should not be None when new_keys is None"
+            return cached_signatures
+
+        new_signatures: torch.Tensor = self._compute_signatures(
+            new_keys, sparse_meta_data, layer_idx
+        )
+        return self._update_and_return_key_signatures(
+            cached_signatures, new_signatures, sparse_meta_data, layer_idx
+        )
 
     def _transform_for_mips(
         self, keys: torch.Tensor, queries: torch.Tensor
@@ -130,24 +365,13 @@ class MagicPig(SamplingMasker):
         return keys_transformed, queries_transformed
 
     def _compute_probabilities(
-        self, keys: torch.Tensor, queries: torch.Tensor
+        self,
+        keys_transformed: torch.Tensor,
+        queries_transformed: torch.Tensor,
     ) -> torch.Tensor:
-        """Compute LSH collision probabilities using cosine similarity.
+        """Compute LSH collision probabilities using cosine similarity on transformed vectors."""
 
-        Args:
-            keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
-            queries: Query tensor with shape (batch_size, num_heads, seq_len_queries, head_dim).
-
-        Returns:
-            Collision probabilities tensor with shape (batch_size, num_heads, seq_len_queries, seq_len_keys).
-        """
-        # Transform for MIPS
-        keys_transformed: torch.Tensor
-        queries_transformed: torch.Tensor
-        keys_transformed, queries_transformed = self._transform_for_mips(keys, queries)
-
-        # Compute cosine similarities
-        # Normalize the transformed vectors
+        # Normalize the already-transformed vectors
         keys_norm: torch.Tensor = torch.norm(keys_transformed, dim=-1, keepdim=True)
         queries_norm: torch.Tensor = torch.norm(
             queries_transformed, dim=-1, keepdim=True
@@ -166,85 +390,46 @@ class MagicPig(SamplingMasker):
         angles: torch.Tensor = torch.acos(cosine_similarities)
 
         # Compute LSH collision probability
-        # P(collision) = (1 - theta/pi)^k for single table
-        # P(collision across l tables) = 1 - (1 - p)^l
         single_table_prob: torch.Tensor = (1 - angles / torch.pi) ** self.lsh_k
         collision_prob: torch.Tensor = 1 - (1 - single_table_prob) ** self.lsh_l
 
         return collision_prob
 
-    def _compute_lsh_matches(
-        self, keys: torch.Tensor, queries: torch.Tensor
+    def _compute_matches_float32(
+        self, keys_signatures: torch.Tensor, queries_signatures: torch.Tensor
     ) -> torch.Tensor:
-        """Compute LSH matches using random signed projections.
+        """Compute LSH matches using float32 signatures.
 
         Args:
-            keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
-            queries: Query tensor with shape (batch_size, num_heads, seq_len_queries, head_dim).
+            keys_signatures: Key signatures tensor with shape (batch_size, num_heads, seq_len_keys, total_bits).
+            queries_signatures: Query signatures tensor with shape (batch_size, num_heads, seq_len_queries, total_bits).
 
         Returns:
             Binary matches tensor with shape (batch_size, num_heads, seq_len_queries, seq_len_keys).
         """
-        # Transform for MIPS
-        keys_transformed: torch.Tensor
-        queries_transformed: torch.Tensor
-        keys_transformed, queries_transformed = self._transform_for_mips(keys, queries)
+        batch_size: int = keys_signatures.shape[0]
+        num_heads: int = keys_signatures.shape[1]
+        seq_len_queries: int = queries_signatures.shape[2]
+        seq_len_keys: int = keys_signatures.shape[2]
 
-        batch_size: int = keys.shape[0]
-        num_heads: int = keys.shape[1]
-        seq_len_queries: int = queries.shape[2]
-        seq_len_keys: int = keys.shape[2]
-        head_dim: int = keys_transformed.shape[-1]
-
-        # Generate random projection matrix
-        total_bits: int = self.lsh_k * self.lsh_l
-        projection: torch.Tensor = torch.randn(
-            head_dim, total_bits, device=keys.device, dtype=keys.dtype
-        )
-
-        # Compute signatures
-        # Reshape for batch processing
-        keys_flat: torch.Tensor = keys_transformed.view(
-            -1, head_dim
-        )  # (batch*heads*seq_len_keys, head_dim)
-        queries_flat: torch.Tensor = queries_transformed.view(
-            -1, head_dim
-        )  # (batch*heads*seq_len_queries, head_dim)
-
-        # Compute signed projections
-        keys_signatures: torch.Tensor = torch.sign(
-            torch.matmul(keys_flat, projection)
-        )  # (batch*heads*seq_len_keys, total_bits)
-        queries_signatures: torch.Tensor = torch.sign(
-            torch.matmul(queries_flat, projection)
-        )  # (batch*heads*seq_len_queries, total_bits)
-
-        # Reshape back to original dimensions
-        keys_signatures = keys_signatures.view(
-            batch_size, num_heads, seq_len_keys, total_bits
-        )
-        queries_signatures = queries_signatures.view(
-            batch_size, num_heads, seq_len_queries, total_bits
-        )
-
-        # Compute matches for each query-key pair
         # Expand dimensions for broadcasting
-        keys_signatures_expanded: torch.Tensor = keys_signatures.unsqueeze(
-            2
-        )  # (batch, heads, 1, seq_len_keys, total_bits)
-        queries_signatures_expanded: torch.Tensor = queries_signatures.unsqueeze(
-            3
-        )  # (batch, heads, seq_len_queries, 1, total_bits)
+        keys_signatures_expanded: torch.Tensor = keys_signatures.unsqueeze(2)
+        queries_signatures_expanded: torch.Tensor = queries_signatures.unsqueeze(3)
 
-        # Compute element-wise product
+        # Compute element-wise product, +1 if same, -1 if different
         signature_matches: torch.Tensor = (
             keys_signatures_expanded * queries_signatures_expanded
         )
-        # Shape: (batch, heads, seq_len_queries, seq_len_keys, total_bits)
+        # Shape: (batch_size, num_heads, seq_len_queries, seq_len_keys, total_bits)
 
         # Reshape to group by LSH tables
         signature_matches_grouped: torch.Tensor = signature_matches.view(
-            batch_size, num_heads, seq_len_queries, seq_len_keys, self.lsh_l, self.lsh_k
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            seq_len_keys,
+            self.lsh_l,
+            self.lsh_k,
         )
 
         # Check if at least one group (table) has all bits matching
@@ -252,11 +437,66 @@ class MagicPig(SamplingMasker):
         group_matches: torch.Tensor = (
             signature_matches_grouped.sum(dim=-1) == self.lsh_k
         ).int()
-        # Shape: (batch, heads, seq_len_queries, seq_len_keys, lsh_l)
+        # Shape: (batch_size, num_heads, seq_len_queries, seq_len_keys, lsh_l)
 
         # Check if at least one table has a match
         matches: torch.Tensor = (group_matches.sum(dim=-1) > 0).int()
-        # Shape: (batch, heads, seq_len_queries, seq_len_keys)
+        # Shape: (batch_size, num_heads, seq_len_queries, seq_len_keys)
+
+        return matches
+
+    def _compute_matches_int64(
+        self, keys_signatures: torch.Tensor, queries_signatures: torch.Tensor
+    ) -> torch.Tensor:
+        """Compute LSH matches using int64 packed signatures."""
+        keys_expanded = keys_signatures.unsqueeze(2)
+        queries_expanded = queries_signatures.unsqueeze(3)
+        table_matches = queries_expanded == keys_expanded
+        matches = torch.any(table_matches, dim=-1)
+        return matches.int()
+
+    def _compute_lsh_matches(
+        self,
+        keys_transformed: torch.Tensor,
+        queries_transformed: torch.Tensor,
+        sparse_meta_data: Dict[Any, Any],
+        layer_idx: int,
+    ) -> torch.Tensor:
+        """Compute LSH matches using bit-packed random signed projections on transformed vectors."""
+
+        self._initialize_projection_cache(sparse_meta_data, layer_idx)
+
+        if sparse_meta_data["projections"][layer_idx] is None:
+            head_dim = keys_transformed.shape[-1]
+            total_bits = self.lsh_k * self.lsh_l
+
+            # Set seed for reproducible projections (seed is guaranteed to be non-None by validation)
+            generator = torch.Generator(device=keys_transformed.device)
+            generator.manual_seed(
+                self.seed + layer_idx
+            )  # Include layer_idx for different layers
+            sparse_meta_data["projections"][layer_idx] = torch.randn(
+                head_dim,
+                total_bits,
+                device=keys_transformed.device,
+                dtype=keys_transformed.dtype,
+                generator=generator,
+            )
+
+        keys_signatures: torch.Tensor = self._update_key_signatures(
+            keys_transformed, sparse_meta_data, layer_idx
+        )
+        queries_signatures: torch.Tensor = (
+            self._compute_signatures(  # Re-using the generic signature computer
+                queries_transformed, sparse_meta_data, layer_idx
+            )
+        )
+
+        # Call the correct matching function based on the config
+        if self.packing == "int64":
+            matches = self._compute_matches_int64(keys_signatures, queries_signatures)
+        else:  # 'float32'
+            matches = self._compute_matches_float32(keys_signatures, queries_signatures)
 
         return matches
 
@@ -306,19 +546,31 @@ class MagicPig(SamplingMasker):
             - Similar key-query pairs have higher probability of being attended to
             - The resulting mask is merged with the previous mask using the merge_mask method
         """
+        layer_idx: int = self._validate_inputs(sparse_meta_data, kwargs)
+
         if previous_mask.is_full_mask():
             return previous_mask
 
-        batch_size: int = queries.shape[0]
-        num_heads: int = queries.shape[1]
-        seq_len_queries: int = queries.shape[2]
-        seq_len_keys: int = keys.shape[2]
+        batch_size, num_heads, seq_len_queries, _ = queries.shape
+        _, _, seq_len_keys, _ = keys.shape
 
         ngroups = _get_num_key_value_groups(queries, keys)
         keys = repeat_kv(keys, ngroups)
 
-        probabilities: torch.Tensor = self._compute_probabilities(keys, queries)
-        matches: torch.Tensor = self._compute_lsh_matches(keys, queries)
+        keys_centered, queries_centered = self._center_KQ(
+            keys, queries, sparse_meta_data, layer_idx
+        )
+        keys_transformed, queries_transformed = self._transform_for_mips(
+            keys_centered, queries_centered
+        )
+
+        probabilities: torch.Tensor = self._compute_probabilities(
+            keys_transformed, queries_transformed
+        )
+        matches: torch.Tensor = self._compute_lsh_matches(
+            keys_transformed, queries_transformed, sparse_meta_data, layer_idx
+        )
+
         dense_mask: torch.Tensor = matches * probabilities
 
         mask_shape: Tuple[int, int, int, int] = (
@@ -332,6 +584,21 @@ class MagicPig(SamplingMasker):
         )
 
         return previous_mask.merge_mask(this_mask, inplace=False)
+
+    def _validate_inputs(
+        self,
+        sparse_meta_data: Dict[str, Dict[int, Optional[torch.Tensor]]],
+        kwargs: Dict[str, Any],
+    ) -> int:
+        """Validate required inputs for hash attention computation and return layer_idx."""
+        if sparse_meta_data is None:
+            raise ValueError("sparse_meta_data cannot be None")
+
+        layer_idx: Optional[int] = kwargs.get("layer_idx")
+        if layer_idx is None:
+            raise ValueError("layer_idx must be provided in kwargs")
+
+        return layer_idx
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "MagicPig":
