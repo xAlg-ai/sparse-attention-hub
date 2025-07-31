@@ -4,7 +4,13 @@ A comprehensive framework for sparse attention mechanisms in deep learning model
 
 ## 🚀 Features
 
-- **Multiple Sparse Attention Algorithms**: Implementations of efficient attention mechanisms including Double Sparsity, Hash Attention, and various research-oriented masking strategies
+- **Multiple Sparse Attention Algorithms**: Im├── benchmark/                      # Benchmark execution and optimization
+│   ├── hyperparameter_optimization.py  # Core Ray Tune optimization system
+│   ├── optimized_executor.py           # Optimization-integrated executor
+│   └── scripts/                        # Benchmark scripts and utilities
+│       ├── demo_optimized_benchmarks.py    # Demo script
+│       ├── get_cached_config.py            # Cache utility
+│       └── run_optimized_benchmarks.py     # CLI runnertations of efficient attention mechanisms including Double Sparsity, Hash Attention, and various research-oriented masking strategies
 - **Framework Integration**: Seamless integration with HuggingFace Transformers and other popular frameworks
 - **Comprehensive Benchmarking**: Built-in support for LongBench, Loogle, InfBench, and custom benchmarks
 - **Hyperparameter Optimization**: Ray Tune-based automatic optimization with intelligent caching and per-task tuning
@@ -184,17 +190,17 @@ optimized_config = optimizer.create_optimized_config_from_cache(
 
 ```bash
 # Run optimized benchmarks with CLI
-python benchmark/run_optimized_benchmarks.py \
+python benchmark/scripts/run_optimized_benchmarks.py \
     --model meta-llama/Llama-3.1-8B-Instruct \
     --benchmark loogle \
     --config magic_pig \
     --optimization-samples 20
 
 # Get cached configurations
-python benchmark/get_cached_config.py
+python benchmark/scripts/get_cached_config.py
 
 # Run quick demo
-python benchmark/demo_optimized_benchmarks.py
+python benchmark/scripts/demo_optimized_benchmarks.py
 ```
 
 ### Features

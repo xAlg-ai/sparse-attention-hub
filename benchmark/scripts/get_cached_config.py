@@ -6,11 +6,14 @@ This script allows you to retrieve previously optimized hyperparameter configura
 without running the full optimization process.
 """
 
+import os
 import sys
 from pathlib import Path
 
-# Setup path - go up to project root
-sys.path.append(str(Path(__file__).parent.parent))
+# Set project root and add to Python path (like magic_pig_experiments)
+project_root = Path(__file__).resolve().parents[2]  # Go up 2 levels from benchmark/scripts/
+os.chdir(project_root)
+sys.path.insert(0, str(project_root))
 
 from benchmark.hyperparameter_optimization import HyperparameterOptimizer, OptimizationConfig
 

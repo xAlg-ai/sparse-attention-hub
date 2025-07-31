@@ -14,12 +14,15 @@ Usage:
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import List, Optional
 
-# Add project root to path for imports
-sys.path.append(str(Path(__file__).parent.parent))
+# Set project root and add to Python path (like magic_pig_experiments)
+project_root = Path(__file__).resolve().parents[2]  # Go up 2 levels from benchmark/scripts/
+os.chdir(project_root)
+sys.path.insert(0, str(project_root))
 
 from benchmark.optimized_executor import run_optimized_benchmarks
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
