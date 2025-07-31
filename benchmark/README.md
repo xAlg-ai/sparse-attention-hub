@@ -100,3 +100,85 @@ Where:
   - `answer`:  ...
   - `max_new_tokens`:  ...
 - `calculate_metrics.py` is a script that calculates the metrics based on the output of `evaluate.py`
+
+## Hyperparameter Optimization
+
+This system supports automatic hyperparameter optimization using Ray Tune with two modes:
+
+### Global Optimization
+- Finds the single best configuration that works well across all tasks
+- Uses combined score from all benchmark subsets
+- Good for general-purpose configs
+
+### Per-Task Optimization  
+- Finds the best configuration for each individual task/subset
+- Allows different hyperparameters for different tasks
+- Maximizes performance on each specific benchmark
+
+### Basic Usage
+
+```python
+from benchmark.hyperparameter_optimization import OptimizationConfig, optimize_sparse_configs
+
+# Global optimization (single best config)
+global_config = OptimizationConfig(
+    enabled=True,
+    num_samples=20,
+    use_per_task_config=False  # Global mode
+)
+
+# Per-task optimization (best config per task)
+per_task_config = OptimizationConfig(
+    enabled=True,
+    num_samples=20,
+    use_per_task_config=True  # Per-task mode
+)
+
+# Run optimization
+optimized_configs = await optimize_sparse_configs(
+    model_name="meta-llama/Llama-3.1-8B-Instruct",
+    benchmarks=your_benchmarks,
+    config_types=["sparse_attention"],
+    optimization_config=global_config  # or per_task_config
+)
+```
+
+### Retrieving Cached Results
+
+Use the provided script to retrieve optimization results:
+
+```bash
+# Show all cached configs for a type
+python benchmark/scripts/get_cached_config.py --config-type sparse_attention --show-all
+
+# Create OptimizedSparseConfig from cache
+python benchmark/scripts/get_cached_config.py --config-type sparse_attention --create-optimized
+
+# Get specific cached result
+python benchmark/scripts/get_cached_config.py --config-type sparse_attention --task loogle_shortdep_qa
+```
+
+### Demo Scripts
+
+The `benchmark/scripts/` directory contains demonstration scripts:
+
+- `demo_optimized_benchmarks.py` - Shows both global and per-task optimization
+- `get_cached_config.py` - Retrieve and display cached optimization results  
+- `run_optimized_benchmarks.py` - CLI for running optimized benchmarks
+
+### Configuration Options
+
+Key `OptimizationConfig` parameters:
+
+- `use_per_task_config: bool` - Enable per-task optimization (default: False)
+- `num_samples: int` - Number of hyperparameter combinations to try
+- `max_concurrent_trials: int` - Parallel optimization trials
+- `timeout_per_trial: int` - Seconds before trial timeout
+- `cache_dir: str` - Directory for caching results
+
+### Caching System
+
+- Results are automatically cached based on model, config type, and task
+- Cache keys: `{model_name}_{config_type}_{benchmark_name}_{subset}`
+- Per-task configs store separate results for each task combination
+- Global configs store single best result across all tasks

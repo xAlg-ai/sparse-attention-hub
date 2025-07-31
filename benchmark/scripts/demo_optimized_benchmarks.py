@@ -89,26 +89,33 @@ def run_demo():
     print("4. Save results and optimization summary")
     print()
     
-    # Create custom optimization config for very quick iteration
-    optimization_config = OptimizationConfig(
+    # Example 1: Global optimization (single best config for all tasks)
+    print("=" * 80)
+    print("EXAMPLE 1: Global Optimization (single best config)")
+    print("=" * 80)
+    
+    # Create custom optimization config for global optimization
+    global_optimization_config = OptimizationConfig(
         enabled=True,
         num_samples=3,  # Fewer samples for quick demo 
         max_concurrent=1,  # Single concurrent trial
         optimization_metric="combined_score",
         optimization_mode="min",
-        cache_dir=f"{result_dir}/hyperparameter_cache",
-        quick_eval_requests=2  # Only 2 requests per optimization trial
+        cache_dir=f"{result_dir}/hyperparameter_cache_global",
+        quick_eval_requests=2,  # Only 2 requests per optimization trial
+        use_per_task_config=False  # Global optimization
     )
     
     try:
-        # Use the new direct approach with custom optimization config
+        # Use the optimized executor with global config
         from benchmark.optimized_executor import create_optimized_benchmark_executor
         
+        print("Running GLOBAL optimization...")
         executor = create_optimized_benchmark_executor(
             gpu_ids=[0],
             max_concurrent_runs=1,
-            base_result_dir=result_dir,
-            optimization_config=optimization_config,
+            base_result_dir=f"{result_dir}/global",
+            optimization_config=global_optimization_config,
             enable_optimization=True
         )
         
@@ -117,31 +124,82 @@ def run_demo():
             sparse_attention_configs=sparse_configs,
             benchmark_configs=benchmark_configs,
             adapter_config=adapter_config,
-            request_kwargs={"max_requests": 2}  # Back to 2 requests for faster multi-task testing
+            request_kwargs={"max_requests": 2}
         )
         
+        print("✅ Global optimization completed!")
+        
+    except Exception as e:
+        print(f"❌ Global optimization failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Example 2: Per-task optimization (best config for each task)
+    print("\n" + "=" * 80)
+    print("EXAMPLE 2: Per-Task Optimization (best config per task)")
+    print("=" * 80)
+    
+    # Create custom optimization config for per-task optimization
+    per_task_optimization_config = OptimizationConfig(
+        enabled=True,
+        num_samples=3,  # Fewer samples for quick demo 
+        max_concurrent=1,  # Single concurrent trial
+        optimization_metric="combined_score",
+        optimization_mode="min",
+        cache_dir=f"{result_dir}/hyperparameter_cache_per_task",
+        quick_eval_requests=2,  # Only 2 requests per optimization trial
+        use_per_task_config=True  # Per-task optimization
+    )
+    
+    try:
+        print("Running PER-TASK optimization...")
+        executor = create_optimized_benchmark_executor(
+            gpu_ids=[0],
+            max_concurrent_runs=1,
+            base_result_dir=f"{result_dir}/per_task",
+            optimization_config=per_task_optimization_config,
+            enable_optimization=True
+        )
+        
+        executor.run_benchmark_matrix(
+            model_names=model_names,
+            sparse_attention_configs=sparse_configs,
+            benchmark_configs=benchmark_configs,
+            adapter_config=adapter_config,
+            request_kwargs={"max_requests": 2}
+        )
+        
+        print("✅ Per-task optimization completed!")
+        
+    except Exception as e:
+        print(f"❌ Per-task optimization failed: {e}")
+        import traceback
+        traceback.print_exc()
+        
         print("\n" + "=" * 80)
-        print("DEMO COMPLETED SUCCESSFULLY!")
+        print("BOTH OPTIMIZATION MODES COMPLETED!")
         print("=" * 80)
         
-        # Show results
+        # Show results for both modes
         result_path = Path(result_dir)
         if result_path.exists():
             print(f"\nResults saved to: {result_path.resolve()}")
             
-            # Show optimization summary if available
-            opt_summary = result_path / "optimization_summary.txt"
-            if opt_summary.exists():
-                print("\nOptimization Summary:")
-                print("-" * 40)
-                with open(opt_summary, 'r') as f:
-                    print(f.read())
+            # Show global optimization results
+            global_path = result_path / "global"
+            if global_path.exists():
+                print(f"\nGlobal optimization results: {global_path}")
+                
+            # Show per-task optimization results  
+            per_task_path = result_path / "per_task"
+            if per_task_path.exists():
+                print(f"Per-task optimization results: {per_task_path}")
             
         print("\nNext steps:")
-        print("- Check the results directory for detailed benchmark outputs")
-        print("- Optimization results are cached for future runs")
-        print("- Try different models or benchmark subsets")
-        print("- Increase optimization_samples for better results")
+        print("- Compare global vs per-task optimization results")
+        print("- Use the get_cached_config.py script to retrieve optimized configs")
+        print("- Try: python benchmark/scripts/get_cached_config.py --config-type sparse_attention --show-all")
+        print("- Or: python benchmark/scripts/get_cached_config.py --config-type sparse_attention --create-optimized")
         
     except Exception as e:
         print(f"\n❌ Demo failed: {e}")

@@ -43,6 +43,7 @@ class OptimizationConfig:
         cache_dir: Directory to cache optimization results
         optimization_timeout: Timeout per optimization in seconds
         quick_eval_requests: Number of requests for quick evaluation during optimization
+        use_per_task_config: Whether to use best config per task/subset vs global best
     """
     enabled: bool = True
     num_samples: int = 20
@@ -52,6 +53,7 @@ class OptimizationConfig:
     cache_dir: str = "./hyperparameter_cache"
     optimization_timeout: float = 7200.0  # 2 hours
     quick_eval_requests: int = 10  # Small number for fast optimization
+    use_per_task_config: bool = True  # Use per-task configs by default
 
 
 @dataclass
@@ -63,19 +65,30 @@ class OptimizedSparseConfig:
     Attributes:
         config_type: Type of sparse attention (e.g., "magic_pig", "hash_attention")
         base_config: Base sparse attention config (may be None for optimization)
-        optimized_params: Optimized hyperparameters from Ray Tune
+        optimized_params: Optimized hyperparameters from Ray Tune (global best)
         optimization_metadata: Metadata about the optimization process
         is_optimized: Whether this config has been optimized
+        per_task_configs: Dict mapping (benchmark, subset) to optimized params for per-task configs
     """
     config_type: str
     base_config: Optional[SparseAttentionConfig] = None
     optimized_params: Optional[Dict[str, Any]] = None
     optimization_metadata: Dict[str, Any] = field(default_factory=dict)
     is_optimized: bool = False
+    per_task_configs: Dict[Tuple[str, Optional[str]], Dict[str, Any]] = field(default_factory=dict)
     
-    def create_optimized_config(self) -> Optional[SparseAttentionConfig]:
-        """Create the final sparse attention config using optimized parameters."""
-        if not self.is_optimized or not self.optimized_params:
+    def create_optimized_config(self, benchmark_name: Optional[str] = None, subset: Optional[str] = None, use_per_task: bool = False) -> Optional[SparseAttentionConfig]:
+        """Create the final sparse attention config using optimized parameters.
+        
+        Args:
+            benchmark_name: Name of benchmark for per-task config lookup
+            subset: Name of subset for per-task config lookup  
+            use_per_task: Whether to use per-task config if available
+            
+        Returns:
+            SparseAttentionConfig object with optimized parameters
+        """
+        if not self.is_optimized:
             if self.base_config:
                 return self.base_config
             elif self.config_type == "dense":
@@ -84,8 +97,33 @@ class OptimizedSparseConfig:
             else:
                 raise ValueError(f"No optimized parameters or base config for {self.config_type}")
         
+        # Choose which parameters to use
+        params_to_use = None
+        
+        if use_per_task and benchmark_name and (benchmark_name, subset) in self.per_task_configs:
+            # Use per-task config if available and requested
+            params_to_use = self.per_task_configs[(benchmark_name, subset)]
+        elif self.optimized_params:
+            # Fall back to global best config
+            params_to_use = self.optimized_params
+        else:
+            raise ValueError(f"No optimized parameters available for {self.config_type}")
+        
         # Delegate to the appropriate config creator based on type
-        return create_sparse_config_from_params(self.config_type, self.optimized_params)
+        return create_sparse_config_from_params(self.config_type, params_to_use)
+    
+    def get_config_for_task(self, benchmark_name: str, subset: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get the optimized parameters for a specific task.
+        
+        Args:
+            benchmark_name: Name of the benchmark
+            subset: Optional subset name
+            
+        Returns:
+            Dict of optimized parameters for this task, or None if not available
+        """
+        task_key = (benchmark_name, subset)
+        return self.per_task_configs.get(task_key, self.optimized_params)
 
 
 class SparseConfigOptimizer(ABC):
@@ -131,11 +169,12 @@ class MagicPigOptimizer(SparseConfigOptimizer):
         from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import MagicPigConfig
         
+        # Provide default values for missing parameters
         masker_config = MagicPigConfig(
-            lsh_l=params["lsh_l"],
-            lsh_k=params["lsh_k"],
-            center=params["center"],
-            packing=params["packing"],
+            lsh_l=params.get("lsh_l", 8),
+            lsh_k=params.get("lsh_k", 32),
+            center=params.get("center", True),
+            packing=params.get("packing", "int64"),
             seed=params.get("seed", 42)
         )
         
@@ -180,13 +219,30 @@ class HyperparameterOptimizer:
     def __init__(self, config: OptimizationConfig):
         self.config = config
         self.cache_dir = Path(config.cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            raise RuntimeError(f"Failed to create cache directory {self.cache_dir}: {e}")
         self.logger = logging.getLogger(__name__)
     
     def get_cache_key(self, model_name: str, config_type: str, benchmark_name: str, subset: Optional[str]) -> str:
         """Generate cache key for optimization results."""
         subset_str = f"_{subset}" if subset else ""
-        return f"{model_name}_{config_type}_{benchmark_name}{subset_str}".replace("/", "_").replace("-", "_")
+        # Clean up the strings to avoid filesystem issues
+        clean_model = model_name.replace("/", "_").replace("-", "_").replace(":", "_")
+        clean_config = config_type.replace("/", "_").replace("-", "_").replace(":", "_")
+        clean_benchmark = benchmark_name.replace("/", "_").replace("-", "_").replace(":", "_")
+        clean_subset = subset_str.replace("/", "_").replace("-", "_").replace(":", "_") if subset_str else ""
+        
+        cache_key = f"{clean_model}_{clean_config}_{clean_benchmark}{clean_subset}"
+        
+        # Ensure the key is not too long for filesystem limits
+        if len(cache_key) > 200:
+            # Hash the key if it's too long
+            import hashlib
+            cache_key = hashlib.md5(cache_key.encode('utf-8')).hexdigest()
+            
+        return cache_key
     
     def create_optimized_config_from_cache(self, model_name: str, config_type: str, benchmark_name: str, subset: Optional[str] = None) -> Optional[Any]:
         """Create optimized sparse attention config from cached parameters.
@@ -228,11 +284,86 @@ class HyperparameterOptimizer:
         try:
             # Create config from cached parameters
             optimized_config = optimizer.create_config_from_params(best_params)
-            self.logger.info(f"Created optimized {config_type} config from cache")
+            self.logger.info(f"Created optimized {config_type} config from cache for {benchmark_name}/{subset}")
             return optimized_config
         except Exception as e:
             self.logger.error(f"Failed to create config from cached params: {e}")
             return None
+    
+    def get_all_cached_configs_for_type(self, model_name: str, config_type: str) -> Dict[Tuple[str, Optional[str]], Dict[str, Any]]:
+        """Get all cached configurations for a specific model and config type.
+        
+        Args:
+            model_name: Name of the model
+            config_type: Type of sparse attention config
+            
+        Returns:
+            Dict mapping (benchmark_name, subset) tuples to cached config results
+        """
+        all_configs = {}
+        
+        # Look for all cache files matching the pattern
+        cache_pattern = f"{model_name.replace('/', '_').replace('-', '_')}_{config_type}_*"
+        
+        for cache_file in self.cache_dir.glob(f"{cache_pattern}.json"):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached_result = json.load(f)
+                
+                benchmark_name = cached_result.get("benchmark_name")
+                subset = cached_result.get("subset")
+                
+                if benchmark_name:
+                    task_key = (benchmark_name, subset)
+                    all_configs[task_key] = cached_result
+                    
+            except (IOError, OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.logger.warning(f"Failed to load cache file {cache_file}: {e}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error loading cache file {cache_file}: {e}")
+        
+        return all_configs
+    
+    def create_optimized_sparse_config_from_cache(self, model_name: str, config_type: str, use_per_task: bool = True) -> Optional[OptimizedSparseConfig]:
+        """Create an OptimizedSparseConfig from all cached results for a config type.
+        
+        Args:
+            model_name: Name of the model
+            config_type: Type of sparse attention config
+            use_per_task: Whether to enable per-task configuration usage
+            
+        Returns:
+            OptimizedSparseConfig with all cached results, or None if no cache found
+        """
+        all_cached_configs = self.get_all_cached_configs_for_type(model_name, config_type)
+        
+        if not all_cached_configs:
+            self.logger.info(f"No cached configurations found for {model_name}/{config_type}")
+            return None
+        
+        # Find the globally best configuration (lowest combined_score)
+        best_global_result = min(
+            all_cached_configs.values(), 
+            key=lambda x: x["best_metrics"]["combined_score"]
+        )
+        
+        # Extract per-task configurations
+        per_task_configs = {}
+        for task_key, cached_result in all_cached_configs.items():
+            per_task_configs[task_key] = cached_result["best_params"]
+        
+        # Create OptimizedSparseConfig
+        optimized_config = OptimizedSparseConfig(
+            config_type=config_type,
+            base_config=None,  # We'll use optimized params
+            optimized_params=best_global_result["best_params"],
+            optimization_metadata=best_global_result["optimization_metadata"],
+            is_optimized=True,
+            per_task_configs=per_task_configs
+        )
+        
+        self.logger.info(f"Created OptimizedSparseConfig for {config_type} with {len(per_task_configs)} per-task configs")
+        return optimized_config
 
     def get_cached_best_config(self, model_name: str, config_type: str, benchmark_name: str, subset: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get best config from cache without running optimization.
@@ -272,21 +403,33 @@ class HyperparameterOptimizer:
         cache_file = self.cache_dir / f"{cache_key}.json"
         if cache_file.exists():
             try:
-                with open(cache_file, 'r') as f:
+                with open(cache_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except Exception as e:
+            except (IOError, OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
                 self.logger.warning(f"Failed to load cache {cache_file}: {e}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error loading cache {cache_file}: {e}")
         return None
     
     def save_optimization_results(self, cache_key: str, results: Dict[str, Any]) -> None:
         """Save optimization results to cache."""
         cache_file = self.cache_dir / f"{cache_key}.json"
         try:
-            with open(cache_file, 'w') as f:
-                json.dump(results, f, indent=2)
+            # Ensure parent directory exists
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
             self.logger.info(f"Saved optimization results to {cache_file}")
-        except Exception as e:
+        except (IOError, OSError, UnicodeEncodeError) as e:
             self.logger.error(f"Failed to save cache {cache_file}: {e}")
+            # Check if it's a permission issue
+            if "Permission denied" in str(e):
+                self.logger.error(f"Permission denied - check write permissions for {self.cache_dir}")
+            elif "No space left on device" in str(e):
+                self.logger.error(f"Disk full - cannot write to {self.cache_dir}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error saving cache {cache_file}: {e}")
     
     def optimize_hyperparameters(
         self, 
@@ -480,19 +623,25 @@ class HyperparameterOptimizer:
         
         if micro_metrics_file.exists():
             try:
-                with open(micro_metrics_file, 'r') as f:
+                with open(micro_metrics_file, 'r', encoding='utf-8') as f:
                     for line in f:
                         if line.strip():
-                            data = json.loads(line)
-                            metric_name = data.get('metric', '')
-                            value = data.get('value')
-                            
-                            if metric_name == 'research_attention_output_error' and value is not None:
-                                attention_errors.append(float(value))
-                            elif metric_name == 'research_attention_density' and value is not None:
-                                densities.append(float(value))
-            except Exception as e:
+                            try:
+                                data = json.loads(line)
+                                metric_name = data.get('metric', '')
+                                value = data.get('value')
+                                
+                                if metric_name == 'research_attention_output_error' and value is not None:
+                                    attention_errors.append(float(value))
+                                elif metric_name == 'research_attention_density' and value is not None:
+                                    densities.append(float(value))
+                            except (json.JSONDecodeError, ValueError, TypeError) as e:
+                                self.logger.debug(f"Skipping malformed line in metrics: {e}")
+                                continue
+            except (IOError, OSError, UnicodeDecodeError) as e:
                 self.logger.warning(f"Error reading micro metrics: {e}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error reading micro metrics: {e}")
         
         if not attention_errors or not densities:
             return {"attention_error": 10.0, "density": 1.0}
@@ -566,8 +715,8 @@ def optimize_sparse_configs(
             continue
         
         # For sparse configs, run optimization for each (model, benchmark, subset) combination
-        # We'll optimize once per unique task and use the best overall parameters
         all_optimizations = []
+        per_task_configs = {}
         
         for model_name in model_names:
             for benchmark_config in benchmark_configs:
@@ -583,19 +732,25 @@ def optimize_sparse_configs(
                             adapter_config=adapter_config
                         )
                         all_optimizations.append(result)
+                        
+                        # Store per-task config for this (benchmark, subset) combination
+                        task_key = (benchmark_config.benchmark_name, subset)
+                        per_task_configs[task_key] = result["best_params"]
+                        
                     except Exception as e:
                         logging.error(f"Optimization failed for {model_name}/{config_name}/{benchmark_config.benchmark_name}/{subset}: {e}")
         
         if all_optimizations:
-            # Use the best optimization result (lowest combined_score)
+            # Use the best optimization result (lowest combined_score) as global best
             best_optimization = min(all_optimizations, key=lambda x: x["best_metrics"]["combined_score"])
             
             optimized_config = OptimizedSparseConfig(
                 config_type=config_name,
                 base_config=base_config,
-                optimized_params=best_optimization["best_params"],
+                optimized_params=best_optimization["best_params"],  # Global best
                 optimization_metadata=best_optimization["optimization_metadata"],
-                is_optimized=True
+                is_optimized=True,
+                per_task_configs=per_task_configs  # Per-task configs
             )
         else:
             # Fall back to base config if optimization failed
