@@ -7,6 +7,7 @@ A comprehensive framework for sparse attention mechanisms in deep learning model
 - **Multiple Sparse Attention Algorithms**: Implementations of efficient attention mechanisms including Double Sparsity, Hash Attention, and various research-oriented masking strategies
 - **Framework Integration**: Seamless integration with HuggingFace Transformers and other popular frameworks
 - **Comprehensive Benchmarking**: Built-in support for LongBench, Loogle, InfBench, and custom benchmarks
+- **Hyperparameter Optimization**: Ray Tune-based automatic optimization with intelligent caching and per-task tuning
 - **Advanced Metrics**: Micro-metrics logging system for detailed performance analysis
 - **Visualization Tools**: Generate plots and heatmaps for attention pattern analysis
 - **Extensible Architecture**: Modular design for easy extension and customization
@@ -48,6 +49,9 @@ The framework is organized into several key modules:
 - **Benchmark**: Abstract benchmark interface
 - **Datasets**: LongBench, Loogle, InfBench implementations
 - **BenchmarkExecutor**: Execution and result management
+- **OptimizedBenchmarkExecutor**: Ray Tune hyperparameter optimization integration
+- **HyperparameterOptimizer**: Manages optimization with intelligent caching
+- **OptimizationConfig**: Configuration for hyperparameter optimization settings
 - **ResultStorage**: Persistent storage for benchmark results
 
 ### Metrics & Visualization
@@ -99,6 +103,108 @@ print(response.responses)
 benchmark_executor = BenchmarkExecutor()
 plot_generator = PlotGenerator()
 plot_path = plot_generator.generate_plot(Granularity.PER_HEAD)
+```
+
+## 🔧 Hyperparameter Optimization
+
+The framework includes a comprehensive Ray Tune-based hyperparameter optimization system for sparse attention configurations:
+
+### Quick Start with Optimization
+
+```python
+from benchmark.hyperparameter_optimization import OptimizationConfig, HyperparameterOptimizer
+from benchmark.optimized_executor import OptimizedBenchmarkExecutor
+from benchmark.executor_config import BenchmarkConfig, AdapterConfig
+
+# Configure optimization
+optimization_config = OptimizationConfig(
+    enabled=True,
+    num_samples=20,
+    max_concurrent=4,
+    optimization_metric="combined_score",
+    cache_dir="./hyperparameter_cache"
+)
+
+# Configure benchmarks
+benchmark_configs = [
+    BenchmarkConfig(benchmark_name="loogle", subsets=["shortdep_qa", "longdep_qa"])
+]
+
+# Configure model adapter
+adapter_config = AdapterConfig(
+    model_kwargs={"torch_dtype": "auto", "device_map": "auto"},
+    tokenizer_kwargs={"padding_side": "left"}
+)
+
+# Run optimized benchmarks
+executor = OptimizedBenchmarkExecutor(
+    models=["meta-llama/Llama-3.1-8B-Instruct"],
+    sparse_configs=["dense", "magic_pig"],
+    benchmark_configs=benchmark_configs,
+    adapter_config=adapter_config,
+    optimization_config=optimization_config,
+    result_dir="./results"
+)
+
+# This will automatically:
+# 1. Optimize Magic Pig hyperparameters for each benchmark subset
+# 2. Cache optimization results for future runs
+# 3. Run benchmarks with both dense and optimized sparse configurations
+results = executor.run()
+```
+
+### Cache Management
+
+Retrieve previously optimized configurations:
+
+```python
+# Get cached best parameters
+optimizer = HyperparameterOptimizer(optimization_config)
+cached_config = optimizer.get_cached_best_config(
+    model_name="meta-llama/Llama-3.1-8B-Instruct",
+    config_type="magic_pig",
+    benchmark_name="loogle",
+    subset="shortdep_qa"
+)
+
+if cached_config:
+    print(f"Best parameters: {cached_config['best_params']}")
+    print(f"Best metrics: {cached_config['best_metrics']}")
+
+# Create optimized config object from cache
+optimized_config = optimizer.create_optimized_config_from_cache(
+    model_name="meta-llama/Llama-3.1-8B-Instruct",
+    config_type="magic_pig", 
+    benchmark_name="loogle",
+    subset="shortdep_qa"
+)
+```
+
+### Command Line Tools
+
+```bash
+# Run optimized benchmarks with CLI
+python benchmark/run_optimized_benchmarks.py \
+    --model meta-llama/Llama-3.1-8B-Instruct \
+    --benchmark loogle \
+    --config magic_pig \
+    --optimization-samples 20
+
+# Get cached configurations
+python benchmark/get_cached_config.py
+
+# Run quick demo
+python benchmark/demo_optimized_benchmarks.py
+```
+
+### Features
+
+- **Per-Task Optimization**: Automatically optimizes hyperparameters for each (model, config_type, benchmark, subset) combination
+- **Intelligent Caching**: Avoids re-optimization by caching results with smart cache key generation
+- **Ray Tune Integration**: Uses advanced search algorithms (HyperOpt) and schedulers (ASHA) for efficient optimization
+- **Resumability**: Supports resuming interrupted benchmark runs and optimization sessions
+- **Multi-GPU Support**: Efficiently utilizes multiple GPUs for parallel optimization trials
+- **Extensible Optimizers**: Easy to add new sparse attention types with custom search spaces
 ```
 
 ## 📊 Benchmarking
@@ -246,9 +352,17 @@ sparse-attention-hub/
 │   ├── metrics/                    # Metrics and logging
 │   ├── plotting/                   # Visualization tools
 │   └── testing/                    # Testing utilities
+├── benchmark/                      # Benchmark execution and optimization
+│   ├── hyperparameter_optimization.py  # Ray Tune optimization system
+│   ├── optimized_executor.py       # Optimization-integrated executor
+│   ├── demo_optimized_benchmarks.py    # Demo script
+│   ├── get_cached_config.py        # Cache utility
+│   └── run_optimized_benchmarks.py # CLI runner
 ├── tests/                          # Test suite
 │   ├── unit/                       # Unit tests
 │   └── integration/                # Integration tests
+│       ├── test_benchmark_hyperparameter_optimization.py
+│       └── test_benchmark_optimization_quick.py
 ├── scripts/                        # Utility scripts
 ├── tutorials/                      # Tutorial notebooks and examples
 └── docs/                          # Documentation
