@@ -14,31 +14,14 @@ Key Features:
 """
 
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, Optional, Type, Union, get_type_hints, get_origin, get_args, List
 
 from ray import tune
 
 
-class SparseConfigOptimizer(ABC):
-    """Base class for sparse attention config optimizers."""
-
-    @abstractmethod
-    def create_search_space(self) -> Dict[str, Any]:
-        """Create Ray Tune search space for the config type."""
-        pass
-
-    @abstractmethod
-    def create_config_from_params(self, params: Dict[str, Any]) -> Any:
-        """Create config instance from optimization parameters."""
-        pass
-
-    @property
-    @abstractmethod
-    def config_type_name(self) -> str:
-        """Get the name of the config type for caching."""
-        pass
+# SparseConfigOptimizer is defined in hyperparameter_optimization.py
+from benchmark.optimizer.hyperparameter_optimization import SparseConfigOptimizer
 
 
 class GenericConfigOptimizer(SparseConfigOptimizer):
@@ -64,16 +47,30 @@ class GenericConfigOptimizer(SparseConfigOptimizer):
         """Create Ray Tune search space by introspecting the config dataclass."""
         search_space = {}
         
+        # First, check if config class defines its own default search space
+        if hasattr(self.config_class, 'get_default_search_space'):
+            try:
+                default_search_space = self.config_class.get_default_search_space()
+                if isinstance(default_search_space, dict):
+                    search_space.update(default_search_space)
+                    self.logger.info(f"Using default search space from {self.config_class.__name__}")
+            except Exception as e:
+                self.logger.warning(f"Failed to get default search space from {self.config_class.__name__}: {e}")
+        
         # Get type hints for the config class
         type_hints = get_type_hints(self.config_class)
         
-        # Iterate through dataclass fields
+        # Iterate through dataclass fields for auto-generation
         for field_info in fields(self.config_class):
             field_name = field_info.name
             
             # Skip if manually overridden
             if field_name in self.search_space_overrides:
                 search_space[field_name] = self.search_space_overrides[field_name]
+                continue
+            
+            # Skip if already in default search space (unless overridden)
+            if field_name in search_space:
                 continue
                 
             # Get field type and default value
@@ -86,7 +83,9 @@ class GenericConfigOptimizer(SparseConfigOptimizer):
                 search_space[field_name] = tune_space
             else:
                 self.logger.debug(f"Skipping field {field_name} of type {field_type}")
-                
+        
+        # Apply final overrides
+        search_space.update(self.search_space_overrides)
         return search_space
     
     def _create_tune_space_for_field(self, field_name: str, field_type: Type, default_value: Any) -> Optional[Any]:
@@ -280,3 +279,55 @@ def create_composite_optimizer(masker_configs: List[Type], config_name: str, ove
         >>> # Creates search space with prefixed parameters: magicpig_lsh_l, localmasker_window_size, etc.
     """
     return CompositeConfigOptimizer(masker_configs, config_name, overrides)
+
+
+def auto_create_composite_optimizer(masker_configs: List[Type], config_name: str) -> CompositeConfigOptimizer:
+    """Auto-create composite optimizer using default search spaces from each config.
+    
+    This function automatically discovers and combines default search spaces from 
+    each masker config without requiring manual override specification.
+    
+    Args:
+        masker_configs: List of masker config classes to optimize
+        config_name: Name for caching purposes
+        
+    Returns:
+        CompositeConfigOptimizer instance with auto-discovered search spaces
+        
+    Example:
+        >>> from sparse_attention_hub.sparse_attention.research_attention.maskers import MagicPigConfig, LocalMaskerConfig
+        >>> # This will automatically use default search spaces from each config
+        >>> optimizer = auto_create_composite_optimizer([MagicPigConfig, LocalMaskerConfig], "auto_composite")
+        >>> search_space = optimizer.create_search_space()
+    """
+    return CompositeConfigOptimizer(masker_configs, config_name, overrides=None)
+
+
+def auto_register_config(config_class: Type, config_name: Optional[str] = None) -> str:
+    """Auto-register a config class for optimization with minimal setup.
+    
+    This function automatically creates and registers an optimizer for any config class.
+    It will use the config's default search space if available, or fall back to 
+    automatic field introspection.
+    
+    Args:
+        config_class: The dataclass config type to register
+        config_name: Optional name for registration (defaults to lowercase class name)
+        
+    Returns:
+        The registered config name
+        
+    Example:
+        >>> from sparse_attention_hub.sparse_attention.research_attention.maskers import MagicPigConfig
+        >>> # Auto-register with default search space
+        >>> name = auto_register_config(MagicPigConfig)  # Returns "magicpigconfig"
+        >>> # Or with custom name
+        >>> name = auto_register_config(MagicPigConfig, "magic_pig")  # Returns "magic_pig"
+    """
+    if config_name is None:
+        config_name = config_class.__name__.lower()
+    
+    # This function will be imported by hyperparameter_optimization.py to register configs
+    from benchmark.optimizer.hyperparameter_optimization import register_config_optimizer
+    register_config_optimizer(config_class, config_name, overrides=None)
+    return config_name

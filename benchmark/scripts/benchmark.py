@@ -17,8 +17,9 @@ from pathlib import Path
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from benchmark.executor import BenchmarkExecutor
+from benchmark.optimized_executor import OptimizedBenchmarkExecutor
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
+from benchmark.optimizer.hyperparameter_optimization import OptimizationConfig
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
     LocalMaskerConfig, SinkMaskerConfig
@@ -43,7 +44,10 @@ SPARSE_CONFIGS = [
     # Dense baseline (no sparse attention)
     ("dense", None),
     
-    # StreamingLLM configurations
+    # Magic Pig with auto-optimization
+    ("magic_pig", None),  # None = optimize using declarative search spaces
+    
+    # StreamingLLM configurations (fixed config)
     ("streaming_conservative", ResearchAttentionConfig(masker_configs=[
         SinkMaskerConfig(sink_size=4),
         LocalMaskerConfig(window_size=16)
@@ -150,6 +154,18 @@ RESULT_DIR = "./benchmark_results"
 ENABLE_RESUMABILITY = True
 TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
 
+# Optimization Settings
+OPTIMIZATION_CONFIG = OptimizationConfig(
+    enabled=True,
+    num_samples=10,  # Reasonable optimization samples
+    max_concurrent=2,
+    optimization_metric="combined_score",
+    optimization_mode="min",
+    cache_dir=f"{RESULT_DIR}/hyperparameter_cache",
+    quick_eval_requests=5,  # Quick evaluation during optimization
+    use_per_task_config=True  # Use per-task optimization
+)
+
 # ============================================================================
 # MAIN EXECUTION
 # ============================================================================
@@ -166,7 +182,10 @@ if __name__ == "__main__":
     print(f"  - Sparse configs: {len(SPARSE_CONFIGS)}")
     for name, config in SPARSE_CONFIGS:
         if config is None:
-            print(f"    - {name}: dense (no sparse attention)")
+            if name == "dense":
+                print(f"    - {name}: dense (no sparse attention)")
+            else:
+                print(f"    - {name}: auto-optimized (using declarative search spaces)")
         else:
             sink_size = config.masker_configs[0].sink_size
             window_size = config.masker_configs[1].window_size
@@ -194,11 +213,13 @@ if __name__ == "__main__":
     print(f"  - Estimated time: {total_combinations * TIMEOUT_PER_BENCHMARK / 3600:.1f} hours (worst case)")
     
     # Create executor
-    print(f"\n🔧 Initializing BenchmarkExecutor...")
-    executor = BenchmarkExecutor(
+    print(f"\n🔧 Initializing OptimizedBenchmarkExecutor...")
+    executor = OptimizedBenchmarkExecutor(
         gpu_ids=GPUS,
         max_concurrent_runs=MAX_CONCURRENT_RUNS,
         base_result_dir=RESULT_DIR,
+        optimization_config=OPTIMIZATION_CONFIG,
+        enable_optimization=True,
         enable_resumability=ENABLE_RESUMABILITY,
         required_result_files=["raw_results.csv"],
         timeout_per_benchmark=TIMEOUT_PER_BENCHMARK,

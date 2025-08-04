@@ -61,6 +61,52 @@ class MagicPigConfig(SamplingMaskerConfig):
             raise ValueError(f"For 'int64' packing, lsh_k must be <= 64, but got {self.lsh_k}")
         if self.seed is None:
             raise ValueError("seed cannot be None")
+    
+    @classmethod
+    def get_default_search_space(cls) -> Dict[str, Any]:
+        """Get the default search space for Magic Pig hyperparameter optimization.
+        
+        This method defines the optimal parameter ranges for Magic Pig LSH based on
+        empirical research and mathematical constraints.
+        
+        Returns:
+            Dictionary mapping parameter names to Ray Tune search space objects
+            
+        Example:
+            >>> search_space = MagicPigConfig.get_default_search_space()
+            >>> print(search_space.keys())
+            dict_keys(['lsh_l', 'lsh_k', 'center', 'packing', 'seed'])
+        """
+        # Import Ray Tune locally to avoid circular imports
+        try:
+            from ray import tune
+        except ImportError:
+            # Fallback for when Ray is not available
+            class tune:
+                @staticmethod
+                def choice(choices): return choices[0]
+                @staticmethod
+                def uniform(low, high): return (low + high) / 2
+        
+        return {
+            # LSH Tables: Balances recall vs computational cost
+            # More tables = better recall but more computation
+            "lsh_l": tune.choice([4, 6, 8, 10, 12]),
+            
+            # Bits per table: Controls precision vs collision probability
+            # Fewer bits = more collisions but less precision
+            # Constraint: lsh_l * lsh_k <= 64 for int64 packing
+            "lsh_k": tune.choice([2, 4, 6, 8]),
+            
+            # Centering generally improves LSH performance for attention
+            "center": tune.choice([True]),
+            
+            # int64 packing is more efficient than float32
+            "packing": tune.choice(["int64"]),
+            
+            # Fixed seed for reproducible results
+            "seed": tune.choice([42]),
+        }
 
 
 @MaskerRegistry.register(MagicPigConfig)

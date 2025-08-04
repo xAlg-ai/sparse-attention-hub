@@ -220,96 +220,74 @@ class GenericOptimizerAdapter(SparseConfigOptimizer):
 
 # Factory functions for creating optimizers for common config types
 def create_magic_pig_optimizer() -> GenericOptimizerAdapter:
-    """Create composite optimizer for MagicPig with sink and local maskers."""
+    """Create composite optimizer for MagicPig with sink and local maskers using auto-discovery."""
     from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import MagicPigConfig
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import (
         LocalMaskerConfig, SinkMaskerConfig
     )
+    from benchmark.optimizer.generic_config_optimizer import auto_create_composite_optimizer
     
-    # Create composite optimizer with all three masker types
-    composite_optimizer = create_composite_optimizer(
+    # Create composite optimizer with automatic search space discovery
+    # Each config class will provide its own default search space via get_default_search_space()
+    composite_optimizer = auto_create_composite_optimizer(
         masker_configs=[SinkMaskerConfig, LocalMaskerConfig, MagicPigConfig],
-        config_name="magic_pig",
-        overrides={
-            # SinkMasker overrides
-            "sinkmasker_sink_size": tune.choice([16, 32, 64, 96, 128]),
-            # LocalMasker overrides  
-            "localmasker_window_size": tune.choice([16, 32, 64, 96, 128]),
-            # MagicPig overrides
-            "magicpig_lsh_l": tune.choice([4, 6, 8, 10, 12]),
-            "magicpig_lsh_k": tune.choice([2, 4, 6, 8]),
-            "magicpig_center": tune.choice([True]),
-            "magicpig_packing": tune.choice(["int64"]),
-            "magicpig_seed": tune.choice([42]),
-        }
+        config_name="magic_pig"
     )
     return GenericOptimizerAdapter(composite_optimizer)
 
+
+
+
 def create_local_masker_optimizer() -> GenericOptimizerAdapter:
-    """Create optimizer for LocalMasker configurations."""
+    """Create optimizer for LocalMasker configurations using auto-discovery."""
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import LocalMaskerConfig
     
     generic_optimizer = create_optimizer_for_config(
         config_class=LocalMaskerConfig,
-        config_name="local_masker",
-        overrides={
-            "window_size": tune.uniform(0.1, 0.8),
-        }
+        config_name="local_masker"
+        # No overrides - uses LocalMaskerConfig.get_default_search_space()
     )
     return GenericOptimizerAdapter(generic_optimizer)
 
 def create_sink_masker_optimizer() -> GenericOptimizerAdapter:
-    """Create optimizer for SinkMasker configurations."""
+    """Create optimizer for SinkMasker configurations using auto-discovery."""
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import SinkMaskerConfig
     
     generic_optimizer = create_optimizer_for_config(
         config_class=SinkMaskerConfig,
-        config_name="sink_masker",
-        overrides={
-            "sink_size": tune.uniform(0.05, 0.3),
-        }
+        config_name="sink_masker"
+        # No overrides - uses SinkMaskerConfig.get_default_search_space()
     )
     return GenericOptimizerAdapter(generic_optimizer)
 
 def create_adaptive_sampling_optimizer() -> GenericOptimizerAdapter:
-    """Create optimizer for AdaptiveSampling configurations."""
+    """Create optimizer for AdaptiveSampling configurations using auto-discovery."""
     from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.adaptive_sampling import AdaptiveSamplingMaskerConfig
     
     generic_optimizer = create_optimizer_for_config(
         config_class=AdaptiveSamplingMaskerConfig,
-        config_name="adaptive_sampling",
-        overrides={
-            "base_rate_sampling": tune.uniform(0.05, 0.3),
-            "epsilon": tune.uniform(0.01, 0.2),
-            "delta": tune.uniform(0.01, 0.1),
-        }
+        config_name="adaptive_sampling"
+        # No overrides - uses AdaptiveSamplingMaskerConfig.get_default_search_space() if available
     )
     return GenericOptimizerAdapter(generic_optimizer)
 
 def create_hash_attention_optimizer() -> GenericOptimizerAdapter:
-    """Create composite optimizer for HashAttention with sink, local, and oracle maskers."""
+    """Create composite optimizer for HashAttention with sink, local, and oracle maskers using auto-discovery."""
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import (
         SinkMaskerConfig, LocalMaskerConfig
     )
     from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.oracle_top_k import OracleTopKConfig
+    from benchmark.optimizer.generic_config_optimizer import auto_create_composite_optimizer
     
-    # Create composite optimizer with all three masker types (matching experimental setup)
-    composite_optimizer = create_composite_optimizer(
+    # Create composite optimizer with automatic search space discovery
+    composite_optimizer = auto_create_composite_optimizer(
         masker_configs=[SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig],
-        config_name="hash_attention",
-        overrides={
-            # SinkMasker overrides - using smaller sizes as per experimental setup
-            "sinkmasker_sink_size": tune.choice([32, 64, 128]),
-            # LocalMasker overrides - window_size parameter  
-            "localmasker_window_size": tune.choice([64, 128, 256, 512]),
-            # OracleTopK overrides - heavy_size parameter
-            "oracletopk_heavy_size": tune.choice([128, 256, 512]),
-        }
+        config_name="hash_attention"
     )
     return GenericOptimizerAdapter(composite_optimizer)
 
 
-# Registry of available optimizers - now using generic optimizers
+# Registry of available optimizers - using auto-discovery
 SPARSE_OPTIMIZERS: Dict[str, SparseConfigOptimizer] = {
     "magic_pig": create_magic_pig_optimizer(),
     "local_masker": create_local_masker_optimizer(), 
@@ -342,55 +320,7 @@ def list_available_optimizers() -> List[str]:
     """List all available optimizer config types."""
     return list(SPARSE_OPTIMIZERS.keys())
 
-# Legacy MagicPigOptimizer for backward compatibility
-class MagicPigOptimizer(SparseConfigOptimizer):
-    """Legacy hyperparameter optimizer for Magic Pig attention.
-    
-    This class is kept for backward compatibility. New code should use
-    the generic optimizer via create_magic_pig_optimizer().
-    """
-    
-    def get_search_space(self) -> Dict[str, Any]:
-        return {
-            "sink_size": tune.choice([16, 32, 64, 96, 128]),
-            "window_size": tune.choice([16, 32, 64, 96, 128]),
-            "lsh_l": tune.choice([16, 32, 64, 96, 128]),
-            "lsh_k": tune.choice([4, 8, 16, 32, 64]),  # Remove 128 for int64 compatibility
-            "center": tune.choice([True]),
-            "packing": tune.choice(["int64"]),
-            "seed": tune.choice([42])
-        }
-    
-    def create_config_from_params(self, params: Dict[str, Any]) -> SparseAttentionConfig:
-        from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
-        from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import MagicPigConfig
-        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-            LocalMaskerConfig, SinkMaskerConfig
-        )
 
-        masker_configs = [
-            SinkMaskerConfig(sink_size=params.get("sink_size", 64)),
-            LocalMaskerConfig(window_size=params.get("window_size", 128)),
-            MagicPigConfig(
-                lsh_l=params.get("lsh_l", 8),
-                lsh_k=params.get("lsh_k", 32),
-                center=params.get("center", True),
-                packing=params.get("packing", "int64"),
-                seed=params.get("seed", 42)
-            )
-        ]
-        
-        return ResearchAttentionConfig(masker_configs=masker_configs)
-    
-    def get_default_request_kwargs(self, benchmark_name: str, subset: Optional[str]) -> Dict[str, Any]:
-        # Task-specific optimization parameters - using minimal requests for quick iteration
-        if benchmark_name == "loogle":
-            if subset and "longdep" in subset:
-                return {"max_requests": 2, "max_context_length": 512}  # Ultra-fast iteration
-            else:
-                return {"max_requests": 2, "max_context_length": 512}  # Ultra-fast iteration
-        else:
-            return {"max_requests": 2, "max_context_length": 512}  # Ultra-fast iteration
 
 
 def create_sparse_config_from_params(config_type: str, params: Dict[str, Any]) -> SparseAttentionConfig:
