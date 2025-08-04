@@ -20,16 +20,18 @@ from pathlib import Path
 from typing import List, Optional
 
 # Set project root and add to Python path (like magic_pig_experiments)
-project_root = Path(__file__).resolve().parents[2]  # Go up 2 levels from benchmark/scripts/
+project_root = Path(__file__).resolve().parents[3]  # Go up 3 levels from benchmark/optimizer/scripts/
 os.chdir(project_root)
 sys.path.insert(0, str(project_root))
 
-from benchmark.optimized_executor import run_optimized_benchmarks
+from benchmark.optimizer.optimized_executor import run_optimized_benchmarks
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
 
 # Sparse attention config imports
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
-from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import MagicPigConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
+    LocalMaskerConfig, SinkMaskerConfig
+)
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -49,7 +51,7 @@ def create_sparse_configs(config_names: List[str]) -> List[tuple]:
     """Create sparse attention configurations from names."""
     configs = []
     
-    # Always include dense baseline
+    # Always include dense baseline if not explicitly included
     if "dense" not in config_names:
         configs.append(("dense", None))
     
@@ -57,19 +59,18 @@ def create_sparse_configs(config_names: List[str]) -> List[tuple]:
         if config_name == "dense":
             configs.append(("dense", None))
         elif config_name == "magic_pig":
-            # Base Magic Pig config - will be optimized
-            magic_pig_config = ResearchAttentionConfig(
-                masker_configs=[MagicPigConfig(
-                    lsh_l=8,
-                    lsh_k=32,
-                    center=True,
-                    packing="int64",
-                    seed=42
-                )]
-            )
-            configs.append(("magic_pig", magic_pig_config))
+            # Base Magic Pig config - parameters will be optimized by MagicPigOptimizer
+            # We pass None to indicate this config should be optimized
+            configs.append(("magic_pig", None))
+        elif config_name == "streaming_conservative":
+            # StreamingLLM conservative configuration
+            streaming_config = ResearchAttentionConfig(masker_configs=[
+                SinkMaskerConfig(sink_size=4),
+                LocalMaskerConfig(window_size=16)
+            ])
+            configs.append(("streaming_conservative", streaming_config))
         else:
-            raise ValueError(f"Unknown sparse config: {config_name}")
+            raise ValueError(f"Unknown sparse config: {config_name}. Supported configs: dense, magic_pig, streaming_conservative")
     
     return configs
 
@@ -90,8 +91,64 @@ def create_benchmark_configs(benchmark_names: List[str], subsets: Optional[List[
                 benchmark_name="loogle",
                 subsets=benchmark_subsets
             ))
+        elif benchmark_name == "infinite_bench":
+            # InfiniteBench - using passkey task
+            benchmark_subsets = subsets if subsets else ["passkey"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="infinite_bench",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "ruler":
+            # Ruler - using 4096 context length
+            benchmark_subsets = subsets if subsets else ["4096"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="ruler",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "zero_scrolls":
+            # ZeroScrolls - using gov_report task
+            benchmark_subsets = subsets if subsets else ["default"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="zero_scrolls",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "longbenchv2":
+            # LongBenchv2 - using 0shot task
+            benchmark_subsets = subsets if subsets else ["0shot"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="longbenchv2",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "aime2024":
+            # AIME2024 - using single task
+            benchmark_subsets = subsets if subsets else ["aime2024"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="aime2024",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "aime2025":
+            # AIME2025 - using single task
+            benchmark_subsets = subsets if subsets else ["aime2025"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="aime2025",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "longbench":
+            # LongBench (existing) - using narrativeqa task
+            benchmark_subsets = subsets if subsets else ["narrativeqa"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="longbench",
+                subsets=benchmark_subsets
+            ))
+        elif benchmark_name == "mock_benchmark":
+            # Mock Benchmark (existing) - using single task
+            benchmark_subsets = subsets if subsets else ["reading_comprehension"]
+            configs.append(BenchmarkConfig(
+                benchmark_name="mock_benchmark",
+                subsets=benchmark_subsets
+            ))
         else:
-            # For other benchmarks, use provided subsets or None
+            # For other benchmarks, use provided subsets or None (all available)
             configs.append(BenchmarkConfig(
                 benchmark_name=benchmark_name,
                 subsets=subsets
@@ -109,14 +166,20 @@ Examples:
   # Basic usage with Magic Pig optimization
   python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --benchmark loogle --config magic_pig
   
+  # Test streaming conservative configuration (no optimization needed)
+  python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --benchmark loogle --config streaming_conservative --no-optimization
+  
   # Multiple models and configs
-  python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --config dense magic_pig --benchmark loogle
+  python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --config dense magic_pig streaming_conservative --benchmark loogle
+  
+  # Multiple benchmarks
+  python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --config magic_pig --benchmark loogle infinite_bench ruler
   
   # Specific benchmark subsets
   python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --config magic_pig --benchmark loogle --subset shortdep_qa
   
-  # Disable optimization (just run benchmarks)
-  python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --config magic_pig --benchmark loogle --no-optimization
+  # Full benchmark suite with streaming conservative
+  python run_optimized_benchmarks.py --model microsoft/Phi-4-mini-instruct --config dense streaming_conservative --benchmark loogle infinite_bench ruler zero_scrolls longbenchv2 --no-optimization
   
   # Custom optimization settings
   python run_optimized_benchmarks.py --model meta-llama/Llama-3.1-8B-Instruct --config magic_pig --benchmark loogle --optimization-samples 50 --max-concurrent 8
@@ -135,14 +198,14 @@ Examples:
         "--benchmark",
         nargs="+",
         required=True,
-        help="Benchmark name(s) to run (e.g., loogle)"
+        help="Benchmark name(s) to run. Options: loogle, infinite_bench, ruler, zero_scrolls, longbenchv2, aime2024, aime2025, longbench, mock_benchmark"
     )
     
     parser.add_argument(
         "--config",
         nargs="+",
         default=["dense", "magic_pig"],
-        help="Sparse attention config(s) to test (default: dense magic_pig)"
+        help="Sparse attention config(s) to test. Options: dense, magic_pig, streaming_conservative (default: dense magic_pig)"
     )
     
     # Optional arguments
@@ -220,6 +283,13 @@ Examples:
         help="PyTorch dtype for model loading (default: auto)"
     )
     
+    parser.add_argument(
+        "--max-requests",
+        type=int,
+        default=None,
+        help="Maximum number of requests per benchmark subtask (default: no limit)"
+    )
+    
     args = parser.parse_args()
     
     # Setup logging
@@ -251,6 +321,12 @@ Examples:
         logger.info(f"Result directory: {args.result_dir}")
         logger.info(f"Cache directory: {cache_dir}")
         
+        # Set up request kwargs if max_requests is specified
+        request_kwargs = {}
+        if args.max_requests is not None:
+            request_kwargs["max_requests"] = args.max_requests
+            logger.info(f"Limiting requests per subtask to: {args.max_requests}")
+        
         # Run optimized benchmarks
         run_optimized_benchmarks(
             model_names=args.model,
@@ -261,7 +337,8 @@ Examples:
             gpu_ids=args.gpu_pool,
             max_concurrent_runs=args.num_workers,
             enable_optimization=not args.no_optimization,
-            optimization_samples=args.optimization_samples
+            optimization_samples=args.optimization_samples,
+            request_kwargs=request_kwargs if request_kwargs else None
         )
         
         logger.info("Benchmark execution completed successfully")

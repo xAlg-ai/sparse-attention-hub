@@ -1,4 +1,132 @@
-# Benchmarks
+# Hyperparameter Optimization Interface
+
+## Quick Start
+
+```bash
+# Demo with both global and per-task optimization
+python benchmark/scripts/demo_optimized_benchmarks.py
+
+# Full CLI with custom parameters
+python benchmark/scripts/run_optimized_benchmarks.py \
+  --models meta-llama/Llama-3.1-8B-Instruct \
+  --benchmarks loogle ruler \
+  --configs dense magic_pig local_masker \
+  --samples 10 --max-requests 50
+
+# Retrieve cached optimized configs
+python benchmark/scripts/get_cached_config.py \
+  --cache-dir ./results/hyperparameter_cache \
+  --config-type magic_pig --show-all
+```
+
+## Core Interface
+
+### OptimizedBenchmarkExecutor
+```python
+from benchmark.optimizer.optimized_executor import create_optimized_benchmark_executor
+from benchmark.hyperparameter_optimization import OptimizationConfig
+
+# Create optimization config
+opt_config = OptimizationConfig(
+    enabled=True,
+    num_samples=10,                     # Ray Tune trials
+    optimization_metric="combined_score", # attention_error + benchmark_score  
+    use_per_task_config=True,          # Optimize per benchmark subset
+    cache_dir="./cache"
+)
+
+# Create executor
+executor = create_optimized_benchmark_executor(
+    gpu_ids=[0],
+    optimization_config=opt_config,
+    enable_optimization=True
+)
+
+# Run full benchmark matrix
+executor.run_benchmark_matrix(
+    model_names=["meta-llama/Llama-3.1-8B-Instruct"],
+    sparse_attention_configs=[("magic_pig", None)],  # None = optimize
+    benchmark_configs=[BenchmarkConfig("loogle", ["shortdep_qa"])],
+    adapter_config=AdapterConfig(),
+    request_kwargs={"max_requests": 100}
+)
+```
+
+## Optimization Modes
+
+### Global Optimization
+- **Single best config** for all benchmark subsets
+- `use_per_task_config=False`
+- Cache: `model_config_global.json`
+
+### Per-Task Optimization  
+- **Task-specific configs** per benchmark subset
+- `use_per_task_config=True`
+- Cache: `model_config_benchmark_subset.json`
+
+## Supported Configs
+
+Auto-optimized via generic optimizer:
+- `magic_pig`: LSH parameters (lsh_l, lsh_k, center, packing, seed)
+- `local_masker`: Window size
+- `sink_masker`: Sink size  
+- `adaptive_sampling`: Sampling rates (base_rate, epsilon, delta, offsets)
+
+Dense/fixed configs skip optimization automatically.
+
+## Cache Management
+
+```python
+from benchmark.hyperparameter_optimization import get_cached_optimization_config
+
+# Retrieve best config for specific task
+config = get_cached_optimization_config(
+    model_name="meta-llama/Llama-3.1-8B-Instruct",
+    config_type="magic_pig", 
+    benchmark_name="loogle",
+    subset="shortdep_qa",
+    cache_dir="./cache"
+)
+```
+
+## Metrics
+
+- **combined_score**: `attention_error + penalty * (1 - benchmark_score)`
+- **attention_error**: MSE vs dense attention patterns
+- **benchmark_score**: Task performance (accuracy/F1)
+- **density**: Sparsity ratio
+
+## Architecture
+
+```
+OptimizedBenchmarkExecutor
+├── Phase 1: Hyperparameter Optimization (Ray Tune)
+│   ├── GenericConfigOptimizer (auto search space)
+│   ├── Per-task or global optimization
+│   └── JSON cache storage
+└── Phase 2: Benchmark Execution  
+    ├── Use optimized configs from cache
+    ├── Resumability support
+    └── Results aggregation
+```
+
+## Error Handling
+
+- **NaN prevention**: Epsilon-based error calculations
+- **Cache validation**: Automatic fallback on cache miss
+- **Resumability**: Skip completed experiments
+- **Robust metrics**: Filter invalid values
+
+## Files
+
+- `benchmark/optimizer/optimized_executor.py`: Main executor
+- `benchmark/hyperparameter_optimization.py`: Optimization logic  
+- `benchmark/generic_config_optimizer.py`: Auto search space generation
+- `benchmark/scripts/`: CLI and demo scripts
+
+---
+
+# Supported Benchmarks
 
 We currently support the following datasets:
 - [Loogle](loogle/README.md) ([hf link](https://huggingface.co/datasets/simonjegou/loogle))

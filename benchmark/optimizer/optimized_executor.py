@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple, Dict, Any
 
 from benchmark.executor import BenchmarkExecutor
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
-from benchmark.hyperparameter_optimization import (
+from benchmark.optimizer.hyperparameter_optimization import (
     OptimizationConfig, HyperparameterOptimizer, OptimizedSparseConfig,
     optimize_sparse_configs
 )

@@ -14,7 +14,7 @@ project_root = Path(__file__).resolve().parents[2]  # Go up 2 levels from benchm
 os.chdir(project_root)
 sys.path.insert(0, str(project_root))
 
-from benchmark.hyperparameter_optimization import HyperparameterOptimizer, OptimizationConfig
+from benchmark.optimizer.hyperparameter_optimization import HyperparameterOptimizer, OptimizationConfig
 
 
 def main():

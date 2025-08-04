@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 # Set project root and add to Python path (like magic_pig_experiments)
-project_root = Path(__file__).resolve().parents[2]  # Go up 2 levels from benchmark/scripts/
+project_root = Path(__file__).resolve().parents[3]  # Go up 3 levels from benchmark/optimizer/scripts/
 os.chdir(project_root)
 sys.path.insert(0, str(project_root))
 

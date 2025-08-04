@@ -1,33 +1,61 @@
 """
-Hyperparameter Optimization Extension for BenchmarkExecutor
+Ray Tune Hyperparameter Optimization for Sparse Attention Benchmarks
 
-This module extends the existing BenchmarkExecutor with Ray Tune hyperparameter optimization.
-Before running benchmarks, it optimizes sparse attention hyperparameters for each 
-(model, sparse_config_type, benchmark, subset) combination.
+This module provides a comprehensive system for optimizing sparse attention configurations
+using Ray Tune with advanced schedulers and search algorithms. It now supports both
+legacy optimizers and a new generic config optimizer that can automatically generate
+search spaces for any dataclass config.
 
-Architecture:
-1. OptimizedSparseConfig: Extends the existing sparse config system
-2. HyperparameterOptimizer: Manages Ray Tune optimization per (model, config_type, task) triplet
-3. Extended BenchmarkExecutor: Integrates optimization phase before benchmark execution
+Key Features:
+- Generic config introspection and automatic search space generation  
+- Support for any config class via dataclass introspection
+- Legacy support for existing optimizers (MagicPigOptimizer)
+- Per-task optimization with separate cache files
+- ASHA scheduler with HyperOpt search for efficient optimization
+- Comprehensive metrics tracking and analysis
+- Robust caching and config retrieval system
+
+The system creates optimized benchmark executors that automatically use optimized
+configurations when available, falling back to default configs when needed.
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Type
 import json
 import logging
-import torch
 from abc import ABC, abstractmethod
 
 from sparse_attention_hub.sparse_attention.base import SparseAttentionConfig
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
+from benchmark.optimizer.generic_config_optimizer import (
+    create_optimizer_for_config, 
+    create_composite_optimizer
+)
 
 # Import Ray Tune components
-import ray
-from ray import tune
-from ray.tune.schedulers import ASHAScheduler
-from ray.tune.search.hyperopt import HyperOptSearch
-from ray.tune.search import ConcurrencyLimiter
+try:
+    import ray
+    from ray import tune
+    from ray.tune.schedulers import ASHAScheduler
+    from ray.tune.search.hyperopt import HyperOptSearch
+    from ray.tune.search import ConcurrencyLimiter
+    RAY_AVAILABLE = True
+except ImportError:
+    RAY_AVAILABLE = False
+    # Define dummy classes for when Ray is not available
+    class tune:
+        @staticmethod
+        def choice(choices): return choices[0]
+        @staticmethod
+        def uniform(low, high): return (low + high) / 2
+
+# Import torch for CUDA cleanup
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 
 @dataclass
@@ -46,13 +74,13 @@ class OptimizationConfig:
         use_per_task_config: Whether to use best config per task/subset vs global best
     """
     enabled: bool = True
-    num_samples: int = 20
+    num_samples: int = 3
     max_concurrent: int = 4
     optimization_metric: str = "combined_score"
     optimization_mode: str = "min"
     cache_dir: str = "./hyperparameter_cache"
     optimization_timeout: float = 7200.0  # 2 hours
-    quick_eval_requests: int = 10  # Small number for fast optimization
+    quick_eval_requests: int = 2  # Small number for fast optimization
     use_per_task_config: bool = True  # Use per-task configs by default
 
 
@@ -129,8 +157,9 @@ class OptimizedSparseConfig:
 class SparseConfigOptimizer(ABC):
     """Abstract base class for sparse attention hyperparameter optimizers.
     
-    Each sparse attention type (Magic Pig, Hash Attention, etc.) should implement
-    this interface to define its optimization behavior.
+    Each sparse attention type can implement this interface to define its 
+    optimization behavior. The new GenericConfigOptimizer provides automatic
+    implementation for most dataclass configs.
     """
     
     @abstractmethod
@@ -153,32 +182,205 @@ class SparseConfigOptimizer(ABC):
         return {"attention_error": 1.0, "density": 0.1}
 
 
+class GenericOptimizerAdapter(SparseConfigOptimizer):
+    """Adapter to make GenericConfigOptimizer and CompositeConfigOptimizer compatible with the legacy interface."""
+    
+    def __init__(self, optimizer):
+        """Initialize with either GenericConfigOptimizer or CompositeConfigOptimizer."""
+        self.optimizer = optimizer
+        
+    def get_search_space(self) -> Dict[str, Any]:
+        """Delegate to optimizer."""
+        return self.optimizer.create_search_space()
+    
+    def create_config_from_params(self, params: Dict[str, Any]) -> SparseAttentionConfig:
+        """Create sparse attention config from params."""
+        # For composite optimizers, this will create ResearchAttentionConfig directly
+        # For single optimizers, we need to wrap in ResearchAttentionConfig
+        config = self.optimizer.create_config_from_params(params)
+        
+        # Check if it's already a ResearchAttentionConfig (from composite optimizer)
+        from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
+        if isinstance(config, ResearchAttentionConfig):
+            return config
+        else:
+            # Single masker - wrap it in ResearchAttentionConfig
+            return ResearchAttentionConfig(masker_configs=[config])
+    
+    def get_default_request_kwargs(self, benchmark_name: str, subset: Optional[str]) -> Dict[str, Any]:
+        """Get task-specific request_kwargs for optimization."""
+        # Use minimal requests for quick optimization
+        return {"max_requests": 2, "max_context_length": 512}
+    
+    @property
+    def config_type_name(self) -> str:
+        """Get the name of the config type for caching."""
+        return self.optimizer.config_type_name
+
+
+# Factory functions for creating optimizers for common config types
+def create_magic_pig_optimizer() -> GenericOptimizerAdapter:
+    """Create composite optimizer for MagicPig with sink and local maskers."""
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import MagicPigConfig
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import (
+        LocalMaskerConfig, SinkMaskerConfig
+    )
+    
+    # Create composite optimizer with all three masker types
+    composite_optimizer = create_composite_optimizer(
+        masker_configs=[SinkMaskerConfig, LocalMaskerConfig, MagicPigConfig],
+        config_name="magic_pig",
+        overrides={
+            # SinkMasker overrides
+            "sinkmasker_sink_size": tune.choice([16, 32, 64, 96, 128]),
+            # LocalMasker overrides  
+            "localmasker_window_size": tune.choice([16, 32, 64, 96, 128]),
+            # MagicPig overrides
+            "magicpig_lsh_l": tune.choice([4, 6, 8, 10, 12]),
+            "magicpig_lsh_k": tune.choice([2, 4, 6, 8]),
+            "magicpig_center": tune.choice([True]),
+            "magicpig_packing": tune.choice(["int64"]),
+            "magicpig_seed": tune.choice([42]),
+        }
+    )
+    return GenericOptimizerAdapter(composite_optimizer)
+
+def create_local_masker_optimizer() -> GenericOptimizerAdapter:
+    """Create optimizer for LocalMasker configurations."""
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import LocalMaskerConfig
+    
+    generic_optimizer = create_optimizer_for_config(
+        config_class=LocalMaskerConfig,
+        config_name="local_masker",
+        overrides={
+            "window_size": tune.uniform(0.1, 0.8),
+        }
+    )
+    return GenericOptimizerAdapter(generic_optimizer)
+
+def create_sink_masker_optimizer() -> GenericOptimizerAdapter:
+    """Create optimizer for SinkMasker configurations."""
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import SinkMaskerConfig
+    
+    generic_optimizer = create_optimizer_for_config(
+        config_class=SinkMaskerConfig,
+        config_name="sink_masker",
+        overrides={
+            "sink_size": tune.uniform(0.05, 0.3),
+        }
+    )
+    return GenericOptimizerAdapter(generic_optimizer)
+
+def create_adaptive_sampling_optimizer() -> GenericOptimizerAdapter:
+    """Create optimizer for AdaptiveSampling configurations."""
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.adaptive_sampling import AdaptiveSamplingMaskerConfig
+    
+    generic_optimizer = create_optimizer_for_config(
+        config_class=AdaptiveSamplingMaskerConfig,
+        config_name="adaptive_sampling",
+        overrides={
+            "base_rate_sampling": tune.uniform(0.05, 0.3),
+            "epsilon": tune.uniform(0.01, 0.2),
+            "delta": tune.uniform(0.01, 0.1),
+        }
+    )
+    return GenericOptimizerAdapter(generic_optimizer)
+
+def create_hash_attention_optimizer() -> GenericOptimizerAdapter:
+    """Create composite optimizer for HashAttention with sink, local, and oracle maskers."""
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import (
+        SinkMaskerConfig, LocalMaskerConfig
+    )
+    from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.oracle_top_k import OracleTopKConfig
+    
+    # Create composite optimizer with all three masker types (matching experimental setup)
+    composite_optimizer = create_composite_optimizer(
+        masker_configs=[SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig],
+        config_name="hash_attention",
+        overrides={
+            # SinkMasker overrides - using smaller sizes as per experimental setup
+            "sinkmasker_sink_size": tune.choice([32, 64, 128]),
+            # LocalMasker overrides - window_size parameter  
+            "localmasker_window_size": tune.choice([64, 128, 256, 512]),
+            # OracleTopK overrides - heavy_size parameter
+            "oracletopk_heavy_size": tune.choice([128, 256, 512]),
+        }
+    )
+    return GenericOptimizerAdapter(composite_optimizer)
+
+
+# Registry of available optimizers - now using generic optimizers
+SPARSE_OPTIMIZERS: Dict[str, SparseConfigOptimizer] = {
+    "magic_pig": create_magic_pig_optimizer(),
+    "local_masker": create_local_masker_optimizer(), 
+    "sink_masker": create_sink_masker_optimizer(),
+    "adaptive_sampling": create_adaptive_sampling_optimizer(),
+    "hash_attention": create_hash_attention_optimizer(),
+}
+
+
+def get_sparse_optimizer(config_type: str) -> SparseConfigOptimizer:
+    """Get a sparse optimizer by config type name.
+    
+    Args:
+        config_type: The config type name (e.g., "magic_pig", "local_masker")
+        
+    Returns:
+        The optimizer instance
+        
+    Raises:
+        ValueError: If config_type is not found
+    """
+    if config_type not in SPARSE_OPTIMIZERS:
+        available = list(SPARSE_OPTIMIZERS.keys())
+        raise ValueError(f"Unknown config type: {config_type}. Available: {available}")
+    
+    return SPARSE_OPTIMIZERS[config_type]
+
+
+def list_available_optimizers() -> List[str]:
+    """List all available optimizer config types."""
+    return list(SPARSE_OPTIMIZERS.keys())
+
+# Legacy MagicPigOptimizer for backward compatibility
 class MagicPigOptimizer(SparseConfigOptimizer):
-    """Hyperparameter optimizer for Magic Pig attention."""
+    """Legacy hyperparameter optimizer for Magic Pig attention.
+    
+    This class is kept for backward compatibility. New code should use
+    the generic optimizer via create_magic_pig_optimizer().
+    """
     
     def get_search_space(self) -> Dict[str, Any]:
         return {
-            "lsh_l": tune.choice([4, 8, 16, 32]),
-            "lsh_k": tune.choice([8, 16, 32, 64]),  # Remove 128 for int64 compatibility
-            "center": tune.choice([True, False]),
-            "packing": tune.choice(["int64", "float32"]),
-            "seed": tune.choice([42, 123, 456])
+            "sink_size": tune.choice([16, 32, 64, 96, 128]),
+            "window_size": tune.choice([16, 32, 64, 96, 128]),
+            "lsh_l": tune.choice([16, 32, 64, 96, 128]),
+            "lsh_k": tune.choice([4, 8, 16, 32, 64]),  # Remove 128 for int64 compatibility
+            "center": tune.choice([True]),
+            "packing": tune.choice(["int64"]),
+            "seed": tune.choice([42])
         }
     
     def create_config_from_params(self, params: Dict[str, Any]) -> SparseAttentionConfig:
         from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import MagicPigConfig
-        
-        # Provide default values for missing parameters
-        masker_config = MagicPigConfig(
-            lsh_l=params.get("lsh_l", 8),
-            lsh_k=params.get("lsh_k", 32),
-            center=params.get("center", True),
-            packing=params.get("packing", "int64"),
-            seed=params.get("seed", 42)
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
+            LocalMaskerConfig, SinkMaskerConfig
         )
+
+        masker_configs = [
+            SinkMaskerConfig(sink_size=params.get("sink_size", 64)),
+            LocalMaskerConfig(window_size=params.get("window_size", 128)),
+            MagicPigConfig(
+                lsh_l=params.get("lsh_l", 8),
+                lsh_k=params.get("lsh_k", 32),
+                center=params.get("center", True),
+                packing=params.get("packing", "int64"),
+                seed=params.get("seed", 42)
+            )
+        ]
         
-        return ResearchAttentionConfig(masker_configs=[masker_config])
+        return ResearchAttentionConfig(masker_configs=masker_configs)
     
     def get_default_request_kwargs(self, benchmark_name: str, subset: Optional[str]) -> Dict[str, Any]:
         # Task-specific optimization parameters - using minimal requests for quick iteration
@@ -191,20 +393,37 @@ class MagicPigOptimizer(SparseConfigOptimizer):
             return {"max_requests": 2, "max_context_length": 512}  # Ultra-fast iteration
 
 
-# Registry of available optimizers
-SPARSE_OPTIMIZERS: Dict[str, SparseConfigOptimizer] = {
-    "magic_pig": MagicPigOptimizer(),
-    # "hash_attention": HashAttentionOptimizer(),  # To be implemented
-    # Add other optimizers here
-}
-
-
 def create_sparse_config_from_params(config_type: str, params: Dict[str, Any]) -> SparseAttentionConfig:
     """Factory function to create sparse config from optimized parameters."""
     if config_type not in SPARSE_OPTIMIZERS:
         raise ValueError(f"Unknown sparse config type: {config_type}")
     
     return SPARSE_OPTIMIZERS[config_type].create_config_from_params(params)
+
+
+def register_config_optimizer(config_class: Type, config_name: str, overrides: Optional[Dict[str, Any]] = None) -> None:
+    """Register a new config type for optimization.
+    
+    This function allows easy registration of new config types without modifying
+    the core optimization code.
+    
+    Args:
+        config_class: The dataclass config type to optimize
+        config_name: Name for the optimizer registry
+        overrides: Optional manual overrides for specific fields
+        
+    Example:
+        >>> from sparse_attention_hub.sparse_attention.research_attention.maskers import RandomSamplingMaskerConfig
+        >>> register_config_optimizer(
+        ...     RandomSamplingMaskerConfig, 
+        ...     "random_sampling",
+        ...     overrides={"sampling_rate": tune.uniform(0.1, 0.9)}
+        ... )
+        >>> # Now "random_sampling" can be used in optimization
+    """
+    generic_optimizer = create_optimizer_for_config(config_class, config_name, overrides)
+    adapter = GenericOptimizerAdapter(generic_optimizer)
+    SPARSE_OPTIMIZERS[config_name] = adapter
 
 
 class HyperparameterOptimizer:
@@ -578,14 +797,21 @@ class HyperparameterOptimizer:
             
             # Calculate combined score using optimizer weights
             weights = optimizer.get_optimization_metric_weights()
-            combined_score = sum(
-                attention_metrics.get(metric, 0.0) * weight 
-                for metric, weight in weights.items()
-            )
+            combined_score = 0.0
+            for metric, weight in weights.items():
+                metric_value = attention_metrics.get(metric, 0.0)
+                # Handle NaN values by replacing with a penalty
+                if isinstance(metric_value, float) and (metric_value != metric_value):  # Check for NaN
+                    metric_value = 10.0  # Penalty for NaN values
+                combined_score += metric_value * weight
             
             # Add penalty for high density
             if attention_metrics.get("density", 0.0) > 0.5:
                 combined_score += 5.0
+            
+            # Ensure combined_score is not NaN
+            if isinstance(combined_score, float) and (combined_score != combined_score):  # Check for NaN
+                combined_score = 20.0  # High penalty for NaN combined score
             
             metrics = {
                 "attention_error": attention_metrics.get("attention_error", 10.0),
@@ -596,7 +822,7 @@ class HyperparameterOptimizer:
             
             # Clean up
             del adapter
-            if torch.cuda.is_available():
+            if TORCH_AVAILABLE and torch.cuda.is_available():
                 torch.cuda.empty_cache()
             
             return metrics
@@ -632,9 +858,20 @@ class HyperparameterOptimizer:
                                 value = data.get('value')
                                 
                                 if metric_name == 'research_attention_output_error' and value is not None:
-                                    attention_errors.append(float(value))
+                                    # Handle NaN values properly
+                                    try:
+                                        error_value = float(value)
+                                        if not (error_value != error_value):  # Check if not NaN
+                                            attention_errors.append(error_value)
+                                    except (ValueError, TypeError):
+                                        pass  # Skip invalid values
                                 elif metric_name == 'research_attention_density' and value is not None:
-                                    densities.append(float(value))
+                                    try:
+                                        density_value = float(value)
+                                        if not (density_value != density_value):  # Check if not NaN  
+                                            densities.append(density_value)
+                                    except (ValueError, TypeError):
+                                        pass  # Skip invalid values
                             except (json.JSONDecodeError, ValueError, TypeError) as e:
                                 self.logger.debug(f"Skipping malformed line in metrics: {e}")
                                 continue
@@ -705,8 +942,8 @@ def optimize_sparse_configs(
     optimized_configs = []
     
     for config_name, base_config in sparse_configs:
-        # Skip dense configs (no optimization needed)
-        if config_name == "dense" or base_config is None:
+        # Skip dense and fixed sparse configs (no optimization needed)
+        if config_name == "dense" or config_name == "streaming_conservative":
             optimized_configs.append((config_name, OptimizedSparseConfig(
                 config_type=config_name,
                 base_config=base_config,
