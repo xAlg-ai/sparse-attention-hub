@@ -22,35 +22,19 @@ class LocalMaskerConfig(FixedMaskerConfig):
     window_size: Union[float, int]
     
     @classmethod
-    def get_default_search_space(cls) -> Dict[str, Any]:
-        """Get the default search space for LocalMasker hyperparameter optimization.
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for Local masker.
         
-        This method defines the optimal parameter ranges for local window attention
-        based on common sequence lengths and computational efficiency.
-        
-        Returns:
-            Dictionary mapping parameter names to Ray Tune search space objects
+        Args:
+            task_name: Name of the benchmark task to optimize for
             
-        Example:
-            >>> search_space = LocalMaskerConfig.get_default_search_space()
-            >>> print(search_space.keys())
-            dict_keys(['window_size'])
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
         """
-        # Import Ray Tune locally to avoid circular imports
-        try:
-            from ray import tune
-        except ImportError:
-            # Fallback for when Ray is not available
-            class tune:
-                @staticmethod
-                def choice(choices): return choices[0]
-                @staticmethod
-                def uniform(low, high): return (low + high) / 2
+        from ray import tune
         
         return {
-            # Window size: Balance between local context and computational efficiency
-            # Common values range from 16 (very local) to 512 (medium-range local)
-            "window_size": tune.choice([16, 32, 64, 96, 128, 256, 512]),
+            "window_size": tune.choice([32, 64, 128, 256])
         }
 
 
@@ -201,35 +185,19 @@ class SinkMaskerConfig(FixedMaskerConfig):
     sink_size: Union[float, int]
     
     @classmethod
-    def get_default_search_space(cls) -> Dict[str, Any]:
-        """Get the default search space for SinkMasker hyperparameter optimization.
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for Sink masker.
         
-        This method defines the optimal parameter ranges for sink token attention
-        based on typical importance of initial tokens and computational efficiency.
-        
-        Returns:
-            Dictionary mapping parameter names to Ray Tune search space objects
+        Args:
+            task_name: Name of the benchmark task to optimize for
             
-        Example:
-            >>> search_space = SinkMaskerConfig.get_default_search_space()
-            >>> print(search_space.keys())
-            dict_keys(['sink_size'])
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
         """
-        # Import Ray Tune locally to avoid circular imports
-        try:
-            from ray import tune
-        except ImportError:
-            # Fallback for when Ray is not available
-            class tune:
-                @staticmethod
-                def choice(choices): return choices[0]
-                @staticmethod
-                def uniform(low, high): return (low + high) / 2
+        from ray import tune
         
         return {
-            # Sink size: Balance between capturing important initial tokens and efficiency
-            # Range from 4 (minimal sink) to 128 (comprehensive initial context)
-            "sink_size": tune.choice([4, 8, 16, 32, 64, 96, 128]),
+            "sink_size": tune.choice([4, 8, 16, 32, 64, 128])
         }
 
 
