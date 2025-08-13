@@ -455,8 +455,14 @@ class BenchmarkExecutor:
     
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
-        signal.signal(signal.SIGTERM, _signal_handler)
-        signal.signal(signal.SIGINT, _signal_handler)
+        import threading
+        
+        # Only set up signal handlers if we're in the main thread
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGTERM, _signal_handler)
+            signal.signal(signal.SIGINT, _signal_handler)
+        else:
+            self.logger.info("Skipping signal handler setup - not in main thread (running in Ray worker)")
         
         # Register cleanup function to run at exit
         import atexit

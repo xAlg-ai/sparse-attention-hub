@@ -65,6 +65,25 @@ class MagicPigConfig(SamplingMaskerConfig):
             )
         if self.seed is None:
             raise ValueError("seed cannot be None")
+    
+    @classmethod
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for MagicPig masker.
+        
+        Args:
+            task_name: Name of the benchmark task to optimize for
+            
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
+        """
+        from ray import tune
+
+        return {
+            "lsh_l": tune.choice([8, 16, 32, 64, 128]),
+            "lsh_k": tune.choice([2, 4, 8, 16, 32]),
+            "center": tune.choice([True]),
+            "packing": tune.choice(["int64"])
+        }
 
 
 @MaskerRegistry.register(MagicPigConfig)
