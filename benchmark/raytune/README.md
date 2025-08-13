@@ -56,8 +56,7 @@ Add a new entry to the masker_config_presets dictionary. The key is the preset's
 # In get_run_configurations() in execute_full_benchmark.py
 
 # 1. Import your custom masker config
-from my_cool_maskers.cool_masker import CoolMaskerConfig
-from sparse_attention_hub.sparse_attention.research_attention.maskers import LocalMaskerConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers import LocalMaskerConfig, NewMaskerConfig
 
 # 2. Add a new preset
 masker_config_presets = {
