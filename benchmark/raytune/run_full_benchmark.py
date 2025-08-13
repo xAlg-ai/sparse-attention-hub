@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Full End-to-End Benchmark Execution and Optimizer.
+Full End-to-End Benchmark Execution and Optimizer for Sparse Attention Methods.
 
 This script performs a robust, two-stage process for each combination of
 model, benchmark, and sparse attention configuration:
@@ -9,8 +9,123 @@ model, benchmark, and sparse attention configuration:
 2.  **Validate**: It takes the single best configuration found during the search
     and runs a final, thorough benchmark with it to get a definitive score.
 
-The entire process is designed to be modular and easy to extend. To add new
-models, benchmarks, or masker presets, see the `get_run_configurations` function.
+## Usage Examples
+
+### Basic Usage
+```bash
+# Run full benchmark suite with all sparse attention configs
+python benchmark/raytune/run_full_benchmark.py
+
+# Run in debug mode (quick test with minimal configs)
+python benchmark/raytune/run_full_benchmark.py --debug
+
+# Run only dense baseline (no sparse attention)
+python benchmark/raytune/run_full_benchmark.py --dense-only
+
+# Print all available configurations without running
+python benchmark/raytune/run_full_benchmark.py --print-configs
+```
+
+### Advanced Usage
+```bash
+# Custom search parameters for faster exploration
+python benchmark/raytune/run_full_benchmark.py \
+    --search-timeout 600 \
+    --search-max-new-tokens 10 \
+    --search-max-context-length 4096 \
+    --num-samples 20
+
+# Custom validation parameters for thorough evaluation
+python benchmark/raytune/run_full_benchmark.py \
+    --validation-timeout 7200 \
+    --validation-max-new-tokens 200 \
+    --validation-max-context-length 64000 \
+    --validation-max-requests 50
+
+# Run with custom result directory suffix
+python benchmark/raytune/run_full_benchmark.py --result-dir-suffix "_experiment_v1"
+```
+
+## Command-Line Arguments
+
+### General Options
+- `--debug`: Run quick test configuration with minimal settings
+- `--num-samples`: Number of Ray Tune samples per optimization (default: 50)
+- `--dense-only`: Run only dense configuration without sparse attention
+- `--result-dir-suffix`: Suffix to add to result directory names
+- `--print-configs`: Print all sparse configurations and exit
+
+### Search Phase Parameters (for finding optimal configs)
+- `--search-timeout`: Timeout for each search trial in seconds (default: 1800)
+- `--search-max-new-tokens`: Max new tokens for search trials (default: 50)
+- `--search-max-context-length`: Max context length for search trials (default: 16384)
+- `--search-max-requests`: Max requests for search trials (default: 15)
+
+### Validation Phase Parameters (for final evaluation)
+- `--validation-timeout`: Timeout for final validation in seconds (default: 3600)
+- `--validation-max-new-tokens`: Max new tokens for validation (default: 100)
+- `--validation-max-context-length`: Max context length for validation (default: 32000)
+- `--validation-max-requests`: Max requests for validation (default: 25)
+
+## Sparse Attention Configurations
+
+The script evaluates 19 different sparse attention configurations across 3 sparsity levels:
+
+### 5% Sparsity
+- Random Sampling (2% sink + 2% window + 1% sampling)
+- Adaptive Sampling with Oracle Top-K
+- Adaptive Sampling with HashAttention Top-K
+- HashAttention Top-K
+- Oracle Top-P (75%)
+- Oracle Top-K
+
+### 10% Sparsity
+- Random Sampling (0.1% sink + 0.1% window + 10% sampling)
+- Adaptive Sampling with Oracle Top-K
+- Adaptive Sampling with HashAttention Top-K
+- HashAttention Top-K
+- Oracle Top-P (80%)
+- Oracle Top-K
+
+### 20% Sparsity
+- Random Sampling (2% sink + 2% window + 20% sampling)
+- Adaptive Sampling with Oracle Top-K
+- Adaptive Sampling with HashAttention Top-K
+- HashAttention Top-K
+- Oracle Top-P (95%)
+- Oracle Top-K
+
+## Benchmarks
+
+The script runs the following benchmark tasks:
+- **InfiniteBench**: passkey task for extreme long context
+- **Ruler**: 4096 context length evaluation
+- **Loogle**: longdep_summarization, longdep_qa, shortdep_qa, shortdep_cloze
+- **ZeroScrolls**: default configuration
+- **LongBenchv2**: 0-shot evaluation
+- **AIME2024/2025**: Mathematical reasoning tasks
+- **LongBench**: passage_retrieval_en
+- **Mock Benchmark**: reading_comprehension (for testing)
+
+## Output Structure
+
+Results are saved in two directories:
+- `./search_results/`: Ray Tune optimization results
+- `./validation_results/`: Final validation results for best configurations
+
+Each run produces:
+- Raw benchmark results (CSV)
+- Micro metrics (JSONL) with attention errors and density
+- Final summary (JSON) with all scores and best configurations
+
+## Notes
+
+- Requires GPU(s) with CUDA support
+- HashAttention weights file should be available at the specified path
+- Ray Tune must be installed: `pip install "ray[tune]" hyperopt`
+- The script automatically handles resumability for interrupted runs
+
+To add new models, benchmarks, or masker presets, modify the `get_run_configurations` function.
 """
 import argparse
 import json
@@ -35,11 +150,17 @@ from benchmark.executor_config import AdapterConfig, BenchmarkConfig, BenchmarkR
 from optimizer_factory import create_optimizer
 
 # --- Masker Config Imports ---
-from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.basic_fixed import (
+from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
     LocalMaskerConfig,
     SinkMaskerConfig,
+    OracleTopKConfig,
+    OracleTopPMaskerConfig,
+    HashAttentionTopKMaskerConfig,
 )
-from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations.magic_pig import (
+from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+    AdaptiveSamplingMaskerConfig,
+    RandomSamplingMaskerConfig,
     MagicPigConfig,
 )
 
@@ -71,7 +192,10 @@ class ComprehensiveBenchmarkRunner:
         )
         self.adapter_config = AdapterConfig(
             adapter_name="huggingface",
-            model_kwargs={"torch_dtype": torch.bfloat16},
+            model_kwargs={
+                "torch_dtype": torch.bfloat16,
+                "attn_implementation": "flash_attention_2",
+            },
             tokenizer_kwargs={"padding_side": "left"},
         )
         self.generation_kwargs = {"max_new_tokens": config["max_new_tokens"], "do_sample": False}
@@ -140,15 +264,210 @@ class ComprehensiveBenchmarkRunner:
         self.results_cache[config_key] = 5.0
         return 5.0
 
+# Helper functions for generating configuration names
+def get_adaptive_config_name(sink_size, window_size, heavy_size, base_rate_sampling, epsilon, delta):
+    return f"adaptive_sampling.sink_{sink_size}_window_{window_size}_heavy_{heavy_size}_base_{base_rate_sampling}_epsilon_{epsilon}_delta_{delta}"
+
+def get_adaptive_hat_config_name(sink_size, window_size, heavy_size, base_rate_sampling, epsilon, delta):
+    return f"adaptive_sampling_hat.sink_{sink_size}_window_{window_size}_heavy_{heavy_size}_base_{base_rate_sampling}_epsilon_{epsilon}_delta_{delta}"
+
+def get_oracle_top_p_config_name(sink_size, window_size, top_p):
+    return f"oracle_top_p_{top_p}.sink_{sink_size}_window_{window_size}"
+
+def get_oracle_top_k_config_name(sink_size, window_size, top_k):
+    return f"oracle_top_k_{top_k}.sink_{sink_size}_window_{window_size}"
+
+def get_hashattention_config_name(sink_size, window_size, top_k):
+    return f"hashattention.sink_{sink_size}_window_{window_size}_top_k_{top_k}"
+
+def get_random_sampling_config_name(sink_size, window_size, sampling_rate):
+    return f"random_sampling.sink_{sink_size}_window_{window_size}_sampling_rate_{sampling_rate}"
+
 def get_run_configurations(args: argparse.Namespace) -> dict:
     """Defines the complete configuration for the optimization run."""
     num_gpus = torch.cuda.device_count()
 
-    masker_config_presets = {
-        "local_sink": [SinkMaskerConfig, LocalMaskerConfig],
-        "sink_local_magic_pig": [SinkMaskerConfig, LocalMaskerConfig, MagicPigConfig],
-    }
-    test_suites = {"default": ["local_sink", "sink_local_magic_pig"], "debug": ["sink_local_magic_pig"]}
+    # Get the HashAttention weights file path
+    machine_key = "ubuntu"
+    weight_file = f"/home/{machine_key}/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+    
+    # If weight file doesn't exist, try a fallback path
+    if not os.path.exists(weight_file):
+        weight_file = "./hat_weights.pkl"  # fallback to local file
+        print(f"Warning: HashAttention weights not found at expected path, using {weight_file}")
+
+    # Generate all sparse configurations from the provided script
+    sparse_configs = []
+    
+    # Dense baseline
+    sparse_configs.append(("dense", None))
+    
+    # ==================== 5% sparsity configs =================
+    # Random sampling 5%
+    sparse_configs.append((get_random_sampling_config_name(0.02, 0.02, 0.01), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.02),
+        LocalMaskerConfig(window_size=0.02),
+        RandomSamplingMaskerConfig(sampling_rate=0.01)
+    ])))
+    
+    # Adaptive sampling with oracle top k 5%
+    sparse_configs.append((get_adaptive_config_name(0.001, 0.001, 0.02, 0.01, 0.1, 0.1), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        OracleTopKConfig(heavy_size=0.02),
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.01, epsilon=0.1, delta=0.1, init_offset=0.001, local_offset=0.001)
+    ])))
+    
+    # Adaptive sampling with HAT top k 5%
+    sparse_configs.append((get_adaptive_hat_config_name(0.01, 0.01, 0.02, 0.01, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.01),
+        LocalMaskerConfig(window_size=0.01),
+        HashAttentionTopKMaskerConfig(heavy_size=0.02, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.01, epsilon=0.25, delta=0.25, init_offset=0.001, local_offset=0.001)
+    ])))
+    
+    # HAT top k 5%
+    sparse_configs.append((get_hashattention_config_name(0.005, 0.005, 0.04), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.005),
+        LocalMaskerConfig(window_size=0.005),
+        HashAttentionTopKMaskerConfig(heavy_size=0.04, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    ])))
+    
+    # Oracle top p 5%
+    sparse_configs.append((get_oracle_top_p_config_name(0.001, 0.001, 0.75), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        OracleTopPMaskerConfig(top_p=0.75)
+    ])))
+    
+    # Oracle top k 5%
+    sparse_configs.append((get_oracle_top_k_config_name(0.005, 0.005, 0.04), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.005),
+        LocalMaskerConfig(window_size=0.005),
+        OracleTopKConfig(heavy_size=0.04)
+    ])))
+    
+    # ==================== 10% sparsity configs =================
+    # Random sampling 10%
+    sparse_configs.append((get_random_sampling_config_name(0.001, 0.001, 0.1), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        RandomSamplingMaskerConfig(sampling_rate=0.1)
+    ])))
+    
+    # Adaptive sampling with oracle top k 10%
+    sparse_configs.append((get_adaptive_config_name(0.001, 0.001, 0.05, 0.05, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        OracleTopKConfig(heavy_size=0.05),
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=0.001, local_offset=0.001)
+    ])))
+    
+    # Adaptive sampling with HAT top k 10%
+    sparse_configs.append((get_adaptive_hat_config_name(0.001, 0.001, 0.05, 0.05, 0.4, 0.4), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        HashAttentionTopKMaskerConfig(heavy_size=0.05, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.4, delta=0.4, init_offset=0.001, local_offset=0.001)
+    ])))
+    
+    # HAT top k 10%
+    sparse_configs.append((get_hashattention_config_name(0.001, 0.001, 0.09), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        HashAttentionTopKMaskerConfig(heavy_size=0.09, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    ])))
+    
+    # Oracle top p 10%
+    sparse_configs.append((get_oracle_top_p_config_name(0.02, 0.02, 0.8), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.02),
+        LocalMaskerConfig(window_size=0.02),
+        OracleTopPMaskerConfig(top_p=0.8)
+    ])))
+    
+    # Oracle top k 10%
+    sparse_configs.append((get_oracle_top_k_config_name(0.001, 0.001, 0.1), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.001),
+        LocalMaskerConfig(window_size=0.001),
+        OracleTopKConfig(heavy_size=0.1)
+    ])))
+    
+    # ==================== 20% sparsity configs =================
+    # Random sampling 20%
+    sparse_configs.append((get_random_sampling_config_name(0.02, 0.02, 0.2), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.02),
+        LocalMaskerConfig(window_size=0.02),
+        RandomSamplingMaskerConfig(sampling_rate=0.2)
+    ])))
+    
+    # Adaptive sampling with oracle top k 20%
+    sparse_configs.append((get_adaptive_config_name(0.02, 0.02, 0.05, 0.1, 0.3, 0.3), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.02),
+        LocalMaskerConfig(window_size=0.02),
+        OracleTopKConfig(heavy_size=0.05),
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.1, epsilon=0.3, delta=0.3, init_offset=0.02, local_offset=0.02)
+    ])))
+    
+    # Adaptive sampling with HAT top k 20%
+    sparse_configs.append((get_adaptive_hat_config_name(0.005, 0.005, 0.1, 0.1, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.005),
+        LocalMaskerConfig(window_size=0.005),
+        HashAttentionTopKMaskerConfig(heavy_size=0.1, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.1, epsilon=0.25, delta=0.25, init_offset=0.005, local_offset=0.005)
+    ])))
+    
+    # HAT top k 20%
+    sparse_configs.append((get_hashattention_config_name(0.005, 0.005, 0.19), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.005),
+        LocalMaskerConfig(window_size=0.005),
+        HashAttentionTopKMaskerConfig(heavy_size=0.19, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    ])))
+    
+    # Oracle top p 20%
+    sparse_configs.append((get_oracle_top_p_config_name(0.01, 0.01, 0.95), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.01),
+        LocalMaskerConfig(window_size=0.01),
+        OracleTopPMaskerConfig(top_p=0.95)
+    ])))
+    
+    # Oracle top k 20%
+    sparse_configs.append((get_oracle_top_k_config_name(0.005, 0.005, 0.19), ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.005),
+        LocalMaskerConfig(window_size=0.005),
+        OracleTopKConfig(heavy_size=0.19)
+    ])))
+    
+    # For Ray Tune optimization, we'll create a smaller subset for the search
+    # and then use all configs for final validation
+    if args.dense_only:
+        # Only run dense configuration
+        selected_sparse_configs = [("dense", None)]
+    elif args.debug:
+        # In debug mode, just test a few configs
+        selected_sparse_configs = sparse_configs[:3]
+    else:
+        # In production, we might want to optimize across all configs or a subset
+        # For now, let's use the full set
+        selected_sparse_configs = sparse_configs
+    
+    # Convert configs to optimizer-compatible format
+    # The optimizer expects classes, not instances
+    masker_config_presets = {}      # For optimizer (classes)
+    sparse_attention_configs = {}   # For validation (full configs)
+    
+    for name, config in selected_sparse_configs:
+        if config is not None:
+            # Extract the class from each config instance for the optimizer
+            masker_classes = []
+            for masker_config in config.masker_configs:
+                masker_classes.append(type(masker_config))
+            masker_config_presets[name] = masker_classes
+            sparse_attention_configs[name] = config  # Store full config for validation
+        else:
+            masker_config_presets[name] = None
+            sparse_attention_configs[name] = None
+    
+    test_suites = {"default": list(masker_config_presets.keys()), "debug": list(masker_config_presets.keys())[:3]}
 
     # --- Decouple Search and Validation Parameters ---
     if args.debug:
@@ -163,7 +482,10 @@ def get_run_configurations(args: argparse.Namespace) -> dict:
             "max_context_length": 16384, "max_requests": 5,
         }
         base_config = {
-            "models": ["meta-llama/Llama-3.1-8B-Instruct"], "benchmarks": ["loogle/shortdep_qa"],
+            "models": ["meta-llama/Llama-3.1-8B-Instruct"], 
+            "benchmarks": [
+                "loogle/shortdep_qa",  # Quick benchmark for debug
+            ],
             "masker_presets": {p: masker_config_presets[p] for p in test_suites["debug"]},
             "num_samples": 8,
         }
@@ -178,8 +500,29 @@ def get_run_configurations(args: argparse.Namespace) -> dict:
             "max_context_length": args.validation_max_context_length, "max_requests": args.validation_max_requests,
         }
         base_config = {
-            "models": ["meta-llama/Llama-3.2-8B-Instruct", "meta-llama/Llama-3.1-8B-Instruct"],
-            "benchmarks": ["loogle/shortdep_qa", "loogle/longdep_qa"],
+            "models": ["meta-llama/Llama-3.1-8B-Instruct"],
+            "benchmarks": [
+                # InfiniteBench
+                "infinite_bench/passkey",
+                # Ruler
+                "ruler/4096",
+                # Loogle
+                "loogle/longdep_summarization",
+                "loogle/longdep_qa",
+                "loogle/shortdep_qa",
+                "loogle/shortdep_cloze",
+                # ZeroScrolls
+                "zero_scrolls/default",
+                # LongBenchv2
+                "longbenchv2/0shot",
+                # AIME benchmarks
+                "aime2024/aime2024",
+                "aime2025/aime2025",
+                # LongBench
+                "longbench/passage_retrieval_en",
+                # Mock benchmark for testing
+                "mock_benchmark/reading_comprehension",
+            ],
             "masker_presets": {p: masker_config_presets[p] for p in test_suites["default"]},
             "num_samples": args.num_samples,
         }
@@ -191,8 +534,10 @@ def get_run_configurations(args: argparse.Namespace) -> dict:
         "validation_params": validation_params,
         "gpu_ids": list(range(num_gpus)),
         "max_concurrent_runs": num_gpus,
-        "result_dir": "./search_results", # Base directory for the search phase
-        "detailed_result_dir": "./validation_results", # Base directory for the validation phase
+        "result_dir": f"./search_results{args.result_dir_suffix}", # Base directory for the search phase
+        "detailed_result_dir": f"./validation_results{args.result_dir_suffix}", # Base directory for the validation phase
+        "sparse_configs": selected_sparse_configs,  # Store the full list for reference
+        "sparse_attention_configs": sparse_attention_configs,  # Store full config objects for validation
     }
 
 def get_ray_tune_components(config: dict) -> dict:
@@ -215,9 +560,31 @@ def create_optimization_objective(config: dict, model_name: str, task_name: str,
         return {"combined_score": score}
     return objective
 
-def run_optimization_and_validation(model_name: str, benchmark_task: str, preset_name: str, masker_configs: list, config: dict) -> dict:
+def run_optimization_and_validation(model_name: str, benchmark_task: str, preset_name: str, masker_configs: list, config: dict, full_sparse_config=None) -> dict:
     """Runs the two-stage Search-then-Validate process for one combination."""
     print(f"\n--- Running: {model_name} | {benchmark_task} | {preset_name} ---")
+    
+    # Handle dense configuration (no masker configs)
+    if masker_configs is None or preset_name == "dense":
+        print("  Running dense configuration (no optimization needed)...")
+        validation_config = {**config, **config["validation_params"]}
+        validation_config["result_dir"] = os.path.join(config["detailed_result_dir"], preset_name)
+        
+        validator = ComprehensiveBenchmarkRunner(validation_config, verbose=True)
+        start_time = time.time()
+        print(f"    Running validation benchmark: {model_name} on {benchmark_task}...")
+        final_score = validator(full_sparse_config, benchmark_task, model_name)  # Use full config
+        runtime = time.time() - start_time
+        print(f"    Validation benchmark completed in {runtime:.1f}s")
+        print(f"     ✓ Final validation score: {final_score:.4f}")
+        
+        return {
+            "best_search_score": final_score,
+            "final_validation_score": final_score,
+            "best_config": None,
+            "best_params": {},
+            "num_trials": 1,
+        }
     
     # Stage 1: Search using the lighter 'search_params'
     print("  1. Searching for optimal configuration...")
@@ -283,7 +650,8 @@ def run_optimization_matrix(config: dict) -> tuple[dict, str]:
         for benchmark_task in config["benchmarks"]:
             all_results[model_name][benchmark_task] = {}
             for preset_name, masker_configs in config["masker_presets"].items():
-                combo_result = run_optimization_and_validation(model_name, benchmark_task, preset_name, masker_configs, config)
+                full_sparse_config = config.get("sparse_attention_configs", {}).get(preset_name)
+                combo_result = run_optimization_and_validation(model_name, benchmark_task, preset_name, masker_configs, config, full_sparse_config)
                 all_results[model_name][benchmark_task][preset_name] = combo_result
     return all_results, storage_path
 
@@ -318,31 +686,75 @@ def define_cli_args() -> argparse.Namespace:
     # General arguments
     parser.add_argument("--debug", action="store_true", help="Run a quick test configuration, ignoring other flags.")
     parser.add_argument("--num-samples", type=int, default=50, help="Number of Ray Tune samples per optimization search.")
+    parser.add_argument("--dense-only", action="store_true", help="Run only dense configuration without sparse attention.")
+    parser.add_argument("--result-dir-suffix", type=str, default="", help="Suffix to add to result directory names.")
+    parser.add_argument("--print-configs", action="store_true", help="Print all sparse configurations and exit.")
 
     # Search-specific arguments
     search_group = parser.add_argument_group('Search Parameters (for finding the best config)')
-    search_group.add_argument("--search-timeout", type=int, default=900, help="Timeout for each search trial.")
-    search_group.add_argument("--search-max-new-tokens", type=int, default=20, help="Max new tokens for search trials.")
-    search_group.add_argument("--search-max-context-length", type=int, default=8192, help="Max context length for search trials.")
-    search_group.add_argument("--search-max-requests", type=int, default=10, help="Max requests for search trials.")
+    search_group.add_argument("--search-timeout", type=int, default=1800, help="Timeout for each search trial.")
+    search_group.add_argument("--search-max-new-tokens", type=int, default=50, help="Max new tokens for search trials.")
+    search_group.add_argument("--search-max-context-length", type=int, default=16384, help="Max context length for search trials.")
+    search_group.add_argument("--search-max-requests", type=int, default=15, help="Max requests for search trials.")
 
     # Validation-specific arguments
     validation_group = parser.add_argument_group('Validation Parameters (for the final run with the best config)')
-    validation_group.add_argument("--validation-timeout", type=int, default=1800, help="Timeout for the final validation run.")
-    validation_group.add_argument("--validation-max-new-tokens", type=int, default=50, help="Max new tokens for the final validation run.")
-    validation_group.add_argument("--validation-max-context-length", type=int, default=16384, help="Max context length for the final validation run.")
-    validation_group.add_argument("--validation-max-requests", type=int, default=20, help="Max requests for the final validation run.")
+    validation_group.add_argument("--validation-timeout", type=int, default=3600, help="Timeout for the final validation run.")
+    validation_group.add_argument("--validation-max-new-tokens", type=int, default=100, help="Max new tokens for the final validation run.")
+    validation_group.add_argument("--validation-max-context-length", type=int, default=32000, help="Max context length for the final validation run.")
+    validation_group.add_argument("--validation-max-requests", type=int, default=25, help="Max requests for the final validation run.")
     
     return parser.parse_args()
 
 def main():
     args = define_cli_args()
     config = get_run_configurations(args)
+    
+    # Print configurations if requested
+    if args.print_configs:
+        print("\n" + "=" * 80)
+        print("SPARSE ATTENTION CONFIGURATIONS")
+        print("=" * 80)
+        for i, (name, cfg) in enumerate(config.get("sparse_configs", [])):
+            print(f"\n{i+1}. {name}")
+            if cfg is not None:
+                print("   Maskers:")
+                for masker in cfg.masker_configs:
+                    print(f"     - {masker.__class__.__name__}")
+            else:
+                print("   Dense (no sparse attention)")
+        print("\n" + "=" * 80)
+        print(f"Total configurations: {len(config.get('sparse_configs', []))}")
+        print("=" * 80)
+        return
+    
     if not ray.is_initialized():
         ray.init(ignore_reinit_error=True, log_to_driver=False, runtime_env={"working_dir": str(root_path)})
 
     mode = "Quick Test" if args.debug else "Full Production"
-    print(f"Starting {mode} Optimization & Validation..."); print(f"Ray Version: {ray.__version__}, GPUs Available: {torch.cuda.device_count()}")
+    print(f"Starting {mode} Optimization & Validation...")
+    print(f"Ray Version: {ray.__version__}, GPUs Available: {torch.cuda.device_count()}")
+    
+    # Print execution summary
+    print("\n" + "=" * 80)
+    print("EXECUTION SUMMARY")
+    print("=" * 80)
+    print(f"Models ({len(config['models'])}):") 
+    for model in config['models']:
+        print(f"  - {model}")
+    print(f"\nBenchmarks ({len(config['benchmarks'])}):") 
+    for benchmark in config['benchmarks']:
+        print(f"  - {benchmark}")
+    print(f"\nSparse Configurations ({len(config['masker_presets'])}):") 
+    for i, preset in enumerate(list(config['masker_presets'].keys())[:5]):
+        print(f"  - {preset}")
+    if len(config['masker_presets']) > 5:
+        print(f"  ... and {len(config['masker_presets']) - 5} more")
+    
+    total_combinations = len(config['models']) * len(config['benchmarks']) * len(config['masker_presets'])
+    print(f"\nTotal combinations to run: {total_combinations}")
+    print("=" * 80 + "\n")
+    
     start_time = time.time()
     try:
         results, storage_path = run_optimization_matrix(config)
@@ -354,6 +766,8 @@ def main():
         def json_serializer(obj): return str(obj)
             
         print(f"Saving summary to: {results_file}")
+        # Create directory if it doesn't exist
+        results_file.parent.mkdir(parents=True, exist_ok=True)
         with open(results_file, "w") as f: json.dump(results, f, indent=2, default=json_serializer)
         print("Summary saved successfully.")
     except KeyboardInterrupt:

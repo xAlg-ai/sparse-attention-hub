@@ -24,6 +24,22 @@ class OracleTopKConfig(TopKMaskerConfig):
     """Configuration for OracleTopK masker."""
 
     pass
+    
+    @classmethod
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for OracleTopK masker.
+        
+        Args:
+            task_name: Name of the benchmark task to optimize for
+            
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
+        """
+        from ray import tune
+
+        return {
+            "heavy_size": tune.choice([0.01, 0.02, 0.04, 0.05, 0.1, 0.15, 0.2])
+        }
 
 
 @MaskerRegistry.register(OracleTopKConfig)
