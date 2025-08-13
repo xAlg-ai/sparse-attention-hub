@@ -109,6 +109,26 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
             raise ValueError(
                 f"local_offset must be int or float, got {type(self.local_offset)}"
             )
+    
+    @classmethod
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for AdaptiveSampling masker.
+        
+        Args:
+            task_name: Name of the benchmark task to optimize for
+            
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
+        """
+        from ray import tune
+
+        return {
+            "base_rate_sampling": tune.choice([0.01, 0.05, 0.1, 0.2, 0.3]),
+            "epsilon": tune.choice([0.1, 0.2, 0.25, 0.3, 0.4]),
+            "delta": tune.choice([0.1, 0.2, 0.25, 0.3, 0.4]),
+            "init_offset": tune.choice([0.0, 0.001, 0.005, 0.01, 0.02]),
+            "local_offset": tune.choice([0.0, 0.001, 0.005, 0.01, 0.02])
+        }
 
 
 @MaskerRegistry.register(AdaptiveSamplingMaskerConfig)
