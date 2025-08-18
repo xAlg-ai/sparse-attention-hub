@@ -1,80 +1,142 @@
-# Sparse Attention Configuration Optimizer
+# Two-Phase Benchmark System
 
-This framework automates the process of finding the optimal hyperparameters for sparse attention configurations and validates their performance across a matrix of models and benchmarks.
+Automated sparse attention optimization with distinct search and execution phases.
 
-It uses a robust **"Search then Validate"** workflow:
-1.  **Search**: Uses Ray Tune to run a fast search with lightweight benchmark settings to find the best configuration.
-2.  **Validate**: Takes the single best configuration and runs a final, thorough benchmark to get a definitive performance score.
+## Architecture
 
----
-## How It Works: The "Search then Validate" Workflow
+`run_full_benchmark.py` implements a two-phase workflow:
 
-The entire process is orchestrated by the `execute_full_benchmark.py` script. For each combination of model, benchmark, and masker preset, it performs two main stages:
+1. **Phase 1**: Hyperparameter search to find optimal configs for each (model, task, masker) combination
+2. **Phase 2**: Parallel benchmark execution using the discovered optimal configs
 
-1.  **Search Stage** 
-    * The script constructs a hyperparameter **search space** from the specified masker configurations.
-    * It launches a **Ray Tune** optimization job, which runs multiple trials in parallel.
-    * Each trial runs a benchmark with a unique set of hyperparameters, using **lightweight settings** (e.g., fewer tokens, smaller context) to get a score quickly.
-    * Ray Tune identifies the trial that produced the **best score**.
+## Basic Usage
 
-2.  **Validation Stage** 
-    * The script takes the single **best configuration** discovered in the search stage.
-    * It then runs the benchmark one final time using **thorough, high-quality settings** (e.g., longer context, more generated tokens).
-    * This produces a definitive **final validation score** and detailed logs for the winning configuration.
+```bash
+# Run both phases (default)
+python benchmark/raytune/run_full_benchmark.py
 
----
-## How to Extend the Framework
+# Run only Phase 1 (config search)
+python benchmark/raytune/run_full_benchmark.py --phase 1
 
-The framework is designed for easy extension by modifying a single function in `execute_full_benchmark.py`: `get_run_configurations()`.
+# Run only Phase 2 (benchmark execution)  
+python benchmark/raytune/run_full_benchmark.py --phase 2
 
-### Adding a New Model or Benchmark
-Simply add the string ID to the corresponding list within the function. Use the `benchmark_name/subset_name` format for clarity.
+# Debug mode (minimal configs, fast execution)
+python benchmark/raytune/run_full_benchmark.py --debug
 
-```python
-# In get_run_configurations() in execute_full_benchmark.py
-
-# Add a new model
-"models": [
-    "meta-llama/Llama-3.2-8B-Instruct",
-    "mistralai/Mistral-7B-v0.1"  # <-- ADD NEW MODEL HERE
-],
-
-# Add a new benchmark
-"benchmarks": [
-    "loogle/shortdep_qa",
-    "new_benchmark/new_subset"  # <-- ADD NEW BENCHMARK HERE
-],
+# Force re-search in Phase 1
+python benchmark/raytune/run_full_benchmark.py --phase 1 --force-search
 ```
 
-### Adding a New Masker Preset
-Import your masker's ...Config class at the top of the file.
+## Configuration
 
-Add a new entry to the masker_config_presets dictionary. The key is the preset's name, and the value is a list of the masker config classes to combine.
+Models and tasks are configured in `get_run_configuration()`:
 
 ```python
-
-# In get_run_configurations() in execute_full_benchmark.py
-
-# 1. Import your custom masker config
-from sparse_attention_hub.sparse_attention.research_attention.maskers import LocalMaskerConfig, NewMaskerConfig
-
-# 2. Add a new preset
-masker_config_presets = {
-    "local_sink": [SinkMaskerConfig, LocalMaskerConfig],
-    "sink_local_magic_pig": [SinkMaskerConfig, LocalMaskerConfig, MagicPigConfig],
-    "new_preset": [SinkMaskerConfig, NewMaskerConfig], # <-- ADD PRESET HERE
-}
+models = ["meta-llama/Llama-3.1-8B-Instruct"]
+tasks = [
+    "infinite_bench/passkey",
+    "ruler/4096", 
+    "loogle/longdep_qa",
+    "zero_scrolls/default",
+    # ... more tasks
+]
 ```
 
-### Key Files
-- execute_full_benchmark.py: Main entry point. This is the file you run and the primary file you'll edit to change the test matrix.
-- optimizer_factory.py: The core engine that builds search spaces from your config classes. You should not need to edit this file unless changing the fundamental optimization logic.
+Sparse configs are generated in `get_all_sparse_configs()` with sparsity levels: 5%, 10%, 25%, 50%.
 
+## How It Works
 
-### Command-Line Arguments
-The script uses decoupled parameters for the search and validation stages.
---debug: Runs a small, fast test.   
---num-samples: Controls how many configurations Ray Tune will try during the search.   
---search-*: A group of flags (--search-timeout, --search-max-new-tokens, etc.) to control the lightweight search trials.    
---validation-*: A group of flags (--validation-timeout, etc.) to control the final, thorough benchmark run.    
-Run with --help to see all available options and their default values.   
+### Phase 1: Hyperparameter Search
+- Uses Ray Tune to search optimal parameters for each masker configuration
+- Runs with lightweight settings (small context, few tokens) for speed
+- Saves best configs to `phase1_results/{model}_{task}_{masker}.json`
+
+### Phase 2: Benchmark Execution  
+- Loads optimal configs from Phase 1
+- Runs full benchmarks with production settings
+- Saves results to `phase2_results/`
+
+## Adding New Components
+
+### New Tasks
+Add to `tasks` list in `get_run_configuration()`:
+```python
+tasks = [
+    "infinite_bench/passkey",
+    "your_benchmark/subset",  # Add here
+]
+```
+
+### New Models
+Add to `models` list in `get_run_configuration()`:
+```python
+models = [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "your-org/your-model",  # Add here
+]
+```
+
+### New Masker Configs
+Add to `get_all_sparse_configs()` following the pattern:
+```python
+# Example: Add custom masker at 5% sparsity
+configs.append((
+    "custom_masker_5pct",
+    ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=0.02),
+        YourMaskerConfig(param=0.03)
+    ]),
+    [SinkMaskerConfig, YourMaskerConfig]  # Classes for Ray Tune
+))
+```
+
+## Phase Control
+
+### Phase 1 Parameters
+```bash
+--phase 1                        # Run search only
+--force-search                   # Ignore existing results
+--num-samples 50                 # Trials per config
+--search-timeout 900             # 15min timeout per trial
+--search-max-new-tokens 20       # Search with minimal tokens
+--search-max-context-length 8192 # Search with small context
+--search-max-requests 10         # Max requests per trial
+```
+
+### Phase 2 Parameters
+```bash
+--phase 2                        # Run benchmark only
+--config-run run_20240315_143022 # Use specific config run
+--max-concurrent-benchmarks 4    # Parallel benchmarks
+--benchmark-timeout 7200         # 2hr timeout
+--max-new-tokens 200             # Full generation
+--max-context-length 64000       # Full context
+```
+
+### Combined Execution
+```bash
+# Run both phases with custom settings
+python run_full_benchmark.py \
+    --num-samples 100 \
+    --search-max-context-length 16384 \
+    --max-new-tokens 500
+```
+
+## Output Structure
+
+```
+phase1_results/
+├── llama-3.1-8b-instruct_loogle-shortdep-qa_sink_local_5pct.json
+├── llama-3.1-8b-instruct_loogle-shortdep-qa_adaptive_oracle_5pct.json
+└── ... (best configs for each combination)
+
+phase2_results/
+├── benchmark_results_2024-01-15_10-30-00.csv
+└── ... (full benchmark results)
+```
+
+## Key Files
+- `run_full_benchmark.py`: Main two-phase system implementation
+- `optimizer_factory.py`: Ray Tune search space generation
+- `analyze_trials.py`: Utility to analyze Phase 1 results
