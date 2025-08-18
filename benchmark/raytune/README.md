@@ -15,6 +15,7 @@ Automated sparse attention optimization with distinct search and execution phase
 ```bash 
 ## install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
 
 ## clone repo, to branch feature/raytune
 git clone https://github.com/xAlg-ai/sparse-attention-hub
@@ -24,6 +25,11 @@ git checkout feature/raytune
 uv sync
 ### need to install flash-attn after init to avoid torch dependencies
 uv add flash-attn --no-build-isolation
+source .venv/bin/activate
+
+## login required for huggingface
+export HF_TOKEN=...
+huggingface-cli login --token $HF_TOKEN
 
 
 ## run benchmark in debug mode
