@@ -83,6 +83,12 @@ python benchmark/raytune/run_full_benchmark.py --debug
 
 # Force re-search in Phase 1
 python benchmark/raytune/run_full_benchmark.py --phase 1 --force-search
+
+# Run with specific sparsity objective
+python benchmark/raytune/run_full_benchmark.py --objective sparsity_10
+
+# Phase 1 only with aggressive sparsity target
+python benchmark/raytune/run_full_benchmark.py --phase 1 --objective sparsity_5
 ```
 
 ## Configuration
@@ -100,7 +106,56 @@ tasks = [
 ]
 ```
 
-Sparse configs are generated in `get_all_sparse_configs()` with sparsity levels: 5%, 10%, 25%, 50%.
+### Optimization Objectives
+
+The benchmark system supports different optimization objectives that balance accuracy and sparsity:
+
+**Available Objectives:**
+- `default`: Balanced objective that penalizes high density (>50%)
+- `sparsity_5`: Target 5% density (95% sparsity)
+- `sparsity_10`: Target 10% density (90% sparsity)
+- `sparsity_15`: Target 15% density (85% sparsity)
+- `sparsity_20`: Target 20% density (80% sparsity)
+- `sparsity_25`: Target 25% density (75% sparsity)
+
+**Examples:**
+
+```bash
+# Default objective - balanced accuracy and efficiency
+python benchmark/raytune/run_full_benchmark.py --objective default
+
+# Target 90% sparsity (10% density) - prioritize efficiency
+python benchmark/raytune/run_full_benchmark.py --objective sparsity_10
+
+# Target 95% sparsity (5% density) - aggressive compression
+python benchmark/raytune/run_full_benchmark.py --objective sparsity_5
+
+# Target 75% sparsity (25% density) - prioritize accuracy
+python benchmark/raytune/run_full_benchmark.py --objective sparsity_25
+```
+
+**How Objectives Work:**
+- Each objective function combines `error` (accuracy loss) and `density` (attention density)
+- Sparsity objectives apply penalties when density exceeds the target level
+- Lower scores are better during optimization
+- Phase 1 searches for hyperparameters that minimize the objective function
+
+**Example with Different Objectives:**
+```bash
+# Run multiple experiments with different sparsity targets
+for sparsity in 5 10 20; do
+    python benchmark/raytune/run_full_benchmark.py \
+        --objective sparsity_${sparsity} \
+        --optimal-configs-dir ./configs_sparsity_${sparsity} \
+        --num-samples 50
+done
+```
+
+Sparse configs are generated in `get_all_sparse_configs()` and include various masker combinations like:
+- Random sampling with sink and local attention
+- Adaptive sampling with oracle top-k
+- Hash-based attention (HAT) with adaptive sampling
+- Magic Pig LSH-based attention
 
 ## How It Works
 
@@ -159,6 +214,7 @@ configs.append((
 --search-max-new-tokens 20       # Search with minimal tokens
 --search-max-context-length 8192 # Search with small context
 --search-max-requests 10         # Max requests per trial
+--objective default              # Optimization objective (default, sparsity_5, sparsity_10, etc.)
 ```
 
 ### Phase 2 Parameters
@@ -178,6 +234,49 @@ python run_full_benchmark.py \
     --num-samples 100 \
     --search-max-context-length 16384 \
     --max-new-tokens 500
+```
+
+### Use Case Examples
+
+**1. Memory-Constrained Deployment (Target 95% Sparsity):**
+```bash
+python run_full_benchmark.py \
+    --objective sparsity_5 \
+    --num-samples 100 \
+    --search-max-context-length 32768 \
+    --benchmark-max-context-length 128000
+```
+
+**2. Quality-First Application (Target 75% Sparsity):**
+```bash
+python run_full_benchmark.py \
+    --objective sparsity_25 \
+    --num-samples 50 \
+    --max-new-tokens 500 \
+    --benchmark-timeout 7200
+```
+
+**3. Comparative Analysis Across Sparsity Levels:**
+```bash
+# Test multiple sparsity levels on same model/task
+for obj in default sparsity_5 sparsity_10 sparsity_20; do
+    echo "Running with objective: $obj"
+    python run_full_benchmark.py \
+        --objective $obj \
+        --optimal-configs-dir ./results_${obj} \
+        --benchmark-results-dir ./benchmarks_${obj} \
+        --num-samples 75
+done
+```
+
+**4. Debug Mode with Specific Objective:**
+```bash
+# Quick test with minimal resources
+python run_full_benchmark.py \
+    --debug \
+    --objective sparsity_10 \
+    --num-samples 5 \
+    --search-timeout 300
 ```
 
 ## Output Structure
