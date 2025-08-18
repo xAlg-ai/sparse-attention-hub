@@ -282,8 +282,8 @@ class ConfigSearchManager:
         start_time = time.time()
         
         try:
-            # Create optimizer
-            optimizer = create_optimizer(masker_classes)
+            # Create optimizer with template config for fixed parameters
+            optimizer = create_optimizer(masker_classes, full_sparse_config)
             
             # Show what we're searching
             search_space = optimizer.create_search_space(task)
