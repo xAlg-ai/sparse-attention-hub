@@ -10,7 +10,7 @@ This factory then assembles these individual search spaces for optimization.
 """
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Type, Optional
 
 from sparse_attention_hub.sparse_attention.research_attention import (
     ResearchAttentionConfig,
@@ -55,8 +55,16 @@ class SingleConfigOptimizer(SparseConfigOptimizer):
 class CompositeConfigOptimizer(SparseConfigOptimizer):
     """Optimizer for a `ResearchAttentionConfig` composed of multiple maskers."""
 
-    def __init__(self, masker_configs: List[Type]):
+    def __init__(self, masker_configs: List[Type], template_config: Optional[ResearchAttentionConfig] = None):
         self.masker_configs = []
+        self.template_config = template_config
+        
+        # Create a mapping from masker class to template instance if template is provided
+        self.template_instances = {}
+        if template_config:
+            for template_masker in template_config.masker_configs:
+                self.template_instances[type(template_masker)] = template_masker
+        
         for masker_class in masker_configs:
             if not hasattr(masker_class, "get_search_space"):
                 raise TypeError(
@@ -87,15 +95,40 @@ class CompositeConfigOptimizer(SparseConfigOptimizer):
             masker_params = {
                 k[len(prefix) :]: v for k, v in params.items() if k.startswith(prefix)
             }
-            masker_instances.append(masker_class(**masker_params))
+            
+            # If we have a template for this masker type, use its fixed parameters
+            if masker_class in self.template_instances:
+                template_masker = self.template_instances[masker_class]
+                # Get all attributes from the template
+                template_dict = {}
+                for attr in dir(template_masker):
+                    if not attr.startswith('_') and not callable(getattr(template_masker, attr)):
+                        try:
+                            value = getattr(template_masker, attr)
+                            # Only include simple types that can be serialized
+                            if isinstance(value, (int, float, str, bool, type(None))):
+                                template_dict[attr] = value
+                        except:
+                            pass
+                
+                # Update template with search params (search params override template)
+                template_dict.update(masker_params)
+                masker_instances.append(masker_class(**template_dict))
+            else:
+                masker_instances.append(masker_class(**masker_params))
+                
         return ResearchAttentionConfig(masker_configs=masker_instances)
 
-def create_optimizer(masker_configs: List[Type]) -> SparseConfigOptimizer:
+def create_optimizer(masker_configs: List[Type], template_config: Optional[ResearchAttentionConfig] = None) -> SparseConfigOptimizer:
     """
     Factory function to create the appropriate optimizer.
 
     This function inspects the list of masker configurations and returns the
     correct optimizer type.
+    
+    Args:
+        masker_configs: List of masker configuration classes to optimize
+        template_config: Optional template configuration with fixed parameters
     """
     if not isinstance(masker_configs, list) or not masker_configs:
         raise ValueError("`masker_configs` must be a non-empty list of config classes.")
@@ -104,4 +137,4 @@ def create_optimizer(masker_configs: List[Type]) -> SparseConfigOptimizer:
 
     if len(masker_configs) == 1:
         return SingleConfigOptimizer(masker_configs[0])
-    return CompositeConfigOptimizer(masker_configs)
+    return CompositeConfigOptimizer(masker_configs, template_config)
