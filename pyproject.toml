@@ -51,7 +51,6 @@ dependencies = [
     "colorama>=0.4.6",
     "ray[tune]>=2.48.0",
     "hyperopt>=0.2.7",
-    "flash-attn>=2.8.2",
 ]
 
 [project.optional-dependencies]
