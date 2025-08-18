@@ -9,6 +9,63 @@ Automated sparse attention optimization with distinct search and execution phase
 1. **Phase 1**: Hyperparameter search to find optimal configs for each (model, task, masker) combination
 2. **Phase 2**: Parallel benchmark execution using the discovered optimal configs
 
+
+## Quick Start
+
+```bash 
+## install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+## clone repo, to branch feature/raytune
+git clone https://github.com/xAlg-ai/sparse-attention-hub
+git checkout feature/raytune
+
+## build env
+uv sync
+### need to install flash-attn after init to avoid torch dependencies
+uv add flash-attn --no-build-isolation
+
+
+## run benchmark in debug mode
+python benchmark/raytune/run_full_benchmark.py --debug
+```
+
+Expected output:
+
+```
+.
+├── optimal_configs/                    # Phase 1 outputs
+│   └── run_20240315_143022/           # Timestamped run directory
+│       ├── meta-llama_Llama-3.1-8B-Instruct_loogle_shortdep_qa_sink_local_5pct.json          # Best config
+│       ├── meta-llama_Llama-3.1-8B-Instruct_loogle_shortdep_qa_sink_local_5pct_trials.json   # Trial details
+│       ├── meta-llama_Llama-3.1-8B-Instruct_loogle_shortdep_qa_sink_local_5pct_analysis.csv  # Ray analysis
+│       └── ... (3 files per model-task-masker combination)
+│
+├── ray_results/                        # Ray Tune working directory
+│   └── search_runs/                    # Hyperparameter search experiments
+│       └── ... (Ray Tune experiment artifacts)
+│
+└── benchmark_results/                  # Phase 2 outputs
+    ├── benchmark_summary.json          # Overall benchmark summary
+    └── meta-llama_Llama-3.1-8B-Instruct/     # Sanitized model name
+        ├── dense/                             # Dense baseline config
+        │   └── loogle_shortdep_qa/            # Benchmark_subset
+        │       └── raw_results.csv
+        ├── sink_local_oracle_top_k_adaptive_sampling/  # Sparse config name
+        │   └── loogle_shortdep_qa/
+        │       ├── raw_results.csv
+        │       └── micro_metrics.jsonl        # Sparse attention metrics
+        └── sink_local_random_sampling/        # Another sparse config
+            └── loogle_shortdep_qa/
+                ├── raw_results.csv
+                └── micro_metrics.jsonl
+```
+
+
+
+
+
+
 ## Basic Usage
 
 ```bash
@@ -126,15 +183,43 @@ python run_full_benchmark.py \
 ## Output Structure
 
 ```
-phase1_results/
-├── llama-3.1-8b-instruct_loogle-shortdep-qa_sink_local_5pct.json
-├── llama-3.1-8b-instruct_loogle-shortdep-qa_adaptive_oracle_5pct.json
-└── ... (best configs for each combination)
-
-phase2_results/
-├── benchmark_results_2024-01-15_10-30-00.csv
-└── ... (full benchmark results)
+.
+├── optimal_configs/                    # Phase 1: Hyperparameter search results
+│   └── run_YYYYMMDD_HHMMSS/           # Timestamped configuration run
+│       ├── {model}_{task}_{masker}.json          # Best hyperparameters
+│       ├── {model}_{task}_{masker}_trials.json   # All trial details
+│       └── {model}_{task}_{masker}_analysis.csv  # Ray Tune analysis
+│
+├── ray_results/                        # Ray Tune experiment artifacts
+│   └── search_runs/                    # Intermediate search data
+│       └── search_{model}_{task}_{masker}/
+│           └── ... (checkpoints, logs, etc.)
+│
+└── benchmark_results/                  # Phase 2: Full benchmark results
+    ├── benchmark_summary.json          # Aggregated results summary
+    └── {model}/                        # Model-specific results (e.g., meta-llama_Llama-3.1-8B-Instruct)
+        └── {sparse_config}/            # Sparse config name (e.g., dense, sink_local_5pct)
+            └── {benchmark}_{subset}/   # Combined benchmark-subset directory
+                ├── raw_results.csv           # Evaluation metrics
+                └── micro_metrics.jsonl       # Sparse attention details (only for sparse configs)
 ```
+
+### File Descriptions
+
+**Phase 1 Files:**
+- **Best hyperparameters** (`{model}_{task}_{masker}.json`): Optimal settings discovered for each combination
+- **Trial details** (`*_trials.json`): Complete record of all hyperparameter search trials
+- **Ray analysis** (`*_analysis.csv`): Detailed metrics for all trials (loss, accuracy, runtime, etc.)
+
+**Phase 2 Files:**
+- **Raw results** (`raw_results.csv`): Final evaluation metrics (accuracy, perplexity, etc.)
+- **Micro metrics** (`micro_metrics.jsonl`): Per-sample sparse attention statistics (only for sparse configs)
+- **Benchmark summary** (`benchmark_summary.json`): Consolidated results across all model/task/masker combinations
+
+**Notes:**
+- Model names containing "/" are replaced with "_" in filenames (e.g., `meta-llama/Llama-3.1-8B` becomes `meta-llama_Llama-3.1-8B`)
+- Sparse config names reflect the masker types and parameters (e.g., `sink_local_oracle_top_k_adaptive_sampling` combines multiple masker strategies)
+- The `dense` configuration serves as a baseline with no sparse attention applied
 
 ## Key Files
 - `run_full_benchmark.py`: Main two-phase system implementation
