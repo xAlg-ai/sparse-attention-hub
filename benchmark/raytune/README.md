@@ -1,11 +1,13 @@
-# Two-Phase Benchmark System
+# Benchmark Runner Scripts
 
-Automated sparse attention optimization with distinct search and execution phases.
+This directory contains scripts for running benchmarks with optimal configurations from Phase 1.
 
-## Architecture
+## Scripts
 
-`run_full_benchmark.py` implements a two-phase workflow:
+### 1. run_ray_benchmarks.py
+The main benchmark runner using Ray for efficient parallel execution.
 
+<<<<<<< HEAD
 1. **Phase 1**: Hyperparameter search to find optimal configs for each (model, task, masker) combination
 2. **Phase 2**: Parallel benchmark execution using the discovered optimal configs
 
@@ -73,260 +75,111 @@ Expected output:
 
 
 ## Basic Usage
+=======
+**Features:**
+- Stateful Ray actors managing GPU resources
+- Fresh model initialization for each task (required due to unique optimized parameters)
+- Real-time progress tracking with ETA
+- Dry run mode to preview execution plan
+- Debug mode for testing with reduced parameters
+- Automatic GPU resource management
+- Resume capability (skips completed benchmarks)
+>>>>>>> 6d836e5 (add parallel benchmark executor with ray, visualization scripts)
 
+**Usage:**
 ```bash
-# Run both phases (default)
-python benchmark/raytune/run_full_benchmark.py
+# Basic usage (uses all available GPUs)
+python benchmark/raytune/run_ray_benchmarks.py --config-run run_20250818_203531
 
-# Run only Phase 1 (config search)
-python benchmark/raytune/run_full_benchmark.py --phase 1
+# Dry run to see what will be executed
+python benchmark/raytune/run_ray_benchmarks.py --config-run run_20250818_203531 --dry-run
 
-# Run only Phase 2 (benchmark execution)  
-python benchmark/raytune/run_full_benchmark.py --phase 2
+# Debug mode - run 2-4 tasks with reduced parameters for testing
+python benchmark/raytune/run_ray_benchmarks.py --config-run run_20250818_203531 --debug
 
-# Debug mode (minimal configs, fast execution)
-python benchmark/raytune/run_full_benchmark.py --debug
+# Single GPU execution
+python benchmark/raytune/run_ray_benchmarks.py --config-run run_20250818_203531 --num-actors 1
 
-# Force re-search in Phase 1
-python benchmark/raytune/run_full_benchmark.py --phase 1 --force-search
+# Maximum utilization with multiple actors per GPU (e.g., 2 actors per GPU)
+python benchmark/raytune/run_ray_benchmarks.py --config-run run_20250818_203531 --actors-per-gpu 2
 
-# Run with specific sparsity objective
-python benchmark/raytune/run_full_benchmark.py --objective sparsity_10
+# Resume from previous run
+python benchmark/raytune/run_ray_benchmarks.py --config-run run_20250818_203531 --resume
 
-# Phase 1 only with aggressive sparsity target
-python benchmark/raytune/run_full_benchmark.py --phase 1 --objective sparsity_5
+# Custom parameters
+python benchmark/raytune/run_ray_benchmarks.py \
+    --config-run run_20250818_203531 \
+    --max-new-tokens 200 \
+    --max-context-length 64000 \
+    --max-requests 50 \
+    --benchmark-results-dir ./my_results
 ```
 
-## Configuration
+### 2. list_benchmark_tasks.py
+Utility to list and inspect benchmark tasks from optimal configurations.
 
-Models and tasks are configured in `get_run_configuration()`:
-
-```python
-models = ["meta-llama/Llama-3.1-8B-Instruct"]
-tasks = [
-    "infinite_bench/passkey",
-    "ruler/4096", 
-    "loogle/longdep_qa",
-    "zero_scrolls/default",
-    # ... more tasks
-]
-```
-
-### Optimization Objectives
-
-The benchmark system supports different optimization objectives that balance accuracy and sparsity:
-
-**Available Objectives:**
-- `default`: Balanced objective that penalizes high density (>50%)
-- `sparsity_5`: Target 5% density (95% sparsity)
-- `sparsity_10`: Target 10% density (90% sparsity)
-- `sparsity_15`: Target 15% density (85% sparsity)
-- `sparsity_20`: Target 20% density (80% sparsity)
-- `sparsity_25`: Target 25% density (75% sparsity)
-
-**Examples:**
-
+**Usage:**
 ```bash
-# Default objective - balanced accuracy and efficiency
-python benchmark/raytune/run_full_benchmark.py --objective default
+# List all tasks in table format
+python benchmark/raytune/list_benchmark_tasks.py --config-run run_20250818_203531
 
-# Target 90% sparsity (10% density) - prioritize efficiency
-python benchmark/raytune/run_full_benchmark.py --objective sparsity_10
+# Group by model
+python benchmark/raytune/list_benchmark_tasks.py --config-run run_20250818_203531 --group-by model
 
-# Target 95% sparsity (5% density) - aggressive compression
-python benchmark/raytune/run_full_benchmark.py --objective sparsity_5
+# Export to CSV
+python benchmark/raytune/list_benchmark_tasks.py --config-run run_20250818_203531 --format csv > tasks.csv
 
-# Target 75% sparsity (25% density) - prioritize accuracy
-python benchmark/raytune/run_full_benchmark.py --objective sparsity_25
+# Filter tasks
+python benchmark/raytune/list_benchmark_tasks.py \
+    --config-run run_20250818_203531 \
+    --filter-task loogle \
+    --filter-masker adaptive
+
+# Simple format for scripting
+python benchmark/raytune/list_benchmark_tasks.py --config-run run_20250818_203531 --format simple
 ```
 
-**How Objectives Work:**
-- Each objective function combines `error` (accuracy loss) and `density` (attention density)
-- Sparsity objectives apply penalties when density exceeds the target level
-- Lower scores are better during optimization
-- Phase 1 searches for hyperparameters that minimize the objective function
+## Performance Tips
 
-**Example with Different Objectives:**
-```bash
-# Run multiple experiments with different sparsity targets
-for sparsity in 5 10 20; do
-    python benchmark/raytune/run_full_benchmark.py \
-        --objective sparsity_${sparsity} \
-        --optimal-configs-dir ./configs_sparsity_${sparsity} \
-        --num-samples 50
-done
-```
+1. **Model Loading**: Each task requires fresh model initialization due to unique optimized parameters from Phase 1. Model loading time is tracked and reported.
 
-Sparse configs are generated in `get_all_sparse_configs()` and include various masker combinations like:
-- Random sampling with sink and local attention
-- Adaptive sampling with oracle top-k
-- Hash-based attention (HAT) with adaptive sampling
-- Magic Pig LSH-based attention
+2. **Actor Count**: 
+   - Default: 1 actor per GPU for maximum parallelism
+   - Debug mode: Limited to 2 actors for faster testing
+   - Custom: Use `--num-actors` to control parallelism
 
-## How It Works
+3. **Debug Mode**: Use `--debug` for quick testing:
+   - Runs only 2-4 diverse tasks
+   - Reduces max_new_tokens to 20
+   - Limits context length to 4096
+   - Processes only 2 requests per benchmark
 
-### Phase 1: Hyperparameter Search
-- Uses Ray Tune to search optimal parameters for each masker configuration
-- Runs with lightweight settings (small context, few tokens) for speed
-- Saves best configs to `phase1_results/{model}_{task}_{masker}.json`
-
-### Phase 2: Benchmark Execution  
-- Loads optimal configs from Phase 1
-- Runs full benchmarks with production settings
-- Saves results to `phase2_results/`
-
-## Adding New Components
-
-### New Tasks
-Add to `tasks` list in `get_run_configuration()`:
-```python
-tasks = [
-    "infinite_bench/passkey",
-    "your_benchmark/subset",  # Add here
-]
-```
-
-### New Models
-Add to `models` list in `get_run_configuration()`:
-```python
-models = [
-    "meta-llama/Llama-3.1-8B-Instruct",
-    "your-org/your-model",  # Add here
-]
-```
-
-### New Masker Configs
-Add to `get_all_sparse_configs()` following the pattern:
-```python
-# Example: Add custom masker at 5% sparsity
-configs.append((
-    "custom_masker_5pct",
-    ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=0.02),
-        YourMaskerConfig(param=0.03)
-    ]),
-    [SinkMaskerConfig, YourMaskerConfig]  # Classes for Ray Tune
-))
-```
-
-## Phase Control
-
-### Phase 1 Parameters
-```bash
---phase 1                        # Run search only
---force-search                   # Ignore existing results
---num-samples 50                 # Trials per config
---search-timeout 900             # 15min timeout per trial
---search-max-new-tokens 20       # Search with minimal tokens
---search-max-context-length 8192 # Search with small context
---search-max-requests 10         # Max requests per trial
---objective default              # Optimization objective (default, sparsity_5, sparsity_10, etc.)
-```
-
-### Phase 2 Parameters
-```bash
---phase 2                        # Run benchmark only
---config-run run_20240315_143022 # Use specific config run
---max-concurrent-benchmarks 4    # Parallel benchmarks
---benchmark-timeout 7200         # 2hr timeout
---max-new-tokens 200             # Full generation
---max-context-length 64000       # Full context
-```
-
-### Combined Execution
-```bash
-# Run both phases with custom settings
-python run_full_benchmark.py \
-    --num-samples 100 \
-    --search-max-context-length 16384 \
-    --max-new-tokens 500
-```
-
-### Use Case Examples
-
-**1. Memory-Constrained Deployment (Target 95% Sparsity):**
-```bash
-python run_full_benchmark.py \
-    --objective sparsity_5 \
-    --num-samples 100 \
-    --search-max-context-length 32768 \
-    --benchmark-max-context-length 128000
-```
-
-**2. Quality-First Application (Target 75% Sparsity):**
-```bash
-python run_full_benchmark.py \
-    --objective sparsity_25 \
-    --num-samples 50 \
-    --max-new-tokens 500 \
-    --benchmark-timeout 7200
-```
-
-**3. Comparative Analysis Across Sparsity Levels:**
-```bash
-# Test multiple sparsity levels on same model/task
-for obj in default sparsity_5 sparsity_10 sparsity_20; do
-    echo "Running with objective: $obj"
-    python run_full_benchmark.py \
-        --objective $obj \
-        --optimal-configs-dir ./results_${obj} \
-        --benchmark-results-dir ./benchmarks_${obj} \
-        --num-samples 75
-done
-```
-
-**4. Debug Mode with Specific Objective:**
-```bash
-# Quick test with minimal resources
-python run_full_benchmark.py \
-    --debug \
-    --objective sparsity_10 \
-    --num-samples 5 \
-    --search-timeout 300
-```
+4. **Resume**: Completed benchmarks are automatically skipped based on the presence of `metrics.json`.
 
 ## Output Structure
 
+Results are saved in the following structure:
 ```
-.
-├── optimal_configs/                    # Phase 1: Hyperparameter search results
-│   └── run_YYYYMMDD_HHMMSS/           # Timestamped configuration run
-│       ├── {model}_{task}_{masker}.json          # Best hyperparameters
-│       ├── {model}_{task}_{masker}_trials.json   # All trial details
-│       └── {model}_{task}_{masker}_analysis.csv  # Ray Tune analysis
-│
-├── ray_results/                        # Ray Tune experiment artifacts
-│   └── search_runs/                    # Intermediate search data
-│       └── search_{model}_{task}_{masker}/
-│           └── ... (checkpoints, logs, etc.)
-│
-└── benchmark_results/                  # Phase 2: Full benchmark results
-    ├── benchmark_summary.json          # Aggregated results summary
-    └── {model}/                        # Model-specific results (e.g., meta-llama_Llama-3.1-8B-Instruct)
-        └── {sparse_config}/            # Sparse config name (e.g., dense, sink_local_5pct)
-            └── {benchmark}_{subset}/   # Combined benchmark-subset directory
-                ├── raw_results.csv           # Evaluation metrics
-                └── micro_metrics.jsonl       # Sparse attention details (only for sparse configs)
+benchmark_results_ray/
+├── meta-llama_Llama-3.1-8B-Instruct/
+│   ├── dense/
+│   │   ├── loogle_longdep_qa/
+│   │   │   ├── raw_results.csv
+│   │   │   ├── metrics.json
+│   │   │   └── micro_metrics.jsonl
+│   │   └── ...
+│   ├── sink_local_random_sampling/
+│   │   └── ...
+│   └── ...
+└── ...
 ```
 
-### File Descriptions
+## Monitoring Progress
 
-**Phase 1 Files:**
-- **Best hyperparameters** (`{model}_{task}_{masker}.json`): Optimal settings discovered for each combination
-- **Trial details** (`*_trials.json`): Complete record of all hyperparameter search trials
-- **Ray analysis** (`*_analysis.csv`): Detailed metrics for all trials (loss, accuracy, runtime, etc.)
-
-**Phase 2 Files:**
-- **Raw results** (`raw_results.csv`): Final evaluation metrics (accuracy, perplexity, etc.)
-- **Micro metrics** (`micro_metrics.jsonl`): Per-sample sparse attention statistics (only for sparse configs)
-- **Benchmark summary** (`benchmark_summary.json`): Consolidated results across all model/task/masker combinations
-
-**Notes:**
-- Model names containing "/" are replaced with "_" in filenames (e.g., `meta-llama/Llama-3.1-8B` becomes `meta-llama_Llama-3.1-8B`)
-- Sparse config names reflect the masker types and parameters (e.g., `sink_local_oracle_top_k_adaptive_sampling` combines multiple masker strategies)
-- The `dense` configuration serves as a baseline with no sparse attention applied
-
-## Key Files
-- `run_full_benchmark.py`: Main two-phase system implementation
-- `optimizer_factory.py`: Ray Tune search space generation
-- `analyze_trials.py`: Utility to analyze Phase 1 results
+The Ray runner provides real-time progress updates:
+- Current task completion status with execution time
+- Model loading time for each task
+- Average model load time statistics
+- Estimated time remaining (ETA)
+- Tasks per second throughput
+- Total execution and model loading time summary
