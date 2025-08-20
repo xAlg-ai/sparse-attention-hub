@@ -34,7 +34,7 @@ class LocalMaskerConfig(FixedMaskerConfig):
         from ray import tune
 
         return {
-            "window_size": tune.choice([32, 64, 128, 256])
+            "window_size": tune.choice([0.01])
         }
 
 
@@ -197,7 +197,7 @@ class SinkMaskerConfig(FixedMaskerConfig):
         from ray import tune
 
         return {
-            "sink_size": tune.choice([4, 8, 16, 32, 64, 128])
+            "sink_size": tune.choice([0.01])
         }
 
 
