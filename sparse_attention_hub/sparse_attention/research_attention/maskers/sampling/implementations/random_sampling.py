@@ -58,9 +58,10 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
         """
         from ray import tune
 
-        return {
-            "sampling_rate": tune.choice([0.01, 0.05, 0.1, 0.2, 0.3, 0.5])
-        }
+        # return {
+        #     "sampling_rate": tune.choice([0.01, 0.05, 0.1, 0.2, 0.3, 0.5])
+        # }
+        return {}
 
 
 @MaskerRegistry.register(RandomSamplingMaskerConfig)
