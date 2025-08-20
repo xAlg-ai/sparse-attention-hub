@@ -845,7 +845,7 @@ def get_run_configuration(args: argparse.Namespace) -> dict:
     
     # Get HashAttention weights file
     machine_key = "ubuntu"
-    weight_file = f"/home/{machine_key}/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+    weight_file = f"/home/{machine_key}/scratch/krishna/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
     if not os.path.exists(weight_file):
         weight_file = "./hat_weights.pkl"
         print(f"Warning: HashAttention weights not found, using {weight_file}")
@@ -863,18 +863,18 @@ def get_run_configuration(args: argparse.Namespace) -> dict:
         sparse_configs = all_sparse_configs
         models = ["meta-llama/Llama-3.1-8B-Instruct"]
         tasks = [
-                "infinite_bench/passkey",
-                "ruler/4096",
+                # "infinite_bench/passkey",
+                # "ruler/4096",
                 "loogle/longdep_summarization",
                 "loogle/longdep_qa",
                 "loogle/shortdep_qa",
                 "loogle/shortdep_cloze",
-                "zero_scrolls/default",
-                "longbenchv2/0shot",
-                "aime2024/aime2024",
-                "aime2025/aime2025",
-                "longbench/passage_retrieval_en",
-                "mock_benchmark/reading_comprehension",
+                # "zero_scrolls/default",
+                # "longbenchv2/0shot",
+                # "aime2024/aime2024",
+                # "aime2025/aime2025",
+                # "longbench/passage_retrieval_en",
+                # "mock_benchmark/reading_comprehension",
         ]
         num_samples = args.num_samples
     
@@ -954,7 +954,7 @@ def main():
                              help="Max new tokens for search trials")
     phase1_group.add_argument("--search-max-context-length", type=int, default=8192,
                              help="Max context length for search trials")
-    phase1_group.add_argument("--search-max-requests", type=int, default=10,
+    phase1_group.add_argument("--search-max-requests", type=int, default=5,
                              help="Max requests per search trial")
     
     # Phase 2 arguments
