@@ -29,7 +29,7 @@ classifiers = [
 keywords = ["attention", "sparse", "transformer", "deep-learning", "pytorch"]
 
 dependencies = [
-    "torch>=1.9.0",
+    "torch==2.7.1",
     "numpy>=1.21.0",
     "matplotlib>=3.5.0",
     "seaborn>=0.11.0",
@@ -49,6 +49,8 @@ dependencies = [
     "pandas>=2.3.1",
     "pynvml>=12.0.0",
     "colorama>=0.4.6",
+    "ray[tune]>=2.48.0",
+    "hyperopt>=0.2.7",
 ]
 
 [project.optional-dependencies]

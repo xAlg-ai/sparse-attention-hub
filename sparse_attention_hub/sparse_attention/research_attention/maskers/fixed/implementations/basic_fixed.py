@@ -21,6 +21,22 @@ class LocalMaskerConfig(FixedMaskerConfig):
 
     window_size: Union[float, int]
 
+    @classmethod
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for Local masker.
+        
+        Args:
+            task_name: Name of the benchmark task to optimize for
+            
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
+        """
+        from ray import tune
+
+        return {
+            "window_size": tune.choice([0.01])
+        }
+
 
 @MaskerRegistry.register(LocalMaskerConfig)
 class LocalMasker(FixedMasker):
@@ -167,6 +183,22 @@ class SinkMaskerConfig(FixedMaskerConfig):
     """Configuration for SinkMasker."""
 
     sink_size: Union[float, int]
+
+    @classmethod
+    def get_search_space(cls, task_name: str) -> Dict[str, Any]:
+        """Get Ray Tune search space for Sink masker.
+        
+        Args:
+            task_name: Name of the benchmark task to optimize for
+            
+        Returns:
+            Dictionary mapping parameter names to Ray Tune distributions
+        """
+        from ray import tune
+
+        return {
+            "sink_size": tune.choice([0.01])
+        }
 
 
 @MaskerRegistry.register(SinkMaskerConfig)
