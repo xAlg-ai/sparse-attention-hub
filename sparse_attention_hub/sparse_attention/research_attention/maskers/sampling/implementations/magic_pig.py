@@ -79,8 +79,8 @@ class MagicPigConfig(SamplingMaskerConfig):
         from ray import tune
 
         return {
-            "lsh_l": tune.choice([8, 16, 32, 64, 128]),
-            "lsh_k": tune.choice([2, 4, 8, 16, 32]),
+            "lsh_l": tune.choice([32, 64, 128]),
+            "lsh_k": tune.choice([8, 16, 32]),
             "center": tune.choice([True]),
             "packing": tune.choice(["int64"])
         }
