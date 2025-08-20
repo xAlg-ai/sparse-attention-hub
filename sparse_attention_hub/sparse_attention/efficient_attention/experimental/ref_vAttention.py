@@ -1,0 +1,618 @@
+import torch
+import torch.nn as nn
+from typing import Optional, List
+import math
+import torch
+import cupy as cp
+
+
+ACTIVATION_FNS = {
+    "silu": nn.SiLU(),
+    "relu": nn.ReLU(),
+    "gelu": nn.GELU(),
+}
+
+
+def ref_dense_attention_with_weights_fwd(query: torch.Tensor, # [B, H, D]
+                            key: torch.Tensor, # [B, H // gqa, S, D]
+                            value: torch.Tensor, # [B, H // gqa, S, D]
+                            weights: torch.Tensor): # [B, H, S]
+    """Vectorised dense attention (reference).
+        weighted attention computation    
+        This assumes q = 1 , so need for causal mask.
+    """
+    assert query.ndim == 3 and key.ndim == 4 and value.ndim == 4
+
+    B, H, D = query.shape
+    _, Kv, S, _ = key.shape
+
+    gqa_group_size = H // Kv  # heads per KV group
+    sm_scale = 1.0 / math.sqrt(D)
+
+    # Repeat key/value so we have one slice per query head: [B, H, S, D]
+    key_rep = key.repeat_interleave(gqa_group_size, dim=1)
+    value_rep = value.repeat_interleave(gqa_group_size, dim=1)
+
+    # Compute attention logits: [B, H, S]
+    attn_logits = torch.einsum("bhd,bhsd->bhs", query, key_rep) * sm_scale
+    max_attn_logits = torch.max(attn_logits, dim=-1, keepdim=True).values
+    exp_attn_logits = torch.exp(attn_logits - max_attn_logits) * weights
+
+    attn_weights = exp_attn_logits / exp_attn_logits.sum(dim=-1, keepdim=True)
+
+    # Output: [B, H, D]
+    out = torch.einsum("bhs,bhsd->bhd", attn_weights, value_rep)
+    return out
+
+
+def ref_sparse_attention_with_weights_fwd(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    sparse_list: torch.Tensor,
+    sparse_list_weights: torch.Tensor,
+    sparse_len: torch.Tensor,
+):
+    """Reference implementation of sparse attention flash-decoding.
+
+    Args:
+        query:        Tensor of shape [B, H, D]
+        key:          Tensor of shape [B, H // gqa, S, D]
+        value:        Tensor of shape [B, H // gqa, S, D]
+        sparse_list:  Tensor of shape [B, H, S] that stores the token indices to
+                      attend to. Only the first ``sparse_len[b, h]`` entries of
+                      the last dimension are valid.
+        sparse_list_weights: Tensor of shape [B, H, S] that stores the weights for 
+                      the token indices to attend to. Only the first 
+                      ``sparse_len[b, h]`` entries of the last dimension 
+                      are valid.
+        sparse_len:   Tensor of shape [B, H] giving the valid length in
+                      ``sparse_list`` for every (b, h).
+    Returns:
+        Tensor of shape [B, H, D] – the attention output for each query head.
+
+    This is a *slow* but very clear reference used for correctness checks. It
+    supports grouped-query attention (GQA) where several query heads share the
+    same key / value head.  Setting ``gqa = 1`` reduces to standard multi-head
+    attention (MHA).
+    Important:
+        This applies causal mask.
+
+
+    """
+
+    assert query.ndim == 3, "query must be [B, H, D]"
+    assert key.ndim == value.ndim == 4, "key/value must be [B, Kv, S, D]"
+
+    B, H, D = query.shape
+    _, Kv, S, _ = key.shape
+    device = query.device
+    dtype = query.dtype
+
+    # Infer group size from the shapes.  gqa == number of Q heads per KV head.
+    gqa_group_size = H // Kv
+    assert gqa_group_size * Kv == H, "H must be divisible by Kv (H//gqa)"
+
+    sm_scale = 1.0 / math.sqrt(D)
+
+    # Output tensor
+    out = torch.empty_like(query)
+
+    # Iterate over batch and heads – this is a slow reference so clarity beats speed.
+    for b in range(B):
+        for h in range(H):
+            kv_h = h // gqa_group_size  # which KV head this Q head should use
+
+            # Number of tokens that this (b, h) attends to
+            L = int(sparse_len[b, h].item())
+            if L == 0:
+                # Edge-case: no tokens attended -> return zeros (like softmax over empty set)
+                out[b, h].zero_()
+                continue
+
+            # The token indices we actually attend to (shape [L])
+            idx = sparse_list[b, h, :L].to(dtype=torch.long, device=device)
+            weights = sparse_list_weights[b, h, :L]
+
+            # Gather the key/value vectors we need (shape [L, D])
+            k_vec = key[b, kv_h].index_select(0, idx)  # [L, D]
+            v_vec = value[b, kv_h].index_select(0, idx)  # [L, D]
+
+            # Attention logits – [L]
+            q_vec = query[b, h]  # [D]
+            attn_logits = (k_vec * q_vec).sum(dim=-1).to(torch.float32) * sm_scale
+            max_attn_logits = torch.max(attn_logits, dim=-1, keepdim=True).values
+            exp_attn_logits = torch.exp(attn_logits - max_attn_logits) * weights
+
+            attn_weights = exp_attn_logits / exp_attn_logits.sum(dim=-1, keepdim=True)
+            out[b, h] = torch.sum(attn_weights.unsqueeze(-1) * v_vec, dim=0)
+
+    return out
+
+
+
+bit_count_kernel_long = cp.RawKernel(r'''
+extern "C" __global__
+void bit_count_kernel_long(const unsigned long long int* input, unsigned long long int* output, int size) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        output[idx] = __popcll(input[idx]);
+    }
+}
+''', 'bit_count_kernel_long')
+
+
+def gpu_bit_count_long(input_tensor, output_tensor):
+    if not isinstance(input_tensor, torch.Tensor):
+        raise ValueError("Input must be a PyTorch tensor")
+    
+    if input_tensor.dtype != torch.int64:
+        raise ValueError("Input tensor must be of type torch.int64 (long)")
+    
+    if not input_tensor.is_cuda:
+        input_tensor = input_tensor.cuda()
+    
+    input_cp = cp.from_dlpack(input_tensor)
+    output_cp = cp.from_dlpack(output_tensor)
+    
+    total_elements = input_cp.size
+    threads_per_block = 256
+    blocks_per_grid = (total_elements + threads_per_block - 1) // threads_per_block
+    
+    bit_count_kernel_long((blocks_per_grid,), (threads_per_block,),
+                          (input_cp, output_cp, total_elements))
+
+
+def hat_get_signatures_4d(
+        input_tensor,
+        hat_bits,
+        hat_mlp_activation_fn,
+        matrix_list,
+        bias_list,
+    ):
+    signatures = input_tensor
+    for i in range(len(matrix_list) - 1):
+        weight_matrix = matrix_list[i]
+        bias_vector = bias_list[i]
+        signatures = torch.einsum(
+            "bhsd,hde->bhse", signatures, weight_matrix
+        )
+        # (B,H,s,d_out) + (H,d_out) -> (B,H,s,d_out)
+        signatures = signatures + bias_vector.unsqueeze(0).unsqueeze(2)
+        signatures = hat_mlp_activation_fn(signatures)
+    if len(matrix_list) > 0:
+        weight_matrix = matrix_list[-1]
+        bias_vector = bias_list[-1]
+        signatures = torch.einsum(
+            "bhsd,hde->bhse", signatures, weight_matrix
+        )
+        signatures = signatures + bias_vector.unsqueeze(0).unsqueeze(2)
+    signatures = torch.sign(signatures)
+    # pack into int64 tensor
+
+    binary_signatures = (signatures > 0).to(torch.int64)
+    packer = 2 ** torch.arange(
+        hat_bits, device=signatures.device, dtype=torch.int64
+    )
+    packed_signatures = (binary_signatures * packer).sum(dim=-1)
+    return packed_signatures
+
+def hat_get_signatures_3d(
+        input_tensor,
+        hat_bits,
+        hat_mlp_activation_fn,
+        matrix_list,
+        bias_list,
+    ):
+    signatures = input_tensor
+    for i in range(len(matrix_list) - 1):
+        weight_matrix = matrix_list[i]
+        bias_vector = bias_list[i]
+        signatures = torch.einsum(
+            "bhd,hde->bhe", signatures, weight_matrix
+        )
+        # (B,H,s,d_out) + (H,d_out) -> (B,H,s,d_out)
+        signatures = signatures + bias_vector.unsqueeze(0)
+        signatures = hat_mlp_activation_fn(signatures)
+    if len(matrix_list) > 0:
+        weight_matrix = matrix_list[-1]
+        bias_vector = bias_list[-1]
+        signatures = torch.einsum(
+            "bhd,hde->bhe", signatures, weight_matrix
+        )
+        signatures = signatures + bias_vector.unsqueeze(0)
+    signatures = torch.sign(signatures)
+    # pack into int64 tensor
+
+    binary_signatures = (signatures > 0).to(torch.int64)
+    packer = 2 ** torch.arange(
+        hat_bits, device=signatures.device, dtype=torch.int64
+    )
+    packed_signatures = (binary_signatures * packer).sum(dim=-1)
+    return packed_signatures
+
+
+def hat_get_scores(
+    query_signatures,
+    key_signatures,
+):
+    '''
+        query_signatures: [B, H]  int64 torch tensor
+        key_signatures: [B, H, kv_len] int64 torch tensor
+        computes bit signature matches
+    '''
+    query_signatures = query_signatures.unsqueeze(-1)
+
+    bit_matches = torch.bitwise_not(torch.bitwise_xor(query_signatures, key_signatures))
+    # count number of bits set to 1 in each integer
+    scores = torch.zeros_like(key_signatures)
+    gpu_bit_count_long(bit_matches, scores)
+    return scores
+    
+
+def add_hashattention_tokens(
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        sink_token_length,
+        local_token_length,
+        heavy_token_length,
+        hat_bits,
+        hat_mlp_layers,
+        hat_mlp_hidden_size, 
+        hat_mlp_activation_fn,
+        hat_weights_query_matrix,
+        hat_weights_query_bias,
+        hat_weights_key_matrix,
+        hat_weights_key_bias,
+        cached_key_signatures,
+        sparse_list,
+):
+    # get hash attention bit signatures for new keys.
+    if cached_key_signatures is not None:
+        old_key_num = cached_key_signatures.shape[2]
+    else:
+        old_key_num = 0
+
+    new_key_signatures = hat_get_signatures_4d(
+        keys[:,:,old_key_num:, :],
+        hat_bits,
+        hat_mlp_activation_fn,
+        hat_weights_key_matrix,
+        hat_weights_key_bias,
+    )
+    if cached_key_signatures is not None:
+        all_key_signatures = torch.cat([cached_key_signatures, new_key_signatures], dim=2)
+    else:
+        all_key_signatures = new_key_signatures
+
+    # get query signatures
+    query_signatures = hat_get_signatures_3d(
+        queries,
+        hat_bits,
+        hat_mlp_activation_fn,
+        hat_weights_query_matrix,
+        hat_weights_query_bias,
+    )
+
+    # get hash attention scores
+    scores_in_range = hat_get_scores(
+        query_signatures,
+        all_key_signatures[:,:,sink_token_length:-local_token_length],
+    )
+    # print("Q", bin(query_signatures[0,0].item()), flush=True)
+    # print("K", bin(all_key_signatures[0,0,2504].item()), flush=True)
+    # print("S", scores_in_range[0,0,2504-sink_token_length].item(), flush=True)
+
+    # get topk indices
+    topk_values, topk_indices = torch.topk(scores_in_range, k=heavy_token_length, dim=-1, largest=True)
+    # adjust for sink tokens
+    topk_indices_global = topk_indices + sink_token_length
+    # print(topk_indices_global[0,0,:10], flush=True)
+    # print(topk_values[0,0,:10], flush=True)
+    # add indices to sparse_list
+    sparse_list[:,:,sink_token_length + local_token_length:sink_token_length + local_token_length + heavy_token_length] = topk_indices_global
+    
+
+def adaptive_get_denominator_statics(
+    queries: torch.Tensor,
+    keys: torch.Tensor,
+    static_idx: torch.Tensor,
+    static_count: int,
+    dynamic_idx: torch.Tensor,
+    dynamic_count: int,
+    sampling_range: int,
+    sm_scale: float,
+):
+    '''
+        queries: [B, H, D]
+        keys: [B, H // gqa, kv_len, D]
+        static_idx: [B, H, static_count]
+        static_count: int
+        dynamic_idx: [B, H, dynamic_count]
+        sampling_range: int
+        sm_scale: float
+    '''
+    B, H, D = queries.shape
+    _, Kv, kv_len, _ = keys.shape
+    gqa_group_size = H // Kv
+    assert gqa_group_size * Kv == H, "H must be divisible by Kv (H//gqa)"
+
+    static_keys = torch.zeros(B, H, static_count, D, device=queries.device, dtype=queries.dtype)
+    dynamic_keys = torch.zeros(B, H, dynamic_count, D, device=queries.device, dtype=queries.dtype)
+
+    for b in range(B):
+        for h in range(H):
+            kh = h // gqa_group_size
+            static_keys[b, kh, :, :] = keys[b, kh, static_idx[b,kh], :] # [static_count, D]
+            dynamic_keys[b, kh, :, :] = keys[b, kh, dynamic_idx[b,kh], :] # [dynamic_count, D]
+
+
+    static_inner_products = torch.sum(queries.unsqueeze(2) * static_keys, dim=-1)*sm_scale # [B, H, static_count]
+    dynamic_inner_products = torch.sum(queries.unsqueeze(2) * dynamic_keys, dim=-1)*sm_scale # [B, H, dynamic_count]
+    
+    
+    #max_value = torch.max(static_inner_products, dim=-1, keepdim=True).values # [B, H, 1]
+    max_value = 0
+    static_inner_products = static_inner_products - max_value
+    dynamic_inner_products = dynamic_inner_products - max_value
+
+    exp_static_inner_products = torch.exp(static_inner_products)
+    exp_dynamic_inner_products = torch.exp(dynamic_inner_products)
+    # print("ST", exp_static_inner_products[0,0].shape,
+    #       exp_static_inner_products[0,0][:10],
+    #       torch.sum(exp_static_inner_products[0,0]),
+    #       flush=True)
+
+    # compute static denominator
+    static_denominator = torch.sum(exp_static_inner_products, dim=-1) # [B, H]
+    dynamic_denominator = torch.sum(exp_dynamic_inner_products, dim=-1) # [B, H]
+    
+    total_denominator = static_denominator + dynamic_denominator * (float(sampling_range) / float(dynamic_count))
+
+    dynamic_denominator_std = torch.std(exp_dynamic_inner_products, dim=-1) # [B, H]
+    dynamic_denominator_std = torch.clamp(dynamic_denominator_std, min=1e-8)
+    
+    # print("static_denominator", static_denominator.view(-1)[:10], flush=True)
+    # print("dynamic_denominator", dynamic_denominator.view(-1)[:10] * (float(sampling_range) / float(dynamic_count)), flush=True)
+    # print("total_denominator", total_denominator.view(-1)[:10], flush=True)
+    # print("dynamic_denominator_std", dynamic_denominator_std.view(-1)[:10], flush=True)
+
+    return total_denominator, dynamic_denominator_std
+
+
+def adaptive_get_adaptive_budget(
+    estimated_residual_denominator_terms_std: torch.Tensor,
+    estimated_total_denominator: torch.Tensor,
+    sampling_range: int,
+    epsilon: float,
+    delta_ppf: float
+):
+    epsilon_allowable_error = epsilon * estimated_total_denominator
+    epsilon_allowable_error = torch.clamp(epsilon_allowable_error, min=1e-8)
+
+    budget_numerator = delta_ppf * estimated_residual_denominator_terms_std * sampling_range
+    budget_squared = (budget_numerator / epsilon_allowable_error) ** 2
+
+    # Ensure budget is positive and within bounds
+    budget = torch.clamp(
+        budget_squared,
+        min=1.0,  # Minimum 1 sample
+        max=float(sampling_range),  # Maximum sampling_range samples
+    ).long()
+
+    return budget
+
+def hash_function(b, h, q):
+    return (b * 4819219 + h * 12345713 + q * 13123211 + 123456789) % 1000000007
+
+def adaptive_update_sparse_list_with_extra_budget(
+    sparse_list: torch.Tensor, # [B, H, kv_len]
+    sparse_list_weights: torch.Tensor, # [B, H, kv_len]
+    sparse_len: torch.Tensor, # [B, H]
+    adaptive_budget: torch.Tensor, # [B, H]
+    base_num_tokens: int,
+    sampling_range: int,
+    start_idx: int,
+    end_idx: int,
+):
+    ### we can create and keep a random number array for general use of random numbers globally if this is time consuming.
+    # total_elements = 1000000
+    # gen = torch.Generator(device=sparse_list.device)
+    # gen.manual_seed(42)
+    # idx_in_row = torch.randint(
+    #     low=start_idx,
+    #     high=end_idx,
+    #     size=(total_elements,),
+    #     device=sparse_list.device,
+    #     dtype=torch.long,
+    #     generator=gen,
+    # )  # (total_elements,)
+    # IDX = 0
+
+    generator = torch.Generator(device=sparse_list.device)
+    generator.manual_seed(42)   
+    idx_in_row = torch.randperm(sampling_range, device=sparse_list.device, dtype=torch.long, generator=generator)
+
+    for b in range(sparse_list.shape[0]):
+        for h in range(sparse_list.shape[1]):
+            budget = max(adaptive_budget[b, h], base_num_tokens)
+            offset = hash_function(b, h, 0) % (sampling_range - budget)
+            for i in range(budget):
+                sparse_list[b, h, sparse_len[b, h]] = start_idx + idx_in_row[(offset + i)]
+                sparse_list_weights[b, h, sparse_len[b, h]] = float(sampling_range) / float(budget)
+                sparse_len[b, h] += 1
+
+
+def add_adaptive_sampling_tokens(
+    queries: torch.Tensor,
+    keys: torch.Tensor,
+    sink_token_length: int,
+    local_token_length: int,
+    heavy_token_length: int,
+    sparse_list: torch.Tensor,
+    sparse_list_weights: torch.Tensor,
+    sparse_len: torch.Tensor,
+    base_rate_sampling: float,
+    epsilon: float,
+    delta_ppf: float,
+    sm_scale: float,
+):
+    kv_len = keys.shape[2]
+    sampling_range = kv_len - sink_token_length - local_token_length
+    start_idx = sink_token_length
+    end_idx = kv_len - local_token_length
+    base_num_tokens = int(base_rate_sampling * sampling_range)
+
+
+    static_count = sink_token_length + local_token_length + heavy_token_length
+    # get base sampling indices
+    generator = torch.Generator(device=queries.device)
+    generator.manual_seed(42)
+    sampling_indices = torch.randint(start_idx, end_idx, (queries.shape[0], queries.shape[1], base_num_tokens,), device=queries.device, generator=generator)
+
+    estimated_total_denominator, estimated_residual_denominator_terms_std = adaptive_get_denominator_statics(
+        queries,
+        keys,
+        static_idx = sparse_list[:,:,:static_count],
+        static_count = static_count,
+        dynamic_idx = sampling_indices,
+        dynamic_count = base_num_tokens,
+        sampling_range = sampling_range,
+        sm_scale = sm_scale,
+    )
+    
+    adaptive_budget = adaptive_get_adaptive_budget(
+        estimated_residual_denominator_terms_std,
+        estimated_total_denominator,
+        sampling_range,
+        epsilon,
+        delta_ppf,
+    )
+    #print("adaptive_budget", adaptive_budget.view(-1)[:10], flush=True)
+
+    adaptive_update_sparse_list_with_extra_budget(
+        sparse_list,
+        sparse_list_weights,
+        sparse_len,
+        adaptive_budget,
+        base_num_tokens,
+        sampling_range,
+        start_idx,
+        end_idx,
+    )
+    # for i in range(32):
+    #     idx = torch.sort(sparse_list[0,i,:1996][1024:]).values[:5]
+    #     print(i, "sparse_list", idx , flush=True)
+    
+    
+
+
+def ref_vAttention_fwd(
+        # attention parameters
+        queries: torch.Tensor,
+        keys: torch.Tensor, 
+        values: torch.Tensor,
+        # Sparse attention params
+        cached_key_signatures: Optional[torch.Tensor],
+        # vAttention config parameters
+        sink_size: float,
+        window_size: float,
+        heavy_size: float,
+        hat_bits: int,
+        hat_mlp_layers: int,
+        hat_mlp_hidden_size: int,
+        hat_mlp_activation: str, # this can be removed if we use standard silu
+        hat_weights_query_matrix: List[torch.Tensor],
+        hat_weights_query_bias: List[torch.Tensor],
+        hat_weights_key_matrix: List[torch.Tensor],
+        hat_weights_key_bias: List[torch.Tensor],
+        # adaptive sampling masker config parameters
+        base_rate_sampling: float,
+        epsilon: float,
+        delta_ppf: float,
+):
+    '''
+        # this code is for B = 1 and q = 1
+        queries: [B, H, D]
+        keys: [B, H // gqa, kv_len, D]
+        values: [B, H // gqa, kv_len, D]
+        token_lens: [B] # this is the length of the tokens in the sequence for each batch.
+        cached_key_signatures: [B, H // gqa, kv_len, hat_bits]
+
+    '''
+    B, qH, D = queries.shape
+    _, kH, kv_len, _ = keys.shape
+    gqa_group_size = qH // kH
+    assert gqa_group_size * kH == qH, "qH must be divisible by Kv (qH//gqa)"
+    assert B == 1, "this code is for B = 1 ( b = 1 and q = 1)"
+
+    keys = keys.repeat_interleave(queries.shape[1] // keys.shape[1], dim=1)
+    values = values.repeat_interleave(queries.shape[1] // values.shape[1], dim=1)
+    
+    # compute the sparse list and sparse list weights
+    sparse_list = torch.zeros(B, qH, kv_len, dtype=torch.int32, device=queries.device)
+    sparse_list_weights = torch.zeros(B, qH, kv_len, dtype=queries.dtype, device=queries.device)
+    sparse_len = torch.zeros(B, qH, dtype=torch.int32, device=queries.device)
+
+    # 1. add sink tokens to sparse_list
+    sink_token_length = int(sink_size * kv_len) 
+    sparse_list[:, :, :sink_token_length] = torch.arange(sink_token_length, device=queries.device)
+    
+    # 2. add local tokens to sparse_list
+    local_token_length = int(window_size * kv_len)
+    sparse_list[:, :, sink_token_length:sink_token_length + local_token_length] = ( 
+        kv_len - 1 - torch.arange(local_token_length, device=queries.device)
+    )
+
+    # 3. add heave tokens with hashattention
+    heavy_token_length = int(heavy_size * kv_len)
+    add_hashattention_tokens(
+        queries,
+        keys,
+        sink_token_length,
+        local_token_length,
+        heavy_token_length,
+        hat_bits,
+        hat_mlp_layers,
+        hat_mlp_hidden_size, # this can be removed if we use standard silu
+        ACTIVATION_FNS[hat_mlp_activation], # this can be removed if we use standard silu
+        hat_weights_query_matrix,
+        hat_weights_query_bias,
+        hat_weights_key_matrix,
+        hat_weights_key_bias,
+        cached_key_signatures,
+        sparse_list,
+    )
+
+    # 4. update sparse_weights and sparse_len
+    sparse_list_weights[:,:,:(sink_token_length + local_token_length + heavy_token_length)] = 1.0
+    sparse_len[:,:] = sink_token_length + local_token_length + heavy_token_length
+
+    # 5. add adaptive sampling tokens. 
+    # should update sparse_list, sparse_list_weights and sparse_len
+    add_adaptive_sampling_tokens(
+        queries,
+        keys,
+        sink_token_length,
+        local_token_length,
+        heavy_token_length,
+        sparse_list,
+        sparse_list_weights,
+        sparse_len,
+        base_rate_sampling,
+        epsilon,
+        delta_ppf,
+        sm_scale=1.0 / math.sqrt(D),
+    )
+    
+    output = ref_sparse_attention_with_weights_fwd(
+        queries,
+        keys,
+        values,
+        sparse_list,
+        sparse_list_weights,
+        sparse_len,
+    )
+    return output
+
+
