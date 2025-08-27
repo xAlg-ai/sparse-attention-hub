@@ -16,6 +16,8 @@ from . import (
     mock_benchmark,
     ruler,
     zero_scrolls,
+    ruler32k,
+    ruler16k,
 )
 
 # Import the base benchmark class
@@ -58,4 +60,6 @@ __all__ = [
     "mock_benchmark",
     "ruler",
     "zero_scrolls",
+    "ruler32k",
+    "ruler16k",
 ]

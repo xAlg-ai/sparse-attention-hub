@@ -17,8 +17,8 @@ from pathlib import Path
 MACHINE_KEY= "apd10/code"
 
 # Add the project root to the path
-os.chdir("/home/" + MACHINE_KEY + "/sparse-attention-hub/")
-sys.path.insert(0, "/home/" + MACHINE_KEY + "/sparse-attention-hub/")
+os.chdir("/workspace/sparse-attention-hub/")
+sys.path.insert(0, "/workspace/sparse-attention-hub/")
 
 from benchmark.executor import BenchmarkExecutor
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
@@ -64,7 +64,7 @@ def get_random_sampling_config_name(sink_size, window_size, sampling_rate):
 
 # HashAttention weights
 # usa_weight_file = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.pt"
-weight_file = "/home/" + MACHINE_KEY + "/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+weight_file = "/workspace/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
 # from sparse_attention_hub.sparse_attention.utils.hashattention_utils import create_hat_weights_file_from_usa
 #create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
 
@@ -212,8 +212,23 @@ SPARSE_CONFIGS.append((get_oracle_top_k_config_name(0.005, 0.005, 0.19), Researc
     OracleTopKConfig(heavy_size=0.19)
 ])))
 
-SPARSE_CONFIGS = [("dense", None)]
+SPARSE_CONFIGS = [
+    ("dense", None),
+(get_adaptive_hat_config_name(0.01, 0.01, 0.02, 0.01, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=0.01),
+    LocalMaskerConfig(window_size=0.01),
+    HashAttentionTopKMaskerConfig(heavy_size=0.02, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=0.01, epsilon=0.25, delta=0.25, init_offset=0.001, local_offset=0.001)
+])),
+(get_adaptive_hat_config_name(128, 128, 1./32, 1./32, 0.25, 0.25), ResearchAttentionConfig(masker_configs=[
+    SinkMaskerConfig(sink_size=128),
+    LocalMaskerConfig(window_size=128),
+    HashAttentionTopKMaskerConfig(heavy_size=1./32, hat_bits=32, hat_mlp_layers=3, hat_mlp_hidden_size=128, hat_mlp_activation="silu", hat_weight_file=weight_file, hat_weights=None),
+    AdaptiveSamplingMaskerConfig(base_rate_sampling=1./32, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128)
+]))
+]
 
+SPARSE_CONFIGS = [("dense", None)]
 # ==========================================================================
 
 # Benchmark List
@@ -275,18 +290,74 @@ mock_benchmark_config = BenchmarkConfig(
     subsets=["reading_comprehension"]
 )
 
+# 10. Ruler32K - using single task
+niah1 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_single_1"]
+)
+niah2 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_single_2"]
+)
+niah3 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_single_3"]
+)
+cwe = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["cwe"]
+)
+fwe = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["fwe"]
+)
+vt = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["vt"]
+)
+qa1 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["qa_1"]
+)
+qa2 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["qa_2"]
+)
+multikey1 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_multikey_1"]
+)
+multikey2 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_multikey_2"]
+)
+multikey3 = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_multikey_3"]
+)
+multikey = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_multiquery"]
+)
+multivalue = BenchmarkConfig(
+    benchmark_name="ruler16K",
+    subsets=["niah_multivalue"]
+)
+
 # List of all sample configurations
 BENCHMARKS = [
     #infinite_bench_config,
     #ruler_config,
-    loogle_config_1,
-    loogle_config_2,
+    #loogle_config_1,
+    #loogle_config_2,
     #zero_scrolls_config,
     #longbenchv2_config,
     #aime2024_config,
     #aime2025_config,
     #longbench_config,
-    #mock_benchmark_config
+    #mock_benchmark_config,
+    #niah1, niah2, niah3, cwe, fwe, vt, qa1, qa2, multikey1, multikey2, multikey3, multikey, multivalue
+    cwe
 ]
 
 
@@ -295,7 +366,7 @@ ADAPTER_CONFIG = AdapterConfig(
     adapter_name="huggingface",
     model_kwargs={
         "torch_dtype": torch.bfloat16,
-        "attn_implementation": "flash_attention_2",
+        #"attn_implementation": "flash_attention_2",
     },
     tokenizer_kwargs={
         "padding_side": "left",
@@ -304,7 +375,7 @@ ADAPTER_CONFIG = AdapterConfig(
 
 # Generation Parameters
 GENERATION_KWARGS = {
-    "max_new_tokens": 100,
+    "max_new_tokens": 120,
     "do_sample": False,
     "temperature": 1.0,
     "top_p": 1.0,
@@ -314,12 +385,12 @@ GENERATION_KWARGS = {
 # Request Parameters
 REQUEST_KWARGS = {
     "max_context_length": 32000,
-    "max_requests": 25,
+    "max_requests": 10,
 }
 
 # Execution Settings
 RESULT_DIR = "./full_benchmark.matrix/"
-ENABLE_RESUMABILITY = True
+ENABLE_RESUMABILITY = False
 TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
 
 # ============================================================================
