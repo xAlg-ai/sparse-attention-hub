@@ -1,7 +1,6 @@
 """Unit tests for Ruler16K benchmark implementation."""
 
 from unittest.mock import Mock, patch
-from typing import Any, Dict
 
 import pandas as pd
 import pytest
@@ -42,7 +41,7 @@ class TestRuler16KUnit:
             "niah_single_3",
             "qa_1",
             "qa_2",
-            "vt"
+            "vt",
         ]
 
         for dataset in expected_datasets:
@@ -58,10 +57,14 @@ class TestRuler16KUnit:
         # Check for different task categories
         niah_tasks = [d for d in ruler16k.all_datasets if d.startswith("niah_")]
         qa_tasks = [d for d in ruler16k.all_datasets if d.startswith("qa_")]
-        other_tasks = [d for d in ruler16k.all_datasets if not d.startswith(("niah_", "qa_"))]
+        other_tasks = [
+            d for d in ruler16k.all_datasets if not d.startswith(("niah_", "qa_"))
+        ]
 
-        assert len(niah_tasks) == 8  # 3 single + 3 multikey + 1 multiquery + 1 multivalue
-        assert len(qa_tasks) == 2   # qa_1, qa_2
+        assert (
+            len(niah_tasks) == 8
+        )  # 3 single + 3 multikey + 1 multiquery + 1 multivalue
+        assert len(qa_tasks) == 2  # qa_1, qa_2
         assert len(other_tasks) == 3  # cwe, fwe, vt
 
     def test_ruler16k_subset_selection_valid(self):
@@ -94,21 +97,25 @@ class TestRuler16KUnit:
         """Test successful dataset loading."""
         # Mock dataset for each subset
         mock_dataset1 = Mock()
-        mock_df1 = pd.DataFrame({
-            "context": ["Context 1", "Context 2"],
-            "question": ["Question 1", "Question 2"],
-            "answer": [["Answer 1"], ["Answer 2"]],
-            "task": ["niah_single_1", "niah_single_1"]
-        })
+        mock_df1 = pd.DataFrame(
+            {
+                "context": ["Context 1", "Context 2"],
+                "question": ["Question 1", "Question 2"],
+                "answer": [["Answer 1"], ["Answer 2"]],
+                "task": ["niah_single_1", "niah_single_1"],
+            }
+        )
         mock_dataset1.to_pandas.return_value = mock_df1
 
         mock_dataset2 = Mock()
-        mock_df2 = pd.DataFrame({
-            "context": ["Context 3"],
-            "question": ["Question 3"],
-            "answer": [["Answer 3"]],
-            "task": ["qa_1"]
-        })
+        mock_df2 = pd.DataFrame(
+            {
+                "context": ["Context 3"],
+                "question": ["Question 3"],
+                "answer": [["Answer 3"]],
+                "task": ["qa_1"],
+            }
+        )
         mock_dataset2.to_pandas.return_value = mock_df2
 
         mock_load_dataset.side_effect = [mock_dataset1, mock_dataset2]
@@ -123,20 +130,26 @@ class TestRuler16KUnit:
 
         # Check mock calls
         assert mock_load_dataset.call_count == 2
-        mock_load_dataset.assert_any_call("xAlg-AI/att-hub-ruler-16k", "niah_single_1", split="niah_single_1")
-        mock_load_dataset.assert_any_call("xAlg-AI/att-hub-ruler-16k", "qa_1", split="qa_1")
+        mock_load_dataset.assert_any_call(
+            "xAlg-AI/att-hub-ruler-16k", "niah_single_1", split="niah_single_1"
+        )
+        mock_load_dataset.assert_any_call(
+            "xAlg-AI/att-hub-ruler-16k", "qa_1", split="qa_1"
+        )
 
     @patch("datasets.load_dataset")
     def test_ruler16k_load_datasets_partial_failure(self, mock_load_dataset):
         """Test dataset loading with some failures."""
         # First dataset succeeds, second fails
         mock_dataset = Mock()
-        mock_df = pd.DataFrame({
-            "context": ["Context 1"],
-            "question": ["Question 1"],
-            "answer": [["Answer 1"]],
-            "task": ["niah_single_1"]
-        })
+        mock_df = pd.DataFrame(
+            {
+                "context": ["Context 1"],
+                "question": ["Question 1"],
+                "answer": [["Answer 1"]],
+                "task": ["niah_single_1"],
+            }
+        )
         mock_dataset.to_pandas.return_value = mock_df
 
         mock_load_dataset.side_effect = [mock_dataset, Exception("Dataset not found")]
@@ -156,8 +169,10 @@ class TestRuler16KUnit:
         mock_load_dataset.side_effect = Exception("No datasets found")
 
         ruler16k = Ruler16K(subsets_to_run=["niah_single_1"])
-        
-        with pytest.raises(Exception, match="No Ruler subsets could be loaded successfully"):
+
+        with pytest.raises(
+            Exception, match="No Ruler subsets could be loaded successfully"
+        ):
             ruler16k._load_datasets()
 
     def test_ruler16k_post_run_evaluate_empty_results(self):
@@ -174,18 +189,26 @@ class TestRuler16KUnit:
         ruler16k = Ruler16K()
 
         # Mock results DataFrame
-        mock_results = pd.DataFrame({
-            "task": ["niah_single_1", "niah_single_1", "qa_1", "qa_1"],
-            "predicted_answer": ["Answer 1", "Answer 2", "Answer 3", "Answer 4"],
-            "answer": [["Truth 1"], ["Truth 2"], ["Truth 3"], ["Truth 4"]],
-            "context_length": [16384, 16384, 16384, 16384]
-        })
+        mock_results = pd.DataFrame(
+            {
+                "task": ["niah_single_1", "niah_single_1", "qa_1", "qa_1"],
+                "predicted_answer": ["Answer 1", "Answer 2", "Answer 3", "Answer 4"],
+                "answer": [["Truth 1"], ["Truth 2"], ["Truth 3"], ["Truth 4"]],
+                "context_length": [16384, 16384, 16384, 16384],
+            }
+        )
 
         with patch("benchmark.ruler16k.ruler16k.calculate_metrics") as mock_calc:
             # Mock different scores for different tasks
             mock_calc.side_effect = [
-                {"niah_single_1": {"string_match": 85.0}, "qa_1": {"string_match": 90.0}},  # first call
-                {"niah_single_1": {"string_match": 85.0}, "qa_1": {"string_match": 90.0}}   # second call for context length
+                {
+                    "niah_single_1": {"string_match": 85.0},
+                    "qa_1": {"string_match": 90.0},
+                },  # first call
+                {
+                    "niah_single_1": {"string_match": 85.0},
+                    "qa_1": {"string_match": 90.0},
+                },  # second call for context length
             ]
 
             results = ruler16k.post_run_evaluate(mock_results)
@@ -214,25 +237,37 @@ class TestRuler16KUnit:
         ruler16k = Ruler16K()
 
         # Mock results with QA and non-QA tasks
-        mock_results = pd.DataFrame({
-            "task": ["qa_1", "qa_1", "niah_single_1", "cwe"],
-            "predicted_answer": ["QA Answer 1", "QA Answer 2", "NIAH Answer", "CWE Answer"],
-            "answer": [["QA Truth 1"], ["QA Truth 2"], ["NIAH Truth"], ["CWE Truth"]],
-            "context_length": [16384, 16384, 16384, 16384]
-        })
+        mock_results = pd.DataFrame(
+            {
+                "task": ["qa_1", "qa_1", "niah_single_1", "cwe"],
+                "predicted_answer": [
+                    "QA Answer 1",
+                    "QA Answer 2",
+                    "NIAH Answer",
+                    "CWE Answer",
+                ],
+                "answer": [
+                    ["QA Truth 1"],
+                    ["QA Truth 2"],
+                    ["NIAH Truth"],
+                    ["CWE Truth"],
+                ],
+                "context_length": [16384, 16384, 16384, 16384],
+            }
+        )
 
         with patch("benchmark.ruler16k.ruler16k.calculate_metrics") as mock_calc:
             mock_calc.side_effect = [
                 {
                     "qa_1": {"string_match": 80.0},
                     "niah_single_1": {"string_match": 75.0},
-                    "cwe": {"string_match": 85.0}
+                    "cwe": {"string_match": 85.0},
                 },
                 {
                     "qa_1": {"string_match": 80.0},
                     "niah_single_1": {"string_match": 75.0},
-                    "cwe": {"string_match": 85.0}
-                }
+                    "cwe": {"string_match": 85.0},
+                },
             ]
 
             results = ruler16k.post_run_evaluate(mock_results)
@@ -251,16 +286,18 @@ class TestRuler16KUnit:
         ruler16k = Ruler16K()
 
         # Mock results without context_length column
-        mock_results = pd.DataFrame({
-            "task": ["niah_single_1", "qa_1"],
-            "predicted_answer": ["Answer 1", "Answer 2"],
-            "answer": [["Truth 1"], ["Truth 2"]]
-        })
+        mock_results = pd.DataFrame(
+            {
+                "task": ["niah_single_1", "qa_1"],
+                "predicted_answer": ["Answer 1", "Answer 2"],
+                "answer": [["Truth 1"], ["Truth 2"]],
+            }
+        )
 
         with patch("benchmark.ruler16k.ruler16k.calculate_metrics") as mock_calc:
             mock_calc.return_value = {
                 "niah_single_1": {"string_match": 85.0},
-                "qa_1": {"string_match": 90.0}
+                "qa_1": {"string_match": 90.0},
             }
 
             results = ruler16k.post_run_evaluate(mock_results)
@@ -275,16 +312,21 @@ class TestRuler16KUnit:
         """Test error handling during evaluation."""
         ruler16k = Ruler16K()
 
-        mock_results = pd.DataFrame({
-            "task": ["niah_single_1", "qa_1"],
-            "predicted_answer": ["Answer 1", "Answer 2"],
-            "answer": [["Truth 1"], ["Truth 2"]],
-            "context_length": [16384, 16384]
-        })
+        mock_results = pd.DataFrame(
+            {
+                "task": ["niah_single_1", "qa_1"],
+                "predicted_answer": ["Answer 1", "Answer 2"],
+                "answer": [["Truth 1"], ["Truth 2"]],
+                "context_length": [16384, 16384],
+            }
+        )
 
         with patch("benchmark.ruler16k.ruler16k.calculate_metrics") as mock_calc:
             # First call succeeds, second call (for context length) fails
-            successful_result = {"niah_single_1": {"string_match": 85.0}, "qa_1": {"string_match": 90.0}}
+            successful_result = {
+                "niah_single_1": {"string_match": 85.0},
+                "qa_1": {"string_match": 90.0},
+            }
             mock_calc.side_effect = [successful_result, Exception("Evaluation failed")]
 
             results = ruler16k.post_run_evaluate(mock_results)
@@ -292,11 +334,11 @@ class TestRuler16KUnit:
         # Should handle errors gracefully
         assert "overall_score" in results
         assert "task_scores" in results
-        
+
         # Should still compute overall score from successful first call
         expected_avg = round((85.0 + 90.0) / 2, 2)
         assert results["overall_score"] == expected_avg
-        
+
         # Context length scores should be empty due to the error
         assert results["context_length_scores"] == {}
 
@@ -304,24 +346,26 @@ class TestRuler16KUnit:
         """Test evaluation when string_match key is missing from some results."""
         ruler16k = Ruler16K()
 
-        mock_results = pd.DataFrame({
-            "task": ["niah_single_1", "qa_1"],
-            "predicted_answer": ["Answer 1", "Answer 2"],
-            "answer": [["Truth 1"], ["Truth 2"]],
-            "context_length": [16384, 16384]
-        })
+        mock_results = pd.DataFrame(
+            {
+                "task": ["niah_single_1", "qa_1"],
+                "predicted_answer": ["Answer 1", "Answer 2"],
+                "answer": [["Truth 1"], ["Truth 2"]],
+                "context_length": [16384, 16384],
+            }
+        )
 
         with patch("benchmark.ruler16k.ruler16k.calculate_metrics") as mock_calc:
             # Return results where one task is missing string_match
             mock_calc.side_effect = [
                 {
                     "niah_single_1": {"string_match": 85.0},
-                    "qa_1": {"other_metric": 90.0}  # Missing string_match
+                    "qa_1": {"other_metric": 90.0},  # Missing string_match
                 },
                 {
                     "niah_single_1": {"string_match": 85.0},
-                    "qa_1": {"other_metric": 90.0}
-                }
+                    "qa_1": {"other_metric": 90.0},
+                },
             ]
 
             results = ruler16k.post_run_evaluate(mock_results)

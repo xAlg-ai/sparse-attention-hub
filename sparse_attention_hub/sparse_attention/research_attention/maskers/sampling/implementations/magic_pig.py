@@ -164,7 +164,7 @@ class MagicPig(SamplingMasker):
         if not self.center:
             return keys, queries
 
-        ## cache the key means if not already cached
+        # cache the key means if not already cached
         if sparse_meta_data["key_mean"][layer_idx] is None:
             sparse_meta_data["key_mean"][layer_idx] = keys.mean(dim=2, keepdim=True)
 
