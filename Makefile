@@ -11,7 +11,7 @@ help:
 	@echo "  test-unit    - Run unit tests only"
 	@echo "  test-integration - Run integration tests only"
 	@echo "  lint         - Run all linting checks"
-	@echo "  format       - Format code with black and isort"
+	@echo "  format       - Format code with black and isart"
 	@echo "  format-check - Check code formatting without making changes"
 	@echo "  pre-commit   - Install and run pre-commit hooks"
 	@echo "  clean        - Clean build artifacts"
