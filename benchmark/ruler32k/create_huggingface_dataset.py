@@ -13,7 +13,9 @@ from datasets import Dataset
 QUESTION_PATTERNS = {
     "niah": re.compile(r"What (?:is|are all) the special magic"),
     "vt": re.compile(r"Question: Find all variables that are assigned the value"),
-    "cwe": re.compile(r"Question: What are the 10 most common words in the above list\?"),
+    "cwe": re.compile(
+        r"Question: What are the 10 most common words in the above list\?"
+    ),
     "fwe": re.compile(r"Question: Do not provide any explanation\."),
     "qa": re.compile(r"Answer the question based on the given documents\."),
 }
@@ -57,21 +59,27 @@ def get_dataframe(path):
             question, answer = qa[:idx], qa[idx:]
             return context, question, answer
 
-        df["context"], df["question"], df["answer_prefix"] = zip(*df["input"].apply(split_context_question))
+        df["context"], df["question"], df["answer_prefix"] = zip(
+            *df["input"].apply(split_context_question)
+        )
         df["task"] = task
         df["max_new_tokens"] = MAX_NEW_TOKENS[task.split("_")[0]]
         df_list.append(df)
 
     # Concatenate all the dataframes
     df = pd.concat(df_list)
-    df = df[["context", "question", "answer_prefix", "outputs", "task", "max_new_tokens"]]
+    df = df[
+        ["context", "question", "answer_prefix", "outputs", "task", "max_new_tokens"]
+    ]
     df = df.rename(columns={"outputs": "answer"}).reset_index(drop=True)
 
     return df
 
 
 if __name__ == "__main__":
-    data_dir = Path("/workspace/sparse-attention-hub/RULER.apd10/scripts/data/data/32768")  # output of the generate.sh script
+    data_dir = Path(
+        "/workspace/sparse-attention-hub/RULER.apd10/scripts/data/data/32768"
+    )  # output of the generate.sh script
     repo_id = "xAlg-AI/att-hub-ruler-32k"
 
     # Loop over all the context lengths
@@ -80,8 +88,6 @@ if __name__ == "__main__":
         print(f"Processing split {split}", flush=True)
         df = get_dataframe(path)
         dataset = Dataset.from_pandas(df)
-        
-        #print (f" dataset.push_to_hub(repo_id={repo_id}, config_name={split}, split={split}) || dataset.len() = {len(dataset)}")
+
+        # print (f" dataset.push_to_hub(repo_id={repo_id}, config_name={split}, split={split}) || dataset.len() = {len(dataset)}")
         dataset.push_to_hub(repo_id=repo_id, config_name=split, split=split)
-
-

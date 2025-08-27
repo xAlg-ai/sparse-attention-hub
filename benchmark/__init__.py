@@ -15,9 +15,9 @@ from . import (
     loogle,
     mock_benchmark,
     ruler,
-    zero_scrolls,
-    ruler32k,
     ruler16k,
+    ruler32k,
+    zero_scrolls,
 )
 
 # Import the base benchmark class
