@@ -38,9 +38,9 @@ class OracleTopKConfig(TopKMaskerConfig):
         from ray import tune
 
         return {
-            "heavy_size": tune.choice([0.01, 0.02, 0.03])
+            "heavy_size": tune.choice([0.01, 0.025, 0.05])
         }
-        # return {}
+        return {}
 
 
 @MaskerRegistry.register(OracleTopKConfig)

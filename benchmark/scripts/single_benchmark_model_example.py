@@ -60,7 +60,7 @@ def main():
     
     benchmark = Ruler32K(['vt'])
 
-    result_dir = Path("./test_results")
+    result_dir = Path("./test_results.5cpt.topk.2/")
     result_dir.mkdir(exist_ok=True)
 
     benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 1000000})

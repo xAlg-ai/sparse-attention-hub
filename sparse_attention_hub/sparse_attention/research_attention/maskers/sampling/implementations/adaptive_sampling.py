@@ -123,11 +123,11 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
         from ray import tune
 
         return {
-            "base_rate_sampling": tune.choice([0.01, 0.02, 0.03]),
-            "epsilon": tune.choice([0.1, 0.2, 0.3, 0.4]),
-            "delta": tune.choice([0.1, 0.2, 0.3, 0.4]),
-            "init_offset": tune.choice([0.01]),
-            "local_offset": tune.choice([0.01])
+            "base_rate_sampling": tune.choice([0.025, 0.05, 0.075]),
+            "epsilon": tune.choice([0.025, 0.05, 0.075, 0.1]),
+            "delta": tune.choice([0.025, 0.05, 0.075, 0.1]),
+            "init_offset": tune.choice([128]),
+            "local_offset": tune.choice([128])
         }
 
 

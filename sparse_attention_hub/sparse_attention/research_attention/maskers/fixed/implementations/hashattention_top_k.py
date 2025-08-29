@@ -47,7 +47,7 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
 
         # Only tune heavy_size, other parameters are fixed by the pre-trained model
         return {
-            "heavy_size": tune.choice([0.01, 0.02, 0.03])
+            "heavy_size": tune.choice([0.01, 0.025, 0.05])
         }
         ## set in benchmarking config
         # return {}
