@@ -72,7 +72,7 @@ def main():
     
     benchmark = Ruler32K(['vt'])
 
-    result_dir = Path("./test_results.3/")
+    result_dir = Path("./test_results.5cpt.topk.2/")
     result_dir.mkdir(exist_ok=True)
     metric_logger = MicroMetricLogger()
     metric_logger.configure_logging(log_path=result_dir, enabled_metrics=["research_attention_density", "research_attention_output_error"])

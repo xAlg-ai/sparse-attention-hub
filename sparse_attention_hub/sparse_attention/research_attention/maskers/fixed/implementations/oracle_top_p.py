@@ -38,7 +38,7 @@ class OracleTopPMaskerConfig(TopPMaskerConfig):
         from ray import tune
 
         return {
-            "top_p": tune.choice([0.5, 0.6, 0.7, 0.8, 0.9, 0.95])
+            "top_p": tune.choice([0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99])
         }
 
 

@@ -33,10 +33,10 @@ class LocalMaskerConfig(FixedMaskerConfig):
         """
         from ray import tune
 
-        return {
-            "window_size": tune.choice([0.01])
-        }
-
+        # return {
+        #     "window_size": tune.choice([128])
+        # }
+        return {}
 
 @MaskerRegistry.register(LocalMaskerConfig)
 class LocalMasker(FixedMasker):
@@ -196,10 +196,10 @@ class SinkMaskerConfig(FixedMaskerConfig):
         """
         from ray import tune
 
-        return {
-            "sink_size": tune.choice([0.01])
-        }
-
+        # return {
+        #     "sink_size": tune.grid([128])
+        # }
+        return {}
 
 @MaskerRegistry.register(SinkMaskerConfig)
 class SinkMasker(FixedMasker):
