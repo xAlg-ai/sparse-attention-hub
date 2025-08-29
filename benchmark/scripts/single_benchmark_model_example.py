@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/apd10/code/sparse-attention-hub')
-sys.path.insert(0, '/home/apd10/code/sparse-attention-hub')
+os.chdir('/workspace/sparse-attention-hub')
+sys.path.insert(0, '/workspace/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -35,7 +35,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
     AdaptiveSamplingMaskerConfig
 )
 
-from benchmark import LongBench
+from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
@@ -53,17 +53,17 @@ def main():
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_2"},
+        model_kwargs= {"torch_dtype": torch.bfloat16},
         generate_kwargs={"max_new_tokens": 32},
         device=device
     )
     
-    benchmark = LongBench(["passage_retrieval_en"])
+    benchmark = Ruler32K(['vt'])
 
     result_dir = Path("./test_results")
     result_dir.mkdir(exist_ok=True)
 
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 16000})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 1000000})
     
 if __name__ == "__main__":
     main() 

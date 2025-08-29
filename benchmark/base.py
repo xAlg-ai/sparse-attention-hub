@@ -174,7 +174,8 @@ class Benchmark(ABC):
             
             try:
                 # Create request using current adapter interface (simplified)
-                request: Request = Request(context=context, questions=questions)
+                answer_prefix = df_group["answer_prefix"].iloc[0]
+                request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
                 
                 # Process through adapter
                 response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
