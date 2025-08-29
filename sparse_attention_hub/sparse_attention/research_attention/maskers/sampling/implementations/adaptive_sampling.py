@@ -202,7 +202,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
         raw_scores = torch.matmul(queries, keys.transpose(-2, -1)) * scaling
         if attention_mask is not None:
             raw_scores = raw_scores + attention_mask[:, :, :, : keys.shape[-2]]
-        max_scores = torch.max(raw_scores, dim=-1, keepdim=True)[0]
+        max_scores = torch.max(raw_scores[:,:,:,:128], dim=-1, keepdim=True)[0]
         return torch.exp(raw_scores - max_scores)
 
     def should_return_full_mask(self, sampling_range: int) -> bool:
@@ -254,8 +254,10 @@ class AdaptiveSamplingMasker(SamplingMasker):
         end_idx: int,
         num_base_samples: int,
         dtype: torch.dtype,
+        previous_mask: Mask,
     ) -> tuple[Mask, torch.Tensor]:
         """Get standard deviation estimate using base sampling and create base mask."""
+
         # Create base sampling indices
         base_row_wise_idx = torch.randint(
             low=start_idx,
@@ -263,16 +265,6 @@ class AdaptiveSamplingMasker(SamplingMasker):
             size=(batch_size, num_heads, seq_len_queries, num_base_samples),
             device=expwts.device,
         )
-
-        # Extract values and compute std
-        sampled_values = torch.gather(expwts, dim=-1, index=base_row_wise_idx)
-        total_rows = batch_size * num_heads * seq_len_queries
-        row_sampled_values = sampled_values.view(total_rows, num_base_samples)
-        std_estimate = torch.std(row_sampled_values, dim=-1, keepdim=True)
-        std_estimate = torch.clamp(std_estimate, min=1e-8)
-        std_estimate = std_estimate.view(batch_size, num_heads, seq_len_queries, 1)
-
-        # Create base sampling mask
         sampling_range = end_idx - start_idx
         base_data = torch.full_like(
             base_row_wise_idx, num_base_samples / sampling_range, dtype=expwts.dtype
@@ -286,7 +278,36 @@ class AdaptiveSamplingMasker(SamplingMasker):
             dtype=dtype,
         )
 
-        return base_mask, std_estimate
+        ### subtract previous mask
+        base_mask_dense = base_mask.get_dense_mask()
+        previous_mask_dense = previous_mask.get_dense_mask()
+        base_mask_dense = base_mask_dense * ( 1 -previous_mask_dense)
+        base_mask = Mask.create_mask_from_dense_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            mask=base_mask_dense,
+            dtype=dtype,
+        )
+        #import pdb; pdb.set_trace()
+        std_estimate_compare = torch.zeros(base_mask_dense.shape[:-1] + (1,), dtype=dtype, device=expwts.device)
+        for i in range(batch_size):
+            for j in range(num_heads):
+                for k in range(seq_len_queries):
+                    if base_mask_dense[i,j,k,:].sum() > 0:
+                        sampled_values = expwts[i,j,k,(base_mask_dense[i,j,k,:] > 0)]
+                        std_estimate_compare[i,j,k,0] = torch.std(sampled_values, dim=-1, keepdim=True)
+                        std_estimate_compare[i,j,k,0] = torch.clamp(std_estimate_compare[i,j,k,0], min=1e-8)
+
+        # Extract values and compute std
+        sampled_values = torch.gather(expwts, dim=-1, index=base_row_wise_idx)
+        total_rows = batch_size * num_heads * seq_len_queries
+        row_sampled_values = sampled_values.view(total_rows, num_base_samples)
+        std_estimate = torch.std(row_sampled_values, dim=-1, keepdim=True)
+        std_estimate = torch.clamp(std_estimate, min=1e-8)
+        std_estimate = std_estimate.view(batch_size, num_heads, seq_len_queries, 1)
+
+        #import pdb; pdb.set_trace()
+
+        return base_mask, std_estimate_compare
 
     def _compute_adaptive_budget(
         self,
@@ -370,7 +391,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             queries, keys, scaling, attention_mask
         )
         static_denominator = apply_inv_mask_sum(expwts, previous_mask)
-
+        #import pdb; pdb.set_trace()
         # Get sampling parameters
 
         num_base_samples = self._get_base_sample_count(sampling_range)
@@ -386,14 +407,18 @@ class AdaptiveSamplingMasker(SamplingMasker):
             end_idx,
             num_base_samples,
             previous_mask.dtype,
+            previous_mask,
         )
         # Compute denominators and budget
         sampled_denominator = apply_inv_mask_sum(expwts, base_sampling_mask)
+        # import pdb; pdb.set_trace()
+
         estimated_denominator = static_denominator + sampled_denominator
         budget = self._compute_adaptive_budget(
             std_estimate, estimated_denominator, sampling_range
         )
         budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
+        #import pdb; pdb.set_trace()
 
         # Create adaptive sampling mask
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
@@ -405,6 +430,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             end_idx=end_idx,
             dtype=previous_mask.dtype,
         )
+        #import pdb; pdb.set_trace()
         # Merge masks
         return previous_mask.merge_mask(adaptive_mask, inplace=False)
 

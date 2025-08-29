@@ -118,6 +118,8 @@ class ResearchAttention(SparseAttention):
                 sparse_attention_mask.get_density(),
                 metadata={"layer_idx": kwargs["layer_idx"]},
             )
+        x = sparse_attention_mask.get_dense_mask()
+        print(queries.shape, kwargs['layer_idx'], "Density", (x > 0).sum() / x.numel(), sparse_attention_mask.get_density(), flush=True)
 
         # Call compute_masked_attention_output on the result of the last mask
         # Always request attention weights to match the expected return signature

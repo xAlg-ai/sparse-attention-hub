@@ -445,34 +445,34 @@ SPARSE_CONFIGS.append(
 )
 
 SPARSE_CONFIGS = [
-    ("dense", None),
+    # ("dense", None),
+    # (
+    #     get_adaptive_hat_config_name(0.01, 0.01, 0.02, 0.01, 0.25, 0.25),
+    #     ResearchAttentionConfig(
+    #         masker_configs=[
+    #             SinkMaskerConfig(sink_size=0.01),
+    #             LocalMaskerConfig(window_size=0.01),
+    #             HashAttentionTopKMaskerConfig(
+    #                 heavy_size=0.02,
+    #                 hat_bits=32,
+    #                 hat_mlp_layers=3,
+    #                 hat_mlp_hidden_size=128,
+    #                 hat_mlp_activation="silu",
+    #                 hat_weight_file=weight_file,
+    #                 hat_weights=None,
+    #             ),
+    #             AdaptiveSamplingMaskerConfig(
+    #                 base_rate_sampling=0.01,
+    #                 epsilon=0.25,
+    #                 delta=0.25,
+    #                 init_offset=0.001,
+    #                 local_offset=0.001,
+    #             ),
+    #         ]
+    #     ),
+    # ),
     (
-        get_adaptive_hat_config_name(0.01, 0.01, 0.02, 0.01, 0.25, 0.25),
-        ResearchAttentionConfig(
-            masker_configs=[
-                SinkMaskerConfig(sink_size=0.01),
-                LocalMaskerConfig(window_size=0.01),
-                HashAttentionTopKMaskerConfig(
-                    heavy_size=0.02,
-                    hat_bits=32,
-                    hat_mlp_layers=3,
-                    hat_mlp_hidden_size=128,
-                    hat_mlp_activation="silu",
-                    hat_weight_file=weight_file,
-                    hat_weights=None,
-                ),
-                AdaptiveSamplingMaskerConfig(
-                    base_rate_sampling=0.01,
-                    epsilon=0.25,
-                    delta=0.25,
-                    init_offset=0.001,
-                    local_offset=0.001,
-                ),
-            ]
-        ),
-    ),
-    (
-        get_adaptive_hat_config_name(128, 128, 1.0 / 32, 1.0 / 32, 0.25, 0.25),
+        get_adaptive_hat_config_name(128, 128, 1.0 / 32, 1.0 / 32, 0.2, 0.2),
         ResearchAttentionConfig(
             masker_configs=[
                 SinkMaskerConfig(sink_size=128),
@@ -488,8 +488,8 @@ SPARSE_CONFIGS = [
                 ),
                 AdaptiveSamplingMaskerConfig(
                     base_rate_sampling=1.0 / 32,
-                    epsilon=0.25,
-                    delta=0.25,
+                    epsilon=0.2,
+                    delta=0.2,
                     init_offset=128,
                     local_offset=128,
                 ),
@@ -498,7 +498,7 @@ SPARSE_CONFIGS = [
     ),
 ]
 
-SPARSE_CONFIGS = [("dense", None)]
+#SPARSE_CONFIGS = [("dense", None)]
 # ==========================================================================
 
 # Benchmark List
@@ -513,11 +513,11 @@ ruler_config = BenchmarkConfig(benchmark_name="ruler", subsets=["4096"])
 # 3. Loogle - using shortdep_qa task
 loogle_config_1 = BenchmarkConfig(
     benchmark_name="loogle",
-    subsets=["longdep_summarization", "longdep_qa"],
+    subsets=["longdep_qa"],
 )
 loogle_config_2 = BenchmarkConfig(
     benchmark_name="loogle",
-    subsets=["shortdep_qa", "shortdep_cloze"],
+    subsets=["shortdep_qa"],
 )
 
 # 4. ZeroScrolls - using gov_report task
@@ -545,25 +545,25 @@ mock_benchmark_config = BenchmarkConfig(
 )
 
 # 10. Ruler32K - using single task
-niah1 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_single_1"])
-niah2 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_single_2"])
-niah3 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_single_3"])
-cwe = BenchmarkConfig(benchmark_name="ruler16K", subsets=["cwe"])
-fwe = BenchmarkConfig(benchmark_name="ruler16K", subsets=["fwe"])
-vt = BenchmarkConfig(benchmark_name="ruler16K", subsets=["vt"])
-qa1 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["qa_1"])
-qa2 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["qa_2"])
-multikey1 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_multikey_1"])
-multikey2 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_multikey_2"])
-multikey3 = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_multikey_3"])
-multikey = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_multiquery"])
-multivalue = BenchmarkConfig(benchmark_name="ruler16K", subsets=["niah_multivalue"])
+niah1 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_single_1"])
+niah2 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_single_2"])
+niah3 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_single_3"])
+cwe = BenchmarkConfig(benchmark_name="ruler32K", subsets=["cwe"])
+fwe = BenchmarkConfig(benchmark_name="ruler32K", subsets=["fwe"])
+vt = BenchmarkConfig(benchmark_name="ruler32K", subsets=["vt"])
+qa1 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["qa_1"])
+qa2 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["qa_2"])
+multikey1 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_multikey_1"])
+multikey2 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_multikey_2"])
+multikey3 = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_multikey_3"])
+multikey = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_multiquery"])
+multivalue = BenchmarkConfig(benchmark_name="ruler32K", subsets=["niah_multivalue"])
 
 # List of all sample configurations
 BENCHMARKS = [
     # infinite_bench_config,
     # ruler_config,
-    # loogle_config_1,
+    loogle_config_1,
     # loogle_config_2,
     # zero_scrolls_config,
     # longbenchv2_config,
@@ -571,8 +571,9 @@ BENCHMARKS = [
     # aime2025_config,
     # longbench_config,
     # mock_benchmark_config,
-    # niah1, niah2, niah3, cwe, fwe, vt, qa1, qa2, multikey1, multikey2, multikey3, multikey, multivalue
-    cwe
+    #niah1, niah2, niah3, cwe, fwe, vt, qa1, qa2, multikey1, multikey2, multikey3, multikey, multivalue
+    #niah1, niah2, niah3
+    #cwe
 ]
 
 
@@ -600,7 +601,7 @@ GENERATION_KWARGS = {
 # Request Parameters
 REQUEST_KWARGS = {
     "max_context_length": 32000,
-    "max_requests": 10,
+    "max_requests": 1,
 }
 
 # Execution Settings
