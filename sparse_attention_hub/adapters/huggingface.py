@@ -54,7 +54,6 @@ class ModelAdapterHF(ModelAdapter):
 
         # Handle dense-only mode when sparse_attention_config is None
         self._sparse_attention_available: bool = sparse_attention_config is not None
-
         # create model and tokenizer
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name, **self.model_kwargs
@@ -99,8 +98,11 @@ class ModelAdapterHF(ModelAdapter):
             else [request.questions]
         )
         context: str = request.context
+        answer_prefix: str = request.answer_prefix
 
-        context, questions = self._preprocess_context_and_questions(context, questions)
+        context, questions = self._preprocess_context_and_questions(
+            context, questions, answer_prefix
+        )
 
         context_tokens = self.tokenizer.encode(context, return_tensors="pt")
         context_tokens = context_tokens[
@@ -154,7 +156,7 @@ class ModelAdapterHF(ModelAdapter):
             return RequestResponse(responses=responses)
 
     def _preprocess_context_and_questions(
-        self, context: str, questions: List[str]
+        self, context: str, questions: List[str], answer_prefix: str
     ) -> Tuple[str, List[str]]:
         """Preprocess the context and questions -- apply chat template if needed
 
@@ -171,7 +173,8 @@ class ModelAdapterHF(ModelAdapter):
             )
         new_context = context.split(self.random_separator)[0]
         new_questions = [
-            question + context.split(self.random_separator)[1] for question in questions
+            question + context.split(self.random_separator)[1] + answer_prefix
+            for question in questions
         ]
         return new_context, new_questions
 

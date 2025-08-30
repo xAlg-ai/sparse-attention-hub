@@ -27,7 +27,9 @@ class TestRequest:
     def test_request_single_question(self) -> None:
         """Test Request with single question."""
         request = Request(
-            context="This is a test context.", questions="What is this test about?"
+            context="This is a test context.",
+            questions="What is this test about?",
+            answer_prefix="Answer: ",
         )
 
         assert request.context == "This is a test context."
@@ -37,7 +39,9 @@ class TestRequest:
     def test_request_multiple_questions(self) -> None:
         """Test Request with multiple questions."""
         questions = ["Question 1?", "Question 2?", "Question 3?"]
-        request = Request(context="Test context", questions=questions)
+        request = Request(
+            context="Test context", questions=questions, answer_prefix="Answer: "
+        )
 
         assert request.context == "Test context"
         assert request.questions == questions
@@ -46,14 +50,18 @@ class TestRequest:
 
     def test_request_empty_context(self) -> None:
         """Test Request with empty context."""
-        request = Request(context="", questions="What is this test about?")
+        request = Request(
+            context="", questions="What is this test about?", answer_prefix="Answer: "
+        )
 
         assert request.context == ""
         assert request.questions == "What is this test about?"
 
     def test_request_empty_questions(self) -> None:
         """Test Request with empty questions list."""
-        request = Request(context="Test context", questions=[])
+        request = Request(
+            context="Test context", questions=[], answer_prefix="Answer: "
+        )
 
         assert request.context == "Test context"
         assert request.questions == []

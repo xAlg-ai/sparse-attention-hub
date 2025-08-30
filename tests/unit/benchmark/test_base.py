@@ -31,6 +31,7 @@ def mock_dataset_df() -> pd.DataFrame:
             "task": ["test_task1", "test_task1", "test_task2"],
             "answers": [["Answer 1a"], ["Answer 1b"], ["Answer 2"]],
             "all_classes": [[], [], []],
+            "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
         }
     )
 

@@ -19,6 +19,7 @@ class Request:
 
     context: str
     questions: Union[str, List[str]]
+    answer_prefix: str = ""
 
 
 @dataclass

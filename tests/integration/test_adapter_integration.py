@@ -115,7 +115,9 @@ class TestAdapterIntegration:
 
         # Create request
         request = Request(
-            context="What is the capital of France?", questions="Tell me about Paris."
+            context="What is the capital of France?",
+            questions="Tell me about Paris.",
+            answer_prefix="Answer: ",
         )
 
         # Process request
@@ -220,6 +222,7 @@ class TestAdapterIntegration:
         request = Request(
             context="Context about France",
             questions=["What is the capital?", "What is the population?"],
+            answer_prefix="Answer: ",
         )
 
         # Process request
@@ -506,6 +509,7 @@ class TestAdapterManual:
          Answer the following question based on the paragraph above:
             """,
             questions="What county was the most affected by the flood?",
+            answer_prefix="Answer: ",
         )
         response = adapter.process_request(request, {}, {})
         assert isinstance(response.responses, str)
@@ -537,6 +541,7 @@ class TestAdapterManual:
                 "What county was the most affected by the flood?",
                 "What was the cause of the flood?",
             ],
+            answer_prefix="Answer: ",
         )
         response = adapter.process_request(request, {}, {})
         assert len(response.responses) == 2

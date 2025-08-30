@@ -103,6 +103,7 @@ class TestBenchmarkAdapterIntegration:
                 "task": ["test_task1"],
                 "answers": [["Test answer"]],
                 "all_classes": [[]],
+                "answer_prefix": ["Answer: "],
             }
         )
 
@@ -161,6 +162,7 @@ class TestBenchmarkAdapterIntegration:
                 "task": ["test_task1", "test_task2"],
                 "answers": [["Answer 1"], ["Answer 2"]],
                 "all_classes": [[], []],
+                "answer_prefix": ["Answer: ", "Answer: "],
             }
         )
 
@@ -178,13 +180,19 @@ class TestRequestResponseIntegration:
     def test_request_response_compatibility(self):
         """Test that Request/RequestResponse interface works correctly."""
         # Test single question
-        request = Request(context="Test context", questions="Single question")
+        request = Request(
+            context="Test context",
+            questions="Single question",
+            answer_prefix="Answer: ",
+        )
         assert request.context == "Test context"
         assert request.questions == "Single question"
 
         # Test multiple questions
         questions = ["Question 1", "Question 2"]
-        request = Request(context="Test context", questions=questions)
+        request = Request(
+            context="Test context", questions=questions, answer_prefix="Answer: "
+        )
         assert request.questions == questions
 
         # Test response formats
@@ -232,6 +240,7 @@ class TestEndToEndBenchmarkWorkflow:
                 "task": ["test_task1", "test_task1", "test_task1"],
                 "answers": [["A1a"], ["A1b"], ["A2"]],
                 "all_classes": [[], [], []],
+                "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
             }
         )
 
@@ -298,6 +307,7 @@ class TestEndToEndBenchmarkWorkflow:
                 "task": ["test_task1"] * 6,
                 "answers": [["A1"], ["A2"], ["A3"], ["A4"], ["A5"], ["A6"]],
                 "all_classes": [[], [], [], [], [], []],
+                "answer_prefix": ["Answer: "] * 6,
             }
         )
 
@@ -396,6 +406,7 @@ class TestErrorHandlingIntegration:
                 "task": ["test_task1", "test_task1", "test_task1"],
                 "answers": [["A1"], ["A2"], ["A3"]],
                 "all_classes": [[], [], []],
+                "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
             }
         )
 
@@ -437,6 +448,7 @@ class TestErrorHandlingIntegration:
                 "task": ["test_task1"],
                 "answers": [["A"]],
                 "all_classes": [[]],
+                "answer_prefix": ["Answer: "],
             }
         )
 
