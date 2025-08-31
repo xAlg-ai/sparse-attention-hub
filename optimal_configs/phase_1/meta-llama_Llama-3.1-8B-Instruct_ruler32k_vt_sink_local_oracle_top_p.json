@@ -1,0 +1,39 @@
+{
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "task": "ruler32k/vt",
+  "masker_name": "sink_local_oracle_top_p",
+  "sparse_config": {
+    "type": "ResearchAttentionConfig",
+    "masker_configs": [
+      {
+        "type": "SinkMaskerConfig",
+        "params": {
+          "sink_size": 128
+        }
+      },
+      {
+        "type": "LocalMaskerConfig",
+        "params": {
+          "window_size": 128
+        }
+      },
+      {
+        "type": "OracleTopPMaskerConfig",
+        "params": {
+          "top_p": 0.9
+        }
+      }
+    ]
+  },
+  "masker_classes": [
+    "SinkMaskerConfig",
+    "LocalMaskerConfig",
+    "OracleTopPMaskerConfig"
+  ],
+  "hyperparams": {
+    "oracletoppmasker_top_p": 0.9
+  },
+  "score": 0.07528101712940938,
+  "search_time": 403.4053919315338,
+  "num_trials": 11
+}

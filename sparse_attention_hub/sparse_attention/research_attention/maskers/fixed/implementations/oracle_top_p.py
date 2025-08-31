@@ -24,21 +24,23 @@ class OracleTopPMaskerConfig(TopPMaskerConfig):
     """Configuration for OracleTopPMasker."""
 
     pass  # Inherits top_p from parent with validation
-    
+
     @classmethod
     def get_search_space(cls, task_name: str) -> Dict[str, Any]:
         """Get Ray Tune search space for OracleTopP masker.
-        
+
         Args:
             task_name: Name of the benchmark task to optimize for
-            
+
         Returns:
             Dictionary mapping parameter names to Ray Tune distributions
         """
         from ray import tune
 
         return {
-            "top_p": tune.choice([0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99])
+            "top_p": tune.grid_search(
+                [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
+            )
         }
 
 

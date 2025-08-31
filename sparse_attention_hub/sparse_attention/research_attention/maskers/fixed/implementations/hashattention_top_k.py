@@ -32,23 +32,21 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     hat_mlp_activation: str
     hat_weights: Optional[Dict[int, Dict[str, List[torch.Tensor]]]] = None
     hat_weight_file: Optional[str] = None
-    
+
     @classmethod
     def get_search_space(cls, task_name: str) -> Dict[str, Any]:
         """Get Ray Tune search space for HashAttentionTopK masker.
-        
+
         Args:
             task_name: Name of the benchmark task to optimize for
-            
+
         Returns:
             Dictionary mapping parameter names to Ray Tune distributions
         """
         from ray import tune
 
         # Only tune heavy_size, other parameters are fixed by the pre-trained model
-        return {
-            "heavy_size": tune.choice([0.01, 0.025, 0.05])
-        }
+        return {"heavy_size": tune.grid_search([0.01, 0.025, 0.05])}
         ## set in benchmarking config
         # return {}
 

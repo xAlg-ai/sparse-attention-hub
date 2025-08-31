@@ -1,0 +1,46 @@
+{
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "task": "ruler32k/vt",
+  "masker_name": "sink_local_magic_pig",
+  "sparse_config": {
+    "type": "ResearchAttentionConfig",
+    "masker_configs": [
+      {
+        "type": "SinkMaskerConfig",
+        "params": {
+          "sink_size": 128
+        }
+      },
+      {
+        "type": "LocalMaskerConfig",
+        "params": {
+          "window_size": 128
+        }
+      },
+      {
+        "type": "MagicPigConfig",
+        "params": {
+          "center": true,
+          "lsh_k": 8,
+          "lsh_l": 32,
+          "packing": "int64",
+          "seed": 42
+        }
+      }
+    ]
+  },
+  "masker_classes": [
+    "SinkMaskerConfig",
+    "LocalMaskerConfig",
+    "MagicPigConfig"
+  ],
+  "hyperparams": {
+    "magicpig_lsh_l": 64,
+    "magicpig_lsh_k": 16,
+    "magicpig_center": true,
+    "magicpig_packing": "int64"
+  },
+  "score": 0.1,
+  "search_time": 245.16551733016968,
+  "num_trials": 9
+}

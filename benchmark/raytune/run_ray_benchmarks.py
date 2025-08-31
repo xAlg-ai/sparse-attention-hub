@@ -368,10 +368,10 @@ def main():
     parser.add_argument("--config-run", type=str, required=True,
                        help="Config run directory name")
     parser.add_argument("--optimal-configs-dir", default="./optimal_configs")
-    parser.add_argument("--benchmark-results-dir", default="./benchmark_results_ray_16k_100req")
-    parser.add_argument("--max-new-tokens", type=int, default=100)
-    parser.add_argument("--max-context-length", type=int, default=16000)
-    parser.add_argument("--max-requests", type=int, default=100)
+    parser.add_argument("--benchmark-results-dir", default="./benchmark_vt_full_10pct")
+    parser.add_argument("--max-new-tokens", type=int, default=1000)
+    parser.add_argument("--max-context-length", type=int, default=100000)
+    parser.add_argument("--max-requests", type=int, default=1000)
     parser.add_argument("--num-actors", type=int, default=None,
                        help="Number of Ray actors (default: number of GPUs)")
     parser.add_argument("--actors-per-gpu", type=int, default=None,

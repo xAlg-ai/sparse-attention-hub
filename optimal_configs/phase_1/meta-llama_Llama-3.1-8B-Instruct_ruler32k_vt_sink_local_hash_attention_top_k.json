@@ -1,0 +1,43 @@
+{
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "task": "ruler32k/vt",
+  "masker_name": "sink_local_hash_attention_top_k",
+  "sparse_config": {
+    "type": "ResearchAttentionConfig",
+    "masker_configs": [
+      {
+        "type": "SinkMaskerConfig",
+        "params": {
+          "sink_size": 128
+        }
+      },
+      {
+        "type": "LocalMaskerConfig",
+        "params": {
+          "window_size": 128
+        }
+      },
+      {
+        "type": "HashAttentionTopKMaskerConfig",
+        "params": {
+          "hat_bits": 32,
+          "hat_mlp_activation": "silu",
+          "hat_mlp_hidden_size": 128,
+          "hat_mlp_layers": 3,
+          "hat_weight_file": "/workspace/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl",
+          "hat_weights": null,
+          "heavy_size": 0.095
+        }
+      }
+    ]
+  },
+  "masker_classes": [
+    "SinkMaskerConfig",
+    "LocalMaskerConfig",
+    "HashAttentionTopKMaskerConfig"
+  ],
+  "hyperparams": {},
+  "score": 0.0,
+  "search_time": 0.0,
+  "num_trials": 0
+}

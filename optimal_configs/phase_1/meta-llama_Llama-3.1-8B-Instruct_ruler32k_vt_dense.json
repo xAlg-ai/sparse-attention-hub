@@ -1,0 +1,11 @@
+{
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "task": "ruler32k/vt",
+  "masker_name": "dense",
+  "sparse_config": null,
+  "masker_classes": null,
+  "hyperparams": {},
+  "score": 0.0,
+  "search_time": 0.0,
+  "num_trials": 0
+}

@@ -1,0 +1,53 @@
+{
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "task": "ruler32k/vt",
+  "masker_name": "sink_local_oracle_top_k_adaptive_sampling",
+  "sparse_config": {
+    "type": "ResearchAttentionConfig",
+    "masker_configs": [
+      {
+        "type": "SinkMaskerConfig",
+        "params": {
+          "sink_size": 128
+        }
+      },
+      {
+        "type": "LocalMaskerConfig",
+        "params": {
+          "window_size": 128
+        }
+      },
+      {
+        "type": "OracleTopKConfig",
+        "params": {
+          "heavy_size": 0.05
+        }
+      },
+      {
+        "type": "AdaptiveSamplingMaskerConfig",
+        "params": {
+          "base_rate_sampling": 0.025,
+          "delta": 0.2,
+          "epsilon": 0.2,
+          "init_offset": 0.005,
+          "local_offset": 0.005
+        }
+      }
+    ]
+  },
+  "masker_classes": [
+    "SinkMaskerConfig",
+    "LocalMaskerConfig",
+    "OracleTopKConfig",
+    "AdaptiveSamplingMaskerConfig"
+  ],
+  "hyperparams": {
+    "oracletopk_heavy_size": 0.05,
+    "adaptivesamplingmasker_base_rate_sampling": 0.025,
+    "adaptivesamplingmasker_epsilon": 0.2,
+    "adaptivesamplingmasker_delta": 0.2
+  },
+  "score": 0.011866225463496683,
+  "search_time": 4657.648453235626,
+  "num_trials": 144
+}

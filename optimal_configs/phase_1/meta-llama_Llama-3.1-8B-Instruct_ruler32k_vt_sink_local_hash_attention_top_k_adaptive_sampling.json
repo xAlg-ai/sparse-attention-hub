@@ -1,0 +1,59 @@
+{
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "task": "ruler32k/vt",
+  "masker_name": "sink_local_hash_attention_top_k_adaptive_sampling",
+  "sparse_config": {
+    "type": "ResearchAttentionConfig",
+    "masker_configs": [
+      {
+        "type": "SinkMaskerConfig",
+        "params": {
+          "sink_size": 128
+        }
+      },
+      {
+        "type": "LocalMaskerConfig",
+        "params": {
+          "window_size": 128
+        }
+      },
+      {
+        "type": "HashAttentionTopKMaskerConfig",
+        "params": {
+          "hat_bits": 32,
+          "hat_mlp_activation": "silu",
+          "hat_mlp_hidden_size": 128,
+          "hat_mlp_layers": 3,
+          "hat_weight_file": "/workspace/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl",
+          "hat_weights": null,
+          "heavy_size": 0.025
+        }
+      },
+      {
+        "type": "AdaptiveSamplingMaskerConfig",
+        "params": {
+          "base_rate_sampling": 0.025,
+          "delta": 0.05,
+          "epsilon": 0.1,
+          "init_offset": 0.005,
+          "local_offset": 0.005
+        }
+      }
+    ]
+  },
+  "masker_classes": [
+    "SinkMaskerConfig",
+    "LocalMaskerConfig",
+    "HashAttentionTopKMaskerConfig",
+    "AdaptiveSamplingMaskerConfig"
+  ],
+  "hyperparams": {
+    "hashattentiontopkmasker_heavy_size": 0.025,
+    "adaptivesamplingmasker_base_rate_sampling": 0.025,
+    "adaptivesamplingmasker_epsilon": 0.1,
+    "adaptivesamplingmasker_delta": 0.05
+  },
+  "score": 0.0942884389991918,
+  "search_time": 4728.119112968445,
+  "num_trials": 144
+}

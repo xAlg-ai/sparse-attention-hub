@@ -45,14 +45,14 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
             raise ValueError(
                 f"sampling_rate must be in range [0, 1], got {self.sampling_rate}"
             )
-    
+
     @classmethod
     def get_search_space(cls, task_name: str) -> Dict[str, Any]:
         """Get Ray Tune search space for RandomSampling masker.
-        
+
         Args:
             task_name: Name of the benchmark task to optimize for
-            
+
         Returns:
             Dictionary mapping parameter names to Ray Tune distributions
         """
