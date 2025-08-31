@@ -25,6 +25,7 @@ from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
     _get_num_key_value_groups,
     apply_inv_mask_sum,
     create_sampling_mask_with_per_head_budget,
+    create_sampling_mask_with_per_head_budget_no_replacement,
     repeat_kv,
 )
 
@@ -49,6 +50,13 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
         local_offset: Union[int, float] representing the end offset for sampling.
             If int, must be non-negative; if float, must be in [0,1] and will be
             multiplied by the number of keys to get the actual offset.
+        sample_without_replacement: bool = False
+            Whether to sample without replacement in both base and adaptive phases.
+            If True: Base sampling uses unique indices for better std estimation,
+            adaptive sampling avoids duplicate computations per row, providing
+            better statistical guarantees with slight computational overhead.
+            If False (default): Uses current replacement sampling behavior.
+            When budget exceeds sampling_range, effective budget is clamped.
     """
 
     base_rate_sampling: Union[int, float]  # Base rate (0,1) if float
@@ -56,6 +64,7 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
     delta: float  # Confidence bound (0,1)
     init_offset: Union[int, float]  # Start index
     local_offset: Union[int, float]  # End offset
+    sample_without_replacement: bool = False  # Sampling strategy
 
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
@@ -165,6 +174,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
         self.delta = config.delta
         self.init_offset = config.init_offset
         self.local_offset = config.local_offset
+        self.sample_without_replacement = config.sample_without_replacement
 
         # Pre-compute delta_ppf for efficiency
         self.delta_ppf = float(norm.ppf(1 - self.delta))
@@ -223,6 +233,55 @@ class AdaptiveSamplingMasker(SamplingMasker):
             return max(2, self.base_rate_sampling)
         return max(2, int(self.base_rate_sampling * sampling_range))
 
+    def _get_base_samples_without_replacement(
+        self,
+        batch_size: int,
+        num_heads: int,
+        seq_len_queries: int,
+        start_idx: int,
+        end_idx: int,
+        num_base_samples: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Generate base sampling indices without replacement using vectorization.
+        
+        Args:
+            batch_size: Batch size
+            num_heads: Number of attention heads
+            seq_len_queries: Length of query sequences
+            start_idx: Starting index for sampling range
+            end_idx: Ending index for sampling range
+            num_base_samples: Number of samples to draw per row
+            device: Device to create tensors on
+            
+        Returns:
+            Tensor of shape (batch_size, num_heads, seq_len_queries, effective_budget)
+            containing unique indices for each row
+        """
+        sampling_range = end_idx - start_idx
+        effective_budget = min(num_base_samples, sampling_range)
+        
+        # Total number of rows to process
+        total_rows = batch_size * num_heads * seq_len_queries
+        
+        # Vectorized approach: create permutations for all rows at once
+        # Much more efficient: use argsort on random values to get permutations
+        random_values = torch.rand(total_rows, sampling_range, device=device)
+        all_perms = torch.argsort(random_values, dim=-1)  # Shape: (total_rows, sampling_range)
+        
+        # Take first effective_budget indices from each permutation
+        selected_indices = all_perms[:, :effective_budget]  # (total_rows, effective_budget)
+        
+        # Add start_idx offset
+        selected_indices = selected_indices + start_idx
+        
+        # Reshape to original dimensions
+        base_row_wise_idx = selected_indices.view(
+            batch_size, num_heads, seq_len_queries, effective_budget
+        )
+        
+        return base_row_wise_idx
+
     def _get_std_estimate_using_base_sample(
         self,
         expwts: torch.Tensor,
@@ -234,20 +293,27 @@ class AdaptiveSamplingMasker(SamplingMasker):
         end_idx: int,
         num_base_samples: int,
         dtype: torch.dtype,
-    ) -> tuple[Mask, torch.Tensor]:
+    ) -> tuple[Mask, torch.Tensor, int]:
         """Get standard deviation estimate using base sampling and create base mask."""
         # Create base sampling indices
-        base_row_wise_idx = torch.randint(
-            low=start_idx,
-            high=end_idx,
-            size=(batch_size, num_heads, seq_len_queries, num_base_samples),
-            device=expwts.device,
-        )
+        if self.sample_without_replacement:
+            base_row_wise_idx = self._get_base_samples_without_replacement(
+                batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, expwts.device
+            )
+            effective_samples = base_row_wise_idx.shape[-1]  # May be less than num_base_samples
+        else:
+            base_row_wise_idx = torch.randint(
+                low=start_idx,
+                high=end_idx,
+                size=(batch_size, num_heads, seq_len_queries, num_base_samples),
+                device=expwts.device,
+            )
+            effective_samples = num_base_samples
 
         # Extract values and compute std
         sampled_values = torch.gather(expwts, dim=-1, index=base_row_wise_idx)
         total_rows = batch_size * num_heads * seq_len_queries
-        row_sampled_values = sampled_values.view(total_rows, num_base_samples)
+        row_sampled_values = sampled_values.view(total_rows, effective_samples)
         std_estimate = torch.std(row_sampled_values, dim=-1, keepdim=True)
         std_estimate = torch.clamp(std_estimate, min=1e-8)
         std_estimate = std_estimate.view(batch_size, num_heads, seq_len_queries, 1)
@@ -255,7 +321,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
         # Create base sampling mask
         sampling_range = end_idx - start_idx
         base_data = torch.full_like(
-            base_row_wise_idx, num_base_samples / sampling_range, dtype=expwts.dtype
+            base_row_wise_idx, effective_samples / sampling_range, dtype=expwts.dtype
         )
 
         base_mask = Mask.create_from_row_wise_idx(
@@ -266,7 +332,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             dtype=dtype,
         )
 
-        return base_mask, std_estimate
+        return base_mask, std_estimate, effective_samples
 
     def _compute_adaptive_budget(
         self,
@@ -356,7 +422,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
         num_base_samples = self._get_base_sample_count(sampling_range)
 
         # Create base sampling mask and estimate std
-        base_sampling_mask, std_estimate = self._get_std_estimate_using_base_sample(
+        base_sampling_mask, std_estimate, effective_samples = self._get_std_estimate_using_base_sample(
             expwts,
             batch_size,
             num_heads,
@@ -373,18 +439,32 @@ class AdaptiveSamplingMasker(SamplingMasker):
         budget = self._compute_adaptive_budget(
             std_estimate, estimated_denominator, sampling_range
         )
-        budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
+        # When sampling without replacement, ensure budget doesn't exceed sampling range
+        if self.sample_without_replacement:
+            budget = torch.clamp(budget, min=effective_samples, max=sampling_range)
+        else:
+            budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
 
         # Create adaptive sampling mask
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
-        adaptive_mask = create_sampling_mask_with_per_head_budget(
-            budgets=budget,
-            sampling_probability=sampling_probabilities,
-            seq_len_keys=seq_len_keys,
-            start_idx=start_idx,
-            end_idx=end_idx,
-            dtype=previous_mask.dtype,
-        )
+        if self.sample_without_replacement:
+            adaptive_mask = create_sampling_mask_with_per_head_budget_no_replacement(
+                budgets=budget,
+                sampling_probability=sampling_probabilities,
+                seq_len_keys=seq_len_keys,
+                start_idx=start_idx,
+                end_idx=end_idx,
+                dtype=previous_mask.dtype,
+            )
+        else:
+            adaptive_mask = create_sampling_mask_with_per_head_budget(
+                budgets=budget,
+                sampling_probability=sampling_probabilities,
+                seq_len_keys=seq_len_keys,
+                start_idx=start_idx,
+                end_idx=end_idx,
+                dtype=previous_mask.dtype,
+            )
         # Merge masks
         return previous_mask.merge_mask(adaptive_mask, inplace=False)
 
