@@ -246,15 +246,15 @@ def create_sampling_mask_with_per_head_budget_no_replacement(
     """
     batch_size, num_heads, seq_len_queries, _ = budgets.shape
     sampling_range = end_idx - start_idx
-    
+
     # Reshape for easier processing
     num_rows = batch_size * num_heads * seq_len_queries
     budgets_flat = budgets.view(num_rows)  # (num_rows,)
     sampling_prob_flat = sampling_probability.view(num_rows)  # (num_rows,)
-    
+
     # Clamp budgets to sampling_range (handle edge case where budget > available positions)
     effective_budgets = torch.clamp(budgets_flat, max=sampling_range)
-    
+
     # Vectorized permutation generation
     # Create a large permutation matrix for all rows at once
     max_budget = int(effective_budgets.max().item())
@@ -263,45 +263,61 @@ def create_sampling_mask_with_per_head_budget_no_replacement(
         return Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=dtype,
-            mask_type="index"
+            mask_type="index",
         )
-    
+
     # Generate permutations for each row using vectorized approach
     # Much more efficient: use argsort on random values to get permutations
     random_values = torch.rand(num_rows, sampling_range, device=budgets.device)
-    all_perms = torch.argsort(random_values, dim=-1)  # Shape: (num_rows, sampling_range)
-    
+    all_perms = torch.argsort(
+        random_values, dim=-1
+    )  # Shape: (num_rows, sampling_range)
+
     # Fully vectorized approach to handle variable budgets
-    
+
     if max_budget > 0:
         # Take indices for max budget from each permutation
-        selected_indices = all_perms[:, :max_budget] + start_idx  # (num_rows, max_budget)
-        
+        selected_indices = (
+            all_perms[:, :max_budget] + start_idx
+        )  # (num_rows, max_budget)
+
         # Create mask for valid budget per row
-        budget_mask = torch.arange(max_budget, device=budgets.device).unsqueeze(0) < effective_budgets.unsqueeze(1)
-        
+        budget_mask = torch.arange(max_budget, device=budgets.device).unsqueeze(
+            0
+        ) < effective_budgets.unsqueeze(1)
+
         # Filter valid indices and flatten
         valid_local_indices = selected_indices[budget_mask]  # (total_valid_elements,)
-        
+
         # Create row indices for valid elements
-        row_ids = torch.arange(num_rows, device=budgets.device).unsqueeze(1).expand(-1, max_budget)[budget_mask]
-        
+        row_ids = (
+            torch.arange(num_rows, device=budgets.device)
+            .unsqueeze(1)
+            .expand(-1, max_budget)[budget_mask]
+        )
+
         # Convert to global indices
         final_indices = valid_local_indices + row_ids * seq_len_keys
-        
+
         # Create data with sampling probabilities
-        final_data = sampling_prob_flat.unsqueeze(1).expand(-1, max_budget)[budget_mask].to(dtype)
+        final_data = (
+            sampling_prob_flat.unsqueeze(1)
+            .expand(-1, max_budget)[budget_mask]
+            .to(dtype)
+        )
     else:
         # All budgets are 0
         final_indices = torch.empty(0, dtype=torch.long, device=budgets.device)
         final_data = torch.empty(0, dtype=dtype, device=budgets.device)
-    
+
     # Create ptr array using cumulative sum (vectorized)
-    final_ptr = torch.cat([
-        torch.zeros(1, dtype=torch.long, device=budgets.device),
-        torch.cumsum(effective_budgets, dim=0),
-    ])
-    
+    final_ptr = torch.cat(
+        [
+            torch.zeros(1, dtype=torch.long, device=budgets.device),
+            torch.cumsum(effective_budgets, dim=0),
+        ]
+    )
+
     # Create the sampling mask
     sampling_mask = Mask.create_mask_from_indices(
         shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
@@ -310,7 +326,7 @@ def create_sampling_mask_with_per_head_budget_no_replacement(
         data=final_data,
         dtype=dtype,
     )
-    
+
     return sampling_mask
 
 

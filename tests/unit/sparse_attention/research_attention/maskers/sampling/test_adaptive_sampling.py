@@ -512,18 +512,31 @@ class TestGetBaseSamplesWithoutReplacement:
         device = torch.device("cpu")
 
         result = masker_no_replacement._get_base_samples_without_replacement(
-            batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, device
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            device,
         )
 
-        assert result.shape == (batch_size, num_heads, seq_len_queries, num_base_samples)
-        
+        assert result.shape == (
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            num_base_samples,
+        )
+
         # Check uniqueness for each row
         for b in range(batch_size):
             for h in range(num_heads):
                 for q in range(seq_len_queries):
                     row_indices = result[b, h, q, :]
                     unique_indices = torch.unique(row_indices)
-                    assert len(unique_indices) == len(row_indices), f"Duplicates found in row [{b},{h},{q}]"
+                    assert len(unique_indices) == len(
+                        row_indices
+                    ), f"Duplicates found in row [{b},{h},{q}]"
 
     def test_indices_within_range(self, masker_no_replacement):
         """Test that all generated indices are within the specified range."""
@@ -533,7 +546,13 @@ class TestGetBaseSamplesWithoutReplacement:
         device = torch.device("cpu")
 
         result = masker_no_replacement._get_base_samples_without_replacement(
-            batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, device
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            device,
         )
 
         # All indices should be in range [start_idx, end_idx)
@@ -548,7 +567,13 @@ class TestGetBaseSamplesWithoutReplacement:
         device = torch.device("cpu")
 
         result = masker_no_replacement._get_base_samples_without_replacement(
-            batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, device
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            device,
         )
 
         # Should return effective_budget = min(num_base_samples, sampling_range) = 5
@@ -571,11 +596,22 @@ class TestGetBaseSamplesWithoutReplacement:
         device = torch.device("cuda")
 
         result = masker_no_replacement._get_base_samples_without_replacement(
-            batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, device
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            device,
         )
 
         assert result.device.type == device.type
-        assert result.shape == (batch_size, num_heads, seq_len_queries, num_base_samples)
+        assert result.shape == (
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            num_base_samples,
+        )
 
     def test_large_tensors(self, masker_no_replacement):
         """Test with larger tensor dimensions."""
@@ -585,20 +621,33 @@ class TestGetBaseSamplesWithoutReplacement:
         device = torch.device("cpu")
 
         result = masker_no_replacement._get_base_samples_without_replacement(
-            batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, device
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            device,
         )
 
-        assert result.shape == (batch_size, num_heads, seq_len_queries, num_base_samples)
-        
+        assert result.shape == (
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            num_base_samples,
+        )
+
         # Verify uniqueness for a few random rows
         total_rows = batch_size * num_heads * seq_len_queries
         result_flat = result.view(total_rows, num_base_samples)
-        
+
         # Test first and last rows
         for row_idx in [0, total_rows - 1]:
             row_indices = result_flat[row_idx]
             unique_indices = torch.unique(row_indices)
-            assert len(unique_indices) == len(row_indices), f"Duplicates in row {row_idx}"
+            assert len(unique_indices) == len(
+                row_indices
+            ), f"Duplicates in row {row_idx}"
 
     def test_minimal_sampling_range(self, masker_no_replacement):
         """Test with minimal sampling range (edge case)."""
@@ -608,12 +657,18 @@ class TestGetBaseSamplesWithoutReplacement:
         device = torch.device("cpu")
 
         result = masker_no_replacement._get_base_samples_without_replacement(
-            batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, device
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            device,
         )
 
         assert result.shape[-1] == 2
         row_indices = result[0, 0, 0, :]
-        
+
         # Should contain both available indices (0 and 1)
         sorted_indices = torch.sort(row_indices)[0]
         expected = torch.tensor([0, 1], dtype=torch.long)
@@ -627,9 +682,20 @@ class TestGetBaseSamplesWithoutReplacement:
         num_base_samples = 8
         dtype = torch.float32
 
-        base_mask, std_estimate, effective_samples = masker_no_replacement._get_std_estimate_using_base_sample(
-            expwts, batch_size, num_heads, seq_len_queries, seq_len_keys,
-            start_idx, end_idx, num_base_samples, dtype
+        (
+            base_mask,
+            std_estimate,
+            effective_samples,
+        ) = masker_no_replacement._get_std_estimate_using_base_sample(
+            expwts,
+            batch_size,
+            num_heads,
+            seq_len_queries,
+            seq_len_keys,
+            start_idx,
+            end_idx,
+            num_base_samples,
+            dtype,
         )
 
         # Verify return values
@@ -642,7 +708,12 @@ class TestGetBaseSamplesWithoutReplacement:
         # Verify mask has correct sparsity
         expected_density = num_base_samples / seq_len_keys
         actual_density = base_mask.get_density()
-        torch.testing.assert_close(torch.tensor(actual_density), torch.tensor(expected_density), rtol=0.1, atol=0.05)
+        torch.testing.assert_close(
+            torch.tensor(actual_density),
+            torch.tensor(expected_density),
+            rtol=0.1,
+            atol=0.05,
+        )
 
 
 @pytest.mark.unit
@@ -680,9 +751,17 @@ class TestAdaptiveSamplingWithoutReplacement:
 
         return keys, queries, values, attention_mask
 
-    def test_end_to_end_no_replacement(self, masker_no_replacement, large_sample_tensors):
+    def test_end_to_end_no_replacement(
+        self, masker_no_replacement, large_sample_tensors
+    ):
         """Test complete end-to-end functionality with no replacement."""
-        batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = 2, 4, 6, 10240, 32
+        batch_size, num_heads, seq_len_queries, seq_len_keys, head_dim = (
+            2,
+            4,
+            6,
+            10240,
+            32,
+        )
 
         keys = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
         queries = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
@@ -747,14 +826,24 @@ class TestAdaptiveSamplingWithoutReplacement:
 
         # Test both modes
         result_replacement = masker_replacement.add_mask(
-            keys, queries, values, attention_mask,
-            scaling=1.0, dropout=0.0, sparse_meta_data={},
+            keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
             previous_mask=empty_mask,
         )
 
         result_no_replacement = masker_no_replacement.add_mask(
-            keys, queries, values, attention_mask,
-            scaling=1.0, dropout=0.0, sparse_meta_data={},
+            keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
             previous_mask=empty_mask,
         )
 
@@ -780,8 +869,13 @@ class TestAdaptiveSamplingWithoutReplacement:
         empty_mask = Mask.create_empty_mask((1, 2, 2, 4), dtype=torch.float32)
 
         result = masker_no_replacement.add_mask(
-            keys, queries, values, attention_mask,
-            scaling=1.0, dropout=0.0, sparse_meta_data={},
+            keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
             previous_mask=empty_mask,
         )
 

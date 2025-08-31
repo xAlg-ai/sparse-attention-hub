@@ -244,7 +244,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
         device: torch.device,
     ) -> torch.Tensor:
         """Generate base sampling indices without replacement using vectorization.
-        
+
         Args:
             batch_size: Batch size
             num_heads: Number of attention heads
@@ -253,33 +253,37 @@ class AdaptiveSamplingMasker(SamplingMasker):
             end_idx: Ending index for sampling range
             num_base_samples: Number of samples to draw per row
             device: Device to create tensors on
-            
+
         Returns:
             Tensor of shape (batch_size, num_heads, seq_len_queries, effective_budget)
             containing unique indices for each row
         """
         sampling_range = end_idx - start_idx
         effective_budget = min(num_base_samples, sampling_range)
-        
+
         # Total number of rows to process
         total_rows = batch_size * num_heads * seq_len_queries
-        
+
         # Vectorized approach: create permutations for all rows at once
         # Much more efficient: use argsort on random values to get permutations
         random_values = torch.rand(total_rows, sampling_range, device=device)
-        all_perms = torch.argsort(random_values, dim=-1)  # Shape: (total_rows, sampling_range)
-        
+        all_perms = torch.argsort(
+            random_values, dim=-1
+        )  # Shape: (total_rows, sampling_range)
+
         # Take first effective_budget indices from each permutation
-        selected_indices = all_perms[:, :effective_budget]  # (total_rows, effective_budget)
-        
+        selected_indices = all_perms[
+            :, :effective_budget
+        ]  # (total_rows, effective_budget)
+
         # Add start_idx offset
         selected_indices = selected_indices + start_idx
-        
+
         # Reshape to original dimensions
         base_row_wise_idx = selected_indices.view(
             batch_size, num_heads, seq_len_queries, effective_budget
         )
-        
+
         return base_row_wise_idx
 
     def _get_std_estimate_using_base_sample(
@@ -298,9 +302,17 @@ class AdaptiveSamplingMasker(SamplingMasker):
         # Create base sampling indices
         if self.sample_without_replacement:
             base_row_wise_idx = self._get_base_samples_without_replacement(
-                batch_size, num_heads, seq_len_queries, start_idx, end_idx, num_base_samples, expwts.device
+                batch_size,
+                num_heads,
+                seq_len_queries,
+                start_idx,
+                end_idx,
+                num_base_samples,
+                expwts.device,
             )
-            effective_samples = base_row_wise_idx.shape[-1]  # May be less than num_base_samples
+            effective_samples = base_row_wise_idx.shape[
+                -1
+            ]  # May be less than num_base_samples
         else:
             base_row_wise_idx = torch.randint(
                 low=start_idx,
@@ -422,7 +434,11 @@ class AdaptiveSamplingMasker(SamplingMasker):
         num_base_samples = self._get_base_sample_count(sampling_range)
 
         # Create base sampling mask and estimate std
-        base_sampling_mask, std_estimate, effective_samples = self._get_std_estimate_using_base_sample(
+        (
+            base_sampling_mask,
+            std_estimate,
+            effective_samples,
+        ) = self._get_std_estimate_using_base_sample(
             expwts,
             batch_size,
             num_heads,
