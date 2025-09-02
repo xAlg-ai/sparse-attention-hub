@@ -3,6 +3,7 @@
 import inspect
 import json
 import os
+import random
 import time
 from collections import deque
 from dataclasses import asdict, dataclass
@@ -41,16 +42,23 @@ class MicroMetricLogger:
         flush_every: int = 1000,  # Flush every N events
         flush_interval: float = 60.0,  # Flush every N seconds
         enabled_metrics: Union[List[str], str] = None,
+        max_records: Optional[int] = None,  # Maximum number of events to log
+        sampling_factor: float = 1.0,  # Probability of logging each event (0.0-1.0)
     ):  # List of string identifiers to enable, or "all"
         if not self._initialized:
             self.log_path = log_path
             self.flush_every = flush_every
             self.flush_interval = flush_interval
+            self.max_records = max_records
+            self.sampling_factor = max(
+                0.0, min(1.0, sampling_factor)
+            )  # Clamp to [0.0, 1.0]
 
             # Internal state
             self.log_queue: deque = deque(maxlen=10000)  # Circular buffer
             self.enabled_metrics: set = set()
             self.last_flush_time = time.time()
+            self._total_records_logged: int = 0  # Track total events logged
 
             # Enable metrics if log_path is provided
             if self.log_path is not None:
@@ -162,6 +170,17 @@ class MicroMetricLogger:
             )
             return
 
+        # Check if max_records limit has been reached
+        if (
+            self.max_records is not None
+            and self._total_records_logged >= self.max_records
+        ):
+            return  # Silently ignore - we've hit the limit
+
+        # Apply sampling factor
+        if self.sampling_factor < 1.0 and random.random() > self.sampling_factor:
+            return  # Event not selected for logging due to sampling
+
         # Create log event
         event = LogEvent(
             timestamp=datetime.now(),
@@ -171,23 +190,35 @@ class MicroMetricLogger:
             location=self._get_calling_location(),
         )
 
-        # Add to queue
+        # Add to queue and increment counter
         self.log_queue.append(event)
+        self._total_records_logged += 1
 
         # Check if we should flush
         if len(self.log_queue) >= self.flush_every:
             self.flush()
 
     def configure_logging(
-        self, log_path: str, enabled_metrics: Union[List[str], str] = None
+        self,
+        log_path: str,
+        enabled_metrics: Union[List[str], str] = None,
+        max_records: Optional[int] = None,
+        sampling_factor: float = 1.0,
     ) -> None:
         """Configure logging with a log path and optionally enable metrics.
 
-        This must be called before logging can work.
+        This must be called before logging can work. Resets the total records counter.
         """
         self.log_path = log_path
         self._ensure_log_directory()
         self.enable_metrics(enabled_metrics)
+
+        # Update limits if provided
+        self.max_records = max_records
+        self.sampling_factor = max(0.0, min(1.0, sampling_factor))
+
+        # Reset the total records counter when reconfiguring
+        self._total_records_logged = 0
 
     def flush(self) -> None:
         """Force flush the current queue to disk."""
@@ -221,3 +252,31 @@ class MicroMetricLogger:
     def is_logging_configured(self) -> bool:
         """Check if logging is configured (log_path is set)."""
         return self.log_path is not None
+
+    def get_total_records_logged(self) -> int:
+        """Get the total number of records logged since initialization or last configure_logging call."""
+        return getattr(self, "_total_records_logged", 0)
+
+    def is_max_records_reached(self) -> bool:
+        """Check if the maximum number of records has been reached."""
+        if self.max_records is None:
+            return False
+        return self.get_total_records_logged() >= self.max_records
+
+    def get_records_remaining(self) -> Optional[int]:
+        """Get the number of records remaining before hitting max_records limit.
+
+        Returns:
+            Number of records remaining, or None if no limit is set.
+        """
+        if self.max_records is None:
+            return None
+        return max(0, self.max_records - self.get_total_records_logged())
+
+    def get_sampling_factor(self) -> float:
+        """Get the current sampling factor."""
+        return getattr(self, "sampling_factor", 1.0)
+
+    def get_max_records(self) -> Optional[int]:
+        """Get the current max_records limit."""
+        return getattr(self, "max_records", None)

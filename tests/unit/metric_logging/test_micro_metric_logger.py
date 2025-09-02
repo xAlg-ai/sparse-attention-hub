@@ -621,6 +621,279 @@ class TestMicroMetricLoggerCleanup:
 
 
 @pytest.mark.unit
+class TestMicroMetricLoggerMaxRecords:
+    """Test cases for max_records functionality."""
+
+    def test_max_records_initialization(self, tmp_path) -> None:
+        """Test initialization with max_records parameter."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), max_records=5)
+        logger.enable_metrics(["test_metric"])
+
+        assert logger.get_max_records() == 5
+        assert logger.get_total_records_logged() == 0
+        assert not logger.is_max_records_reached()
+        assert logger.get_records_remaining() == 5
+
+    def test_max_records_limiting(self, tmp_path) -> None:
+        """Test that max_records limits the number of events logged."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), max_records=3)
+        logger.enable_metrics(["test_metric"])
+
+        # Log 5 events, but only 3 should be recorded
+        for i in range(5):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 3
+        assert logger.is_max_records_reached()
+        assert logger.get_records_remaining() == 0
+        assert len(logger.log_queue) == 3
+
+    def test_max_records_none_unlimited(self, tmp_path) -> None:
+        """Test that max_records=None allows unlimited logging."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), max_records=None)
+        logger.enable_metrics(["test_metric"])
+
+        # Log many events
+        for i in range(100):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 100
+        assert not logger.is_max_records_reached()
+        assert logger.get_records_remaining() is None
+        assert logger.get_max_records() is None
+
+    def test_max_records_configure_logging_reset(self, tmp_path) -> None:
+        """Test that configure_logging resets the records counter."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), max_records=5)
+        logger.enable_metrics(["test_metric"])
+
+        # Log 3 events
+        for i in range(3):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 3
+
+        # Reconfigure logging - should reset counter
+        logger.configure_logging(str(tmp_path), ["test_metric"], max_records=10)
+
+        assert logger.get_total_records_logged() == 0
+        assert logger.get_max_records() == 10
+        assert logger.get_records_remaining() == 10
+
+        # Log more events
+        for i in range(5):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 5
+
+
+@pytest.mark.unit
+class TestMicroMetricLoggerSamplingFactor:
+    """Test cases for sampling_factor functionality."""
+
+    def test_sampling_factor_initialization(self, tmp_path) -> None:
+        """Test initialization with sampling_factor parameter."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=0.5)
+        logger.enable_metrics(["test_metric"])
+
+        assert logger.get_sampling_factor() == 0.5
+
+    def test_sampling_factor_clamping(self, tmp_path) -> None:
+        """Test that sampling_factor is clamped to [0.0, 1.0]."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        # Test values above 1.0
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=1.5)
+        assert logger.get_sampling_factor() == 1.0
+
+        # Reset and test values below 0.0
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=-0.5)
+        assert logger.get_sampling_factor() == 0.0
+
+    def test_sampling_factor_zero_no_logging(self, tmp_path) -> None:
+        """Test that sampling_factor=0.0 prevents all logging."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=0.0)
+        logger.enable_metrics(["test_metric"])
+
+        # Try to log many events - none should be recorded
+        for i in range(100):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 0
+        assert len(logger.log_queue) == 0
+
+    def test_sampling_factor_one_all_logging(self, tmp_path) -> None:
+        """Test that sampling_factor=1.0 logs all events."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=1.0)
+        logger.enable_metrics(["test_metric"])
+
+        # Log events - all should be recorded
+        for i in range(10):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 10
+        assert len(logger.log_queue) == 10
+
+    def test_sampling_factor_partial_logging(self, tmp_path) -> None:
+        """Test that sampling_factor reduces logging approximately as expected."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=0.5)
+        logger.enable_metrics(["test_metric"])
+
+        # Log many events to get statistical significance
+        # Set random seed for reproducible test
+        import random
+
+        random.seed(42)
+
+        num_events = 1000
+        for i in range(num_events):
+            logger.log("test_metric", float(i))
+
+        # With sampling_factor=0.5, we expect roughly half the events
+        # Allow for some variance (±20% of expected)
+        expected = num_events * 0.5
+        recorded = logger.get_total_records_logged()
+        tolerance = expected * 0.2
+
+        assert expected - tolerance <= recorded <= expected + tolerance
+
+    def test_sampling_factor_configure_logging_update(self, tmp_path) -> None:
+        """Test that configure_logging can update sampling_factor."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(log_path=str(tmp_path), sampling_factor=1.0)
+        logger.enable_metrics(["test_metric"])
+
+        assert logger.get_sampling_factor() == 1.0
+
+        # Update sampling factor through configure_logging
+        logger.configure_logging(str(tmp_path), ["test_metric"], sampling_factor=0.3)
+
+        assert logger.get_sampling_factor() == 0.3
+
+
+@pytest.mark.unit
+class TestMicroMetricLoggerCombinedFeatures:
+    """Test cases for max_records and sampling_factor working together."""
+
+    def test_max_records_with_sampling(self, tmp_path) -> None:
+        """Test that max_records and sampling_factor work together correctly."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        # Set sampling_factor=1.0 to ensure all events that pass other checks are logged
+        logger = MicroMetricLogger(
+            log_path=str(tmp_path), max_records=5, sampling_factor=1.0
+        )
+        logger.enable_metrics(["test_metric"])
+
+        # Log 10 events, but only 5 should be recorded due to max_records
+        for i in range(10):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 5
+        assert logger.is_max_records_reached()
+        assert len(logger.log_queue) == 5
+
+    def test_sampling_with_max_records_zero_sampling(self, tmp_path) -> None:
+        """Test max_records with sampling_factor=0.0."""
+        # Reset singleton state and registered metrics
+        MicroMetricLogger._instance = None
+        MicroMetricLogger._initialized = False
+        MicroMetricLogger._registered_metrics.clear()
+
+        MicroMetricLogger.register_metric("test_metric", float)
+
+        logger = MicroMetricLogger(
+            log_path=str(tmp_path), max_records=5, sampling_factor=0.0
+        )
+        logger.enable_metrics(["test_metric"])
+
+        # Try to log events - none should be recorded due to sampling_factor=0.0
+        for i in range(10):
+            logger.log("test_metric", float(i))
+
+        assert logger.get_total_records_logged() == 0
+        assert (
+            not logger.is_max_records_reached()
+        )  # Never reached because nothing was logged
+        assert len(logger.log_queue) == 0
+
+
+@pytest.mark.unit
 class TestMicroMetricLoggerEdgeCases:
     """Test cases for edge cases and error handling."""
 

@@ -138,7 +138,9 @@ def _benchmark_worker(
     gpu_pool: multiprocessing.Queue,
     result_queue: multiprocessing.Queue,
     error_queue: multiprocessing.Queue,
-    timeout_per_benchmark: float = 3600.0
+    timeout_per_benchmark: float = 3600.0,
+    micro_metric_logger_max_records: Optional[int] = None,
+    micro_metric_logger_sampling_factor: float = 1.0
 ) -> None:
     """Worker function to execute benchmarks with dynamic GPU allocation.
     
@@ -155,6 +157,8 @@ def _benchmark_worker(
         result_queue: Queue for reporting successful benchmark results
         error_queue: Queue for reporting benchmark failures
         timeout_per_benchmark: Timeout for individual benchmark execution (seconds)
+        max_records: Maximum number of metric events to log (None for unlimited)
+        sampling_factor: Probability of logging each metric event (0.0-1.0)
     """
     worker_id = os.getpid()
     logger = logging.getLogger(f"{__name__}.worker_{worker_id}")
@@ -235,7 +239,12 @@ def _benchmark_worker(
                     # Execute benchmark
                     logger.info(f"Worker {worker_id}: Executing benchmark {stub.benchmark_name} on GPU {current_gpu_id}")
                     metric_logger = MicroMetricLogger()
-                    metric_logger.configure_logging(log_path=stub.result_dir, enabled_metrics=["research_attention_density", "research_attention_output_error"])
+                    metric_logger.configure_logging(
+                        log_path=stub.result_dir, 
+                        enabled_metrics=["research_attention_density", "research_attention_output_error"],
+                        max_records=micro_metric_logger_max_records,
+                        sampling_factor=micro_metric_logger_sampling_factor
+                    )
                     metrics = benchmark.run_benchmark(
                         adapter=adapter,
                         result_dir=stub.result_dir,
@@ -386,7 +395,9 @@ class BenchmarkExecutor:
         result_file_validation: bool = True,
         required_result_files: Optional[List[str]] = None,
         timeout_per_benchmark: float = 360000.0,  # 100 hours default
-        verbose: bool = True
+        verbose: bool = True,
+        micro_metric_logger_max_records: Optional[int] = None,  # Maximum number of metric events to log
+        micro_metric_logger_sampling_factor: float = 1.0,  # Probability of logging each metric event (0.0-1.0)
     ):
         """Initialize the BenchmarkExecutor.
         
@@ -399,6 +410,8 @@ class BenchmarkExecutor:
             required_result_files: List of files required for completion check
             timeout_per_benchmark: Timeout for individual benchmark execution (seconds)
             verbose: Whether to enable verbose logging
+            micro_metric_logger_max_records: Maximum number of metric events to log (None for unlimited)
+            micro_metric_logger_sampling_factor: Probability of logging each metric event (0.0-1.0)
             
         Raises:
             ValueError: If configuration parameters are invalid
@@ -413,6 +426,10 @@ class BenchmarkExecutor:
         self.required_result_files = required_result_files or ["raw_results.csv"]
         self.timeout_per_benchmark = timeout_per_benchmark
         self.verbose = verbose
+        
+        # Metric logging configuration
+        self.micro_metric_logger_max_records = micro_metric_logger_max_records
+        self.micro_metric_logger_sampling_factor = max(0.0, min(1.0, micro_metric_logger_sampling_factor))  # Clamp to [0.0, 1.0]
         
         # Initialize logging
         self._setup_logging()
@@ -433,6 +450,8 @@ class BenchmarkExecutor:
         self.logger.info(f"  Max concurrent runs: {self.max_concurrent_runs}")
         self.logger.info(f"  Base result directory: {self.base_result_dir}")
         self.logger.info(f"  Resumability: {'enabled' if self.enable_resumability else 'disabled'}")
+        self.logger.info(f"  Metric logging - Max records: {self.micro_metric_logger_max_records if self.micro_metric_logger_max_records else 'unlimited'}")
+        self.logger.info(f"  Metric logging - Sampling factor: {self.micro_metric_logger_sampling_factor}")
     
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
@@ -641,7 +660,9 @@ class BenchmarkExecutor:
         for i in range(self.max_concurrent_runs):
             worker = multiprocessing.Process(
                 target=_benchmark_worker,
-                args=(stub_queue, gpu_pool, result_queue, error_queue, self.timeout_per_benchmark),
+                args=(stub_queue,
+                        gpu_pool, 
+                        result_queue, error_queue, self.timeout_per_benchmark, self.micro_metric_logger_max_records, self.micro_metric_logger_sampling_factor),
                 name=f"benchmark_worker_{i}"
             )
             worker.daemon = True  # Ensure workers are terminated when main process exits
