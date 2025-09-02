@@ -38,6 +38,11 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
     MagicPigConfig,
     RandomSamplingMaskerConfig,
 )
+from sparse_attention_hub.adapters.utils.config import ModelServerConfig
+from sparse_attention_hub.adapters.model_servers.huggingface import ModelServerHF
+
+## spin a model server ###
+model_server = ModelServerHF(ModelServerConfig(enable_stats_logging=True, delete_on_zero_reference=False))
 
 # ============================================================================
 # CONFIGURATION
@@ -498,7 +503,7 @@ SPARSE_CONFIGS = [
     ),
 ]
 
-SPARSE_CONFIGS = [("dense", None)]
+#SPARSE_CONFIGS = [("dense", None)]
 # ==========================================================================
 
 # Benchmark List
@@ -572,7 +577,8 @@ BENCHMARKS = [
     # longbench_config,
     # mock_benchmark_config,
     # niah1, niah2, niah3, cwe, fwe, vt, qa1, qa2, multikey1, multikey2, multikey3, multikey, multivalue
-    cwe
+    cwe,
+    niah1
 ]
 
 
@@ -600,7 +606,7 @@ GENERATION_KWARGS = {
 # Request Parameters
 REQUEST_KWARGS = {
     "max_context_length": 32000,
-    "max_requests": 10,
+    "max_requests": 1,
 }
 
 # Execution Settings

@@ -13,6 +13,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from ..sparse_attention.base import SparseAttention, SparseAttentionConfig
 from ..sparse_attention.research_attention.base import ResearchAttention
 from .base import ModelAdapter, Request, RequestResponse
+from .model_servers.huggingface import ModelServerHF
 
 INT_MAX = 2**31 - 1
 
@@ -55,17 +56,14 @@ class ModelAdapterHF(ModelAdapter):
         # Handle dense-only mode when sparse_attention_config is None
         self._sparse_attention_available: bool = sparse_attention_config is not None
         # create model and tokenizer
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name, **self.model_kwargs
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name, **self.tokenizer_kwargs
-        )
+        
+        model_server = ModelServerHF()
+        self.model = model_server.get_model(self.model_name, self.device, self.model_kwargs)
+        self.tokenizer = model_server.get_tokenizer(self.model_name, self.tokenizer_kwargs)
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # TODO: support dynamic and multipledevice placement
-        self.model.to(self.device)
         self.random_separator = "".join(
             random.choices(string.ascii_lowercase + string.digits, k=100)
         )
