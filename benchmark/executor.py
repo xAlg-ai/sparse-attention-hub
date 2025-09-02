@@ -157,8 +157,8 @@ def _benchmark_worker(
         result_queue: Queue for reporting successful benchmark results
         error_queue: Queue for reporting benchmark failures
         timeout_per_benchmark: Timeout for individual benchmark execution (seconds)
-        max_records: Maximum number of metric events to log (None for unlimited)
-        sampling_factor: Probability of logging each metric event (0.0-1.0)
+        micro_metric_logger_max_records: Maximum number of metric events to log (None for unlimited)
+        micro_metric_logger_sampling_factor: Probability of logging each metric event (0.0-1.0)
     """
     worker_id = os.getpid()
     logger = logging.getLogger(f"{__name__}.worker_{worker_id}")
@@ -662,7 +662,12 @@ class BenchmarkExecutor:
                 target=_benchmark_worker,
                 args=(stub_queue,
                         gpu_pool, 
-                        result_queue, error_queue, self.timeout_per_benchmark, self.micro_metric_logger_max_records, self.micro_metric_logger_sampling_factor),
+                        result_queue, 
+                        error_queue, 
+                        self.timeout_per_benchmark, 
+                        self.micro_metric_logger_max_records, 
+                        self.micro_metric_logger_sampling_factor
+                        ),
                 name=f"benchmark_worker_{i}"
             )
             worker.daemon = True  # Ensure workers are terminated when main process exits
