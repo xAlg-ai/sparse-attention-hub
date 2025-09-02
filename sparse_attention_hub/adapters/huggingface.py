@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
@@ -56,10 +55,14 @@ class ModelAdapterHF(ModelAdapter):
         # Handle dense-only mode when sparse_attention_config is None
         self._sparse_attention_available: bool = sparse_attention_config is not None
         # create model and tokenizer
-        
+
         model_server = ModelServerHF()
-        self.model = model_server.get_model(self.model_name, self.device, self.model_kwargs)
-        self.tokenizer = model_server.get_tokenizer(self.model_name, self.tokenizer_kwargs)
+        self.model = model_server.get_model(
+            self.model_name, self.device, self.model_kwargs
+        )
+        self.tokenizer = model_server.get_tokenizer(
+            self.model_name, self.tokenizer_kwargs
+        )
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token

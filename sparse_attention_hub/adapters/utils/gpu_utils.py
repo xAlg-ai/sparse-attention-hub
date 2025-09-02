@@ -7,10 +7,10 @@ import torch
 
 def cleanup_gpu_memory(gpu_id: Optional[int] = None) -> None:
     """Clean up GPU memory by emptying CUDA cache.
-    
+
     Args:
         gpu_id: Specific GPU to clean up, or None for current device
-        
+
     Example:
         >>> cleanup_gpu_memory(0)  # Clean up GPU 0
         >>> cleanup_gpu_memory()   # Clean up current device

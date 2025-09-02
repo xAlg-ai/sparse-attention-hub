@@ -1,11 +1,11 @@
 """Model server implementations for centralized model management."""
 
-from .base import ModelServer, ModelEntry, TokenizerEntry
+from .base import ModelEntry, ModelServer, TokenizerEntry
 from .huggingface import ModelServerHF
 
 __all__ = [
     "ModelServer",
-    "ModelEntry", 
+    "ModelEntry",
     "TokenizerEntry",
     "ModelServerHF",
 ]
