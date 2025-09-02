@@ -50,7 +50,10 @@ class ModelServerHF(ModelServer):
             # Handle device placement
             if gpu_id is not None:
                 if torch.cuda.is_available():
-                    device = f"cuda:{gpu_id}"
+                    if type(gpu_id) == str and gpu_id.startswith("cuda"):
+                        device = gpu_id
+                    else:
+                        device = f"cuda:{gpu_id}"
                     self.logger.debug(f"Moving model {model_name} to device: {device}")
                     model = model.to(device)
                 else:
