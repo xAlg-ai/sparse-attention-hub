@@ -31,7 +31,9 @@ DATA_NAME_TO_MAX_NEW_TOKENS = {"0shot": 128, "cot": 1024}
 # Longbench-v2
 for task in ["0shot", "cot"]:
     dataset = load_dataset("THUDM/LongBench-v2", split="train")
-    dataset = dataset.map(lambda x: {"context": context_prefix[task].format(context=x["context"].strip())})
+    dataset = dataset.map(
+        lambda x: {"context": context_prefix[task].format(context=x["context"].strip())}
+    )
     dataset = dataset.map(
         lambda x: {
             "question": question_template[task].format(

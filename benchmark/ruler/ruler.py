@@ -27,31 +27,29 @@ class Ruler(Benchmark):
     """
 
     # All available Ruler datasets (context lengths)
-    all_datasets: List[str] = [
-        "4096",
-        "8192", 
-        "16384",
-        "32768"
-    ]
-    
+    all_datasets: List[str] = ["4096", "8192", "16384", "32768"]
+
     benchmark_name: str = "ruler"
     huggingface_dataset_id: str = "simonjegou/ruler"
 
     def _load_datasets(self) -> pd.DataFrame:
         """Load Ruler datasets by individual configs.
-        
+
         Ruler requires loading each context length as a separate config.
-        
+
         Returns:
             Combined pandas DataFrame with all samples from subsets_to_run.
         """
         print(f"Loading Ruler datasets: {self.subsets_to_run}")
         dfs = []
-        
+
         for subset in self.subsets_to_run:
             try:
                 from datasets import load_dataset
-                subset_dataset = load_dataset(self.huggingface_dataset_id, subset, split="test")
+
+                subset_dataset = load_dataset(
+                    self.huggingface_dataset_id, subset, split="test"
+                )
                 subset_df = subset_dataset.to_pandas()
                 # Add context length as a column for analysis
                 subset_df["context_length"] = subset
@@ -60,12 +58,13 @@ class Ruler(Benchmark):
             except Exception as subset_error:
                 print(f"  ❌ Failed to load {subset}: {str(subset_error)}")
                 continue
-        
+
         if not dfs:
             raise Exception("No Ruler subsets could be loaded successfully")
-        
+
         # Combine all subset DataFrames
         import pandas as pd
+
         combined_df = pd.concat(dfs, ignore_index=True)
         print(f"Combined {len(combined_df)} total samples from {len(dfs)} subsets")
         return combined_df
@@ -91,15 +90,15 @@ class Ruler(Benchmark):
 
         # Use the calculate_metrics function from HashAttention evaluation
         task_scores: Dict[str, Dict[str, float]] = calculate_metrics(results_df)
-        
+
         # Extract string_match scores and compute overall
         all_scores: List[float] = []
         for task, scores in task_scores.items():
             if "string_match" in scores:
                 all_scores.append(scores["string_match"])
-        
+
         overall_score = sum(all_scores) / len(all_scores) if all_scores else 0.0
-        
+
         # Group by context length if available
         context_length_scores: Dict[str, float] = {}
         if "context_length" in results_df.columns:
@@ -107,9 +106,19 @@ class Ruler(Benchmark):
                 length_df = results_df[results_df["context_length"] == context_length]
                 if len(length_df) > 0:
                     length_scores = calculate_metrics(length_df)
-                    length_overall = sum(score.get("string_match", 0) for score in length_scores.values()) / len(length_scores) if length_scores else 0.0
-                    context_length_scores[str(context_length)] = round(length_overall, 2)
-        
+                    length_overall = (
+                        sum(
+                            score.get("string_match", 0)
+                            for score in length_scores.values()
+                        )
+                        / len(length_scores)
+                        if length_scores
+                        else 0.0
+                    )
+                    context_length_scores[str(context_length)] = round(
+                        length_overall, 2
+                    )
+
         overall_metrics: Dict[str, Any] = {
             "overall_score": round(overall_score, 2),
             "task_scores": task_scores,
@@ -117,8 +126,8 @@ class Ruler(Benchmark):
             "summary": {
                 "total_tasks": len(task_scores),
                 "total_samples": len(results_df),
-                "context_lengths": list(context_length_scores.keys())
-            }
+                "context_lengths": list(context_length_scores.keys()),
+            },
         }
-        
-        return overall_metrics 
+
+        return overall_metrics

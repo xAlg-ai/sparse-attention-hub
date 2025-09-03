@@ -50,7 +50,9 @@ def sparse_attention_config(masker_config):
 class TestBenchmarkAdapterIntegration:
     """Test benchmark integration with real adapter interfaces."""
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_benchmark_with_real_adapter_interface(
         self,
@@ -118,7 +120,9 @@ class TestBenchmarkAdapterIntegration:
         assert (result_path / "raw_results.csv").exists()
         assert (result_path / "metrics.json").exists()
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_dense_only_adapter_integration(
         self, mock_tokenizer_class, mock_model_class, temp_result_dir
@@ -382,6 +386,7 @@ class TestErrorHandlingIntegration:
 
     def test_adapter_failure_recovery(self, temp_result_dir):
         """Test benchmark recovery when adapter fails intermittently."""
+
         # Create adapter that fails on certain contexts
         def failing_process_request(
             request: Request,

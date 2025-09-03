@@ -24,46 +24,64 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/sparse-attention-hub')
-sys.path.insert(0, '/workspace/sparse-attention-hub')
+os.chdir("/workspace/sparse-attention-hub")
+sys.path.insert(0, "/workspace/sparse-attention-hub")
 
-from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
+from sparse_attention_hub.sparse_attention.research_attention import (
+    ResearchAttentionConfig,
+)
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig
+    LocalMaskerConfig,
+    SinkMaskerConfig,
+    OracleTopKConfig,
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-    AdaptiveSamplingMaskerConfig
+    AdaptiveSamplingMaskerConfig,
 )
 
 from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
 
+
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=128),
-        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128)
-    ])
-    
+    sparse_attention_config = ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=128),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,
+                epsilon=0.25,
+                delta=0.25,
+                init_offset=128,
+                local_offset=128,
+            ),
+        ]
+    )
+
     print("  ✓ Loading model...")
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16},
+        model_kwargs={"torch_dtype": torch.bfloat16},
         generate_kwargs={"max_new_tokens": 32},
-        device=device
+        device=device,
     )
-    
-    benchmark = Ruler32K(['vt'])
+
+    benchmark = Ruler32K(["vt"])
 
     result_dir = Path("./test_results")
     result_dir.mkdir(exist_ok=True)
 
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 1000000})
-    
+    benchmark.run_benchmark(
+        adapter,
+        result_dir,
+        request_kwargs={"max_requests": 1, "max_context_length": 1000000},
+    )
+
+
 if __name__ == "__main__":
-    main() 
+    main()

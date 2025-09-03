@@ -485,8 +485,10 @@ class TestHuggingFaceSpecificMethods:
         mock_cuda_available.return_value = True
         mock_device_count.return_value = 4
 
-        with patch("torch.cuda.device"), patch("torch.zeros") as mock_zeros, patch(
-            "torch.cuda.empty_cache"
+        with (
+            patch("torch.cuda.device"),
+            patch("torch.zeros") as mock_zeros,
+            patch("torch.cuda.empty_cache"),
         ):
             mock_zeros.return_value = Mock()
             result = self.server.validate_gpu_availability(0)

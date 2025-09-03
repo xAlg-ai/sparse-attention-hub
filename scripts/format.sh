@@ -23,7 +23,7 @@ builtin cd "$ROOT" || exit 1
 # Check if development dependencies are installed
 check_tool_installed() {
     if ! command -v "$1" &> /dev/null; then
-        echo "Error: $1 is not installed. Please run: pip install -r requirements-dev.txt"
+        echo "Error: $1 is not installed. Please run: poetry install --with dev"
         exit 1
     fi
 }
@@ -43,7 +43,7 @@ tool_version_check() {
     
     if [[ "$installed_version" != "$required_version" ]]; then
         echo "Warning: $tool_name version mismatch. Required: $required_version, Installed: $installed_version"
-        echo "Consider running: pip install -r requirements-dev.txt"
+        echo "Consider running: poetry install --with dev"
     fi
 }
 
@@ -54,13 +54,13 @@ FLAKE8_VERSION=$(flake8 --version | head -n 1 | awk '{print $1}')
 MYPY_VERSION=$(mypy --version | awk '{print $2}')
 PYLINT_VERSION=$(pylint --version | head -n 1 | awk '{print $2}')
 
-# Check versions against requirements-dev.txt
-if [[ -f "requirements-dev.txt" ]]; then
-    tool_version_check "black" "$BLACK_VERSION" "$(grep "black==" requirements-dev.txt | cut -d'=' -f3)"
-    tool_version_check "isort" "$ISORT_VERSION" "$(grep "isort==" requirements-dev.txt | cut -d'=' -f3)"
-    tool_version_check "flake8" "$FLAKE8_VERSION" "$(grep "flake8==" requirements-dev.txt | cut -d'=' -f3)"
-    tool_version_check "mypy" "$MYPY_VERSION" "$(grep "mypy==" requirements-dev.txt | cut -d'=' -f3)"
-    tool_version_check "pylint" "$PYLINT_VERSION" "$(grep "pylint==" requirements-dev.txt | cut -d'=' -f3)"
+# Check versions against pyproject.toml
+if [[ -f "pyproject.toml" ]]; then
+    tool_version_check "black" "$BLACK_VERSION" "$(grep 'black = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')"
+    tool_version_check "isort" "$ISORT_VERSION" "$(grep 'isort = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')"
+    tool_version_check "flake8" "$FLAKE8_VERSION" "$(grep 'flake8 = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')"
+    tool_version_check "mypy" "$MYPY_VERSION" "$(grep 'mypy = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')"
+    tool_version_check "pylint" "$PYLINT_VERSION" "$(grep 'pylint = ' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')"
 fi
 
 # Formatting flags

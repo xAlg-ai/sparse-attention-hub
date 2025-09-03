@@ -30,19 +30,30 @@ answer_prefix = {
 }
 
 # Source: https://github.com/bigai-nlco/LooGLE/blob/main/config/task2maxlen.json
-max_new_tokens = {"shortdep_qa": 300, "longdep_qa": 500, "longdep_summarization": 500, "shortdep_cloze": 50}
+max_new_tokens = {
+    "shortdep_qa": 300,
+    "longdep_qa": 500,
+    "longdep_summarization": 500,
+    "shortdep_cloze": 50,
+}
 
 for task in ["shortdep_qa", "longdep_qa", "shortdep_cloze", "longdep_summarization"]:
 
-    df = load_dataset("bigainlco/LooGLE", task, split="test", trust_remote_code=True).to_pandas()
+    df = load_dataset(
+        "bigainlco/LooGLE", task, split="test", trust_remote_code=True
+    ).to_pandas()
 
     if task == "longdep_summarization":
         df["question"] = ""
         df = df.rename(columns={"output": "answer", "input": "context"})
     else:
-        df["qa_pairs"] = df["qa_pairs"].apply(lambda x: eval(x) if x != "none" else [{"Q": "", "A": "", "S": [""]}])
+        df["qa_pairs"] = df["qa_pairs"].apply(
+            lambda x: eval(x) if x != "none" else [{"Q": "", "A": "", "S": [""]}]
+        )
         df = df.explode("qa_pairs")
-        df = pd.concat([df.drop(["qa_pairs"], axis=1), df["qa_pairs"].apply(pd.Series)], axis=1)
+        df = pd.concat(
+            [df.drop(["qa_pairs"], axis=1), df["qa_pairs"].apply(pd.Series)], axis=1
+        )
         df = df.rename(columns={"A": "answer", "Q": "question", "input": "context"})
         if task == "shortdep_cloze":
             df["answer"] = df["answer"].apply(json.dumps, ensure_ascii=False)

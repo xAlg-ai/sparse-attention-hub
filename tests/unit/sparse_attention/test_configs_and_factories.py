@@ -1,4 +1,5 @@
 """Tests for sparse attention config classes and create_from_config methods."""
+
 import pytest
 
 

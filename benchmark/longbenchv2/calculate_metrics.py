@@ -29,7 +29,9 @@ def scorer(predictions, answers, lengths, difficulties):
     compensated = False
     easy, hard, short, medium, long = 0, 0, 0, 0, 0
     easy_acc, hard_acc, short_acc, medium_acc, long_acc = 0, 0, 0, 0, 0
-    for pred, answer, length, difficulty in zip(predictions, answers, lengths, difficulties):
+    for pred, answer, length, difficulty in zip(
+        predictions, answers, lengths, difficulties
+    ):
         acc = int(extract_answer(pred) == answer)
         if compensated and pred["pred"] is None:
             acc = 0.25  # type:ignore[assignment]

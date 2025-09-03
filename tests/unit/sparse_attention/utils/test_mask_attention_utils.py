@@ -6,7 +6,6 @@
 :summary: Tests for sparse attention. This file is part of the Sparse Attention Hub project.
 """
 
-
 import mock
 import numpy as np
 import pytest

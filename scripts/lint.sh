@@ -29,7 +29,7 @@ NC='\033[0m' # No Color
 # Check if tool is installed
 check_tool() {
     if ! command -v "$1" &> /dev/null; then
-        echo -e "${RED}Error: $1 is not installed. Please run: pip install -r requirements-dev.txt${NC}"
+        echo -e "${RED}Error: $1 is not installed. Please run: poetry install --with dev${NC}"
         return 1
     fi
     return 0

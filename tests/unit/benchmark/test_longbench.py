@@ -314,7 +314,7 @@ class TestLongBenchUnit:
                 "task": ["qasper_e"],
                 "predicted_answer": ["Answer 1"],
                 "answers": [["Truth 1"]],
-                "all_classes": [[]]
+                "all_classes": [[]],
                 # Missing 'length' column
             }
         )

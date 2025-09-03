@@ -37,7 +37,9 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
             no indices are sampled, while 1.0 means all indices are sampled.
     """
 
-    sampling_rate: float  # Float in range [0,1] representing fraction of indices to sample
+    sampling_rate: (
+        float  # Float in range [0,1] representing fraction of indices to sample
+    )
 
     def __post_init__(self) -> None:
         """Validate sampling_rate after initialization."""
