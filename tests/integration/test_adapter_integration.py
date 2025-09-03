@@ -45,8 +45,18 @@ def model_name():
 class TestAdapterIntegration:
     """Integration tests for the adapter system with mocked components."""
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    def setup_method(self) -> None:
+        """Set up test fixtures - reset ModelServer singleton."""
+        from sparse_attention_hub.adapters.model_servers.base import ModelServer
+        ModelServer._instance = None
+
+    def teardown_method(self) -> None:
+        """Clean up after each test - reset ModelServer singleton."""
+        from sparse_attention_hub.adapters.model_servers.base import ModelServer
+        ModelServer._instance = None
+
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_full_request_processing_flow(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
@@ -131,8 +141,8 @@ class TestAdapterIntegration:
         assert mock_tokenizer_instance.encode.call_count == 2
         mock_tokenizer_instance.decode.assert_called_once()
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_multiple_questions_processing(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
@@ -236,8 +246,8 @@ class TestAdapterIntegration:
         assert mock_tokenizer_instance.encode.call_count == 3
         assert mock_tokenizer_instance.decode.call_count == 2
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_mode_switching_integration(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
@@ -277,8 +287,8 @@ class TestAdapterIntegration:
             # Should not raise any errors
             pass
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_custom_attention_function_integration(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
@@ -340,8 +350,8 @@ class TestAdapterIntegration:
             mock_custom_attention.assert_called_once()
             assert result is not None
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_error_handling_integration(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
@@ -389,8 +399,8 @@ class TestAdapterIntegration:
                 # missing sparse_meta_data
             )
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_adapter_with_device_configuration(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
@@ -443,8 +453,8 @@ class TestAdapterIntegration:
             "test-model", device_map="cuda", torch_dtype=torch.float16
         )
 
-    @patch("sparse_attention_hub.adapters.huggingface.AutoModelForCausalLM")
-    @patch("sparse_attention_hub.adapters.huggingface.AutoTokenizer")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_adapter_cleanup_on_exception(
         self, mock_tokenizer, mock_model, sparse_attention_config
     ):
