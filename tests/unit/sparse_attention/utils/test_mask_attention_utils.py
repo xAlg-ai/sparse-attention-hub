@@ -17,6 +17,7 @@ from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
     _compute_masked_exp_attention_weights,
     apply_inv_mask_sum,
     create_sampling_mask_with_per_head_budget,
+    create_sampling_mask_with_per_head_budget_no_replacement,
     get_attention_denominator,
     get_attention_numerator,
     get_masked_attention_output,
@@ -990,3 +991,327 @@ class TestGetMaskedAttentionOutputExternal:
         print(
             "[NOTE] dropout behavior is different in eager and sparse attention by design"
         )
+
+
+@pytest.mark.unit
+class TestCreateSamplingMaskWithPerHeadBudgetNoReplacement:
+    """Test create_sampling_mask_with_per_head_budget_no_replacement utility function."""
+
+    @pytest.fixture
+    def sample_budgets(self):
+        """Create sample budgets tensor."""
+        return torch.tensor(
+            [[[[3]], [[5]], [[2]], [[4]]]], dtype=torch.long
+        )  # (1, 4, 1, 1)
+
+    @pytest.fixture
+    def sample_sampling_probabilities(self):
+        """Create sample sampling probabilities tensor."""
+        return torch.tensor(
+            [[[[0.3]], [[0.5]], [[0.2]], [[0.4]]]], dtype=torch.float32
+        )  # (1, 4, 1, 1)
+
+    def test_basic_functionality_no_replacement(
+        self, sample_budgets, sample_sampling_probabilities
+    ):
+        """Test basic functionality with no replacement."""
+        seq_len_keys = 20
+        start_idx = 0
+        end_idx = seq_len_keys
+        dtype = torch.float32
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=sample_budgets,
+            sampling_probability=sample_sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        assert isinstance(mask_object, Mask)
+        mask = mask_object.get_dense_mask()
+        assert mask.shape == (1, 4, 1, 20)
+        assert mask.dtype == dtype
+
+        # With no replacement, exact budget should be achieved
+        torch.testing.assert_close(
+            (mask > 0).long().sum(dim=-1, keepdim=True), sample_budgets
+        )
+
+        # Verify sampling probabilities are correct
+        mask_2d = mask.view(-1, seq_len_keys)
+        sampling_probabilities_2d = sample_sampling_probabilities.view(-1, 1)
+        for i in range(mask_2d.shape[0]):
+            if (mask_2d[i] > 0).sum() > 0:  # Only check non-empty rows
+                torch.testing.assert_close(
+                    mask_2d[i][mask_2d[i] > 0],
+                    torch.full_like(
+                        mask_2d[i][mask_2d[i] > 0],
+                        sampling_probabilities_2d[i][0],
+                        dtype=dtype,
+                    ),
+                )
+
+    def test_unique_indices_per_row(
+        self, sample_budgets, sample_sampling_probabilities
+    ):
+        """Test that each row has unique indices (no duplicates)."""
+        seq_len_keys = 50
+        start_idx = 5
+        end_idx = 45  # Sampling range of 40
+        dtype = torch.float32
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=sample_budgets,
+            sampling_probability=sample_sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        mask = mask_object.get_dense_mask()
+
+        # Check uniqueness for each row
+        for b in range(mask.shape[0]):
+            for h in range(mask.shape[1]):
+                for q in range(mask.shape[2]):
+                    row_mask = mask[b, h, q, :]
+                    active_indices = torch.nonzero(row_mask, as_tuple=False).squeeze(-1)
+                    unique_indices = torch.unique(active_indices)
+                    assert len(active_indices) == len(
+                        unique_indices
+                    ), f"Duplicates found in row [{b},{h},{q}]"
+
+    def test_sampling_range_limits(self, sample_budgets, sample_sampling_probabilities):
+        """Test that indices are within sampling range."""
+        seq_len_keys = 30
+        start_idx = 8
+        end_idx = 22  # Range [8, 22)
+        dtype = torch.float32
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=sample_budgets,
+            sampling_probability=sample_sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        mask = mask_object.get_dense_mask()
+
+        # Check that no indices outside the range are active
+        assert mask[:, :, :, :start_idx].sum() == 0
+        assert mask[:, :, :, end_idx:].sum() == 0
+
+    def test_budget_exceeds_range(self):
+        """Test behavior when budget exceeds sampling range."""
+        # Large budgets that exceed sampling range
+        budgets = torch.tensor(
+            [[[[10]], [[15]], [[8]]]], dtype=torch.long
+        )  # (1, 3, 1, 1)
+        sampling_probabilities = torch.tensor(
+            [[[[0.1]], [[0.15]], [[0.08]]]], dtype=torch.float32
+        )
+
+        seq_len_keys = 20
+        start_idx = 5
+        end_idx = 10  # Small range of 5
+        dtype = torch.float32
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        mask = mask_object.get_dense_mask()
+        assert mask.shape == (1, 3, 1, 20)
+
+        # Should use all available positions in range (5 positions: indices 5,6,7,8,9)
+        sampling_range = end_idx - start_idx
+        for h in range(3):
+            row_mask = mask[0, h, 0, start_idx:end_idx]
+            active_count = (row_mask > 0).sum().item()
+            assert (
+                active_count == sampling_range
+            ), f"Head {h} should use all {sampling_range} positions"
+
+    def test_zero_budgets_no_replacement(self):
+        """Test with zero budgets."""
+        budgets = torch.zeros(2, 2, 3, 1, dtype=torch.long)
+        sampling_probabilities = torch.zeros(2, 2, 3, 1, dtype=torch.float32)
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=16,
+            start_idx=0,
+            end_idx=16,
+            dtype=torch.float32,
+        )
+
+        assert isinstance(mask_object, Mask)
+        assert mask_object.shape == (2, 2, 3, 16)
+        assert mask_object.is_empty()
+
+    def test_single_element_budget(self):
+        """Test with budget of 1 for each row."""
+        budgets = torch.ones(1, 2, 4, 1, dtype=torch.long)  # Budget of 1 each
+        sampling_probabilities = torch.full((1, 2, 4, 1), 0.1, dtype=torch.float32)
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=20,
+            start_idx=2,
+            end_idx=18,
+            dtype=torch.float32,
+        )
+
+        mask = mask_object.get_dense_mask()
+        assert mask.shape == (1, 2, 4, 20)
+
+        # Each row should have exactly 1 active element
+        active_per_row = (mask > 0).sum(dim=-1, keepdim=True)
+        torch.testing.assert_close(active_per_row.float(), budgets.float())
+
+    def test_large_tensors_no_replacement(self):
+        """Test with larger tensor dimensions."""
+        batch_size, num_heads, seq_len_queries = 3, 6, 8
+        budgets = torch.randint(
+            1, 10, (batch_size, num_heads, seq_len_queries, 1), dtype=torch.long
+        )
+        sampling_probabilities = (
+            torch.rand(batch_size, num_heads, seq_len_queries, 1, dtype=torch.float32)
+            * 0.5
+        )
+
+        seq_len_keys = 64
+        start_idx = 0
+        end_idx = seq_len_keys
+        dtype = torch.float32
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        mask = mask_object.get_dense_mask()
+        assert mask.shape == (batch_size, num_heads, seq_len_queries, seq_len_keys)
+
+        # Verify exact budget achievement for each row
+        active_per_row = (mask > 0).sum(dim=-1, keepdim=True)
+        torch.testing.assert_close(active_per_row.float(), budgets.float())
+
+        # Verify uniqueness for a few sample rows
+        mask_flat = mask.view(-1, seq_len_keys)
+        for row_idx in [0, mask_flat.shape[0] // 2, mask_flat.shape[0] - 1]:
+            row_mask = mask_flat[row_idx]
+            active_indices = torch.nonzero(row_mask, as_tuple=False).squeeze(-1)
+            unique_indices = torch.unique(active_indices)
+            assert len(active_indices) == len(
+                unique_indices
+            ), f"Duplicates in row {row_idx}"
+
+    def test_device_consistency_no_replacement(self):
+        """Test device consistency with no replacement."""
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        budgets = torch.tensor([[[[2]], [[3]]]], dtype=torch.long, device=device)
+        sampling_probabilities = torch.tensor(
+            [[[[0.2]], [[0.3]]]], dtype=torch.float32, device=device
+        )
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=16,
+            start_idx=0,
+            end_idx=16,
+            dtype=torch.float32,
+        )
+
+        dense_mask = mask_object.get_dense_mask()
+        assert dense_mask.device.type == budgets.device.type
+
+    def test_comparison_with_replacement_version(self):
+        """Compare no-replacement version with replacement version."""
+        budgets = torch.tensor([[[[3]], [[4]], [[2]]]], dtype=torch.long)
+        sampling_probabilities = torch.tensor(
+            [[[[0.3]], [[0.4]], [[0.2]]]], dtype=torch.float32
+        )
+
+        seq_len_keys = 50  # Large enough to minimize collision probability
+        start_idx = 0
+        end_idx = seq_len_keys
+        dtype = torch.float32
+
+        # With replacement
+        mask_replacement = create_sampling_mask_with_per_head_budget(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        # Without replacement
+        mask_no_replacement = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        # Both should have same shape
+        assert mask_replacement.shape == mask_no_replacement.shape
+
+        # No-replacement should have exact budget achievement
+        mask_dense = mask_no_replacement.get_dense_mask()
+        active_per_row = (mask_dense > 0).sum(dim=-1, keepdim=True)
+        torch.testing.assert_close(active_per_row.float(), budgets.float())
+
+        # No-replacement should have higher or equal density (no wasted duplicates)
+        assert mask_no_replacement.get_density() >= mask_replacement.get_density()
+
+    def test_edge_case_minimal_range(self):
+        """Test edge case with minimal sampling range."""
+        budgets = torch.tensor([[[[2]]]], dtype=torch.long)  # (1, 1, 1, 1)
+        sampling_probabilities = torch.tensor([[[[0.5]]]], dtype=torch.float32)
+
+        seq_len_keys = 10
+        start_idx = 8
+        end_idx = 10  # Range of only 2 positions
+        dtype = torch.float32
+
+        mask_object = create_sampling_mask_with_per_head_budget_no_replacement(
+            budgets=budgets,
+            sampling_probability=sampling_probabilities,
+            seq_len_keys=seq_len_keys,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dtype=dtype,
+        )
+
+        mask = mask_object.get_dense_mask()
+        assert mask.shape == (1, 1, 1, 10)
+
+        # Should use exactly 2 positions (the entire range)
+        active_in_range = mask[0, 0, 0, start_idx:end_idx].sum()
+        assert active_in_range > 0
+        active_per_row = (mask > 0).sum(dim=-1, keepdim=True)
+        expected_budget = min(budgets[0, 0, 0, 0].item(), end_idx - start_idx)
+        assert active_per_row[0, 0, 0, 0].item() == expected_budget

@@ -214,6 +214,122 @@ def create_sampling_mask_with_per_head_budget(
     return sampling_mask
 
 
+def create_sampling_mask_with_per_head_budget_no_replacement(
+    budgets: torch.Tensor,
+    sampling_probability: torch.Tensor,
+    seq_len_keys: int,
+    start_idx: int,
+    end_idx: int,
+    dtype: torch.dtype = torch.float32,
+) -> Mask:
+    """Create a sampling mask with per-head budget without replacement using vectorization.
+
+    This function creates a sparse sampling mask ensuring no duplicate indices within
+    each row, providing more accurate sampling and better statistical guarantees.
+
+    Args:
+        budgets: Budget tensor of shape (b, h, q, 1) indicating how many elements to sample per row
+        sampling_probability: Sampling probability tensor of shape (b, h, q, 1)
+        seq_len_keys: Length of the key sequence dimension
+        start_idx: Starting index for sampling range (inclusive)
+        end_idx: Ending index for sampling range (exclusive)
+        dtype: Data type for the mask
+
+    Returns:
+        Mask object with sparse sampling representation (no duplicates per row)
+
+    Note:
+        - Uses vectorized permutation generation for efficiency
+        - When budget > sampling_range, effective budget is clamped to sampling_range
+        - Each row gets unique indices within the sampling range
+        - Sampling probabilities are adjusted based on effective budget
+    """
+    batch_size, num_heads, seq_len_queries, _ = budgets.shape
+    sampling_range = end_idx - start_idx
+
+    # Reshape for easier processing
+    num_rows = batch_size * num_heads * seq_len_queries
+    budgets_flat = budgets.view(num_rows)  # (num_rows,)
+    sampling_prob_flat = sampling_probability.view(num_rows)  # (num_rows,)
+
+    # Clamp budgets to sampling_range (handle edge case where budget > available positions)
+    effective_budgets = torch.clamp(budgets_flat, max=sampling_range)
+
+    # Vectorized permutation generation
+    # Create a large permutation matrix for all rows at once
+    max_budget = int(effective_budgets.max().item())
+    if max_budget == 0:
+        # Handle edge case: all budgets are 0
+        return Mask.create_empty_mask(
+            shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+            dtype=dtype,
+            mask_type="index",
+        )
+
+    # Generate permutations for each row using vectorized approach
+    # Much more efficient: use argsort on random values to get permutations
+    random_values = torch.rand(num_rows, sampling_range, device=budgets.device)
+    all_perms = torch.argsort(
+        random_values, dim=-1
+    )  # Shape: (num_rows, sampling_range)
+
+    # Fully vectorized approach to handle variable budgets
+
+    if max_budget > 0:
+        # Take indices for max budget from each permutation
+        selected_indices = (
+            all_perms[:, :max_budget] + start_idx
+        )  # (num_rows, max_budget)
+
+        # Create mask for valid budget per row
+        budget_mask = torch.arange(max_budget, device=budgets.device).unsqueeze(
+            0
+        ) < effective_budgets.unsqueeze(1)
+
+        # Filter valid indices and flatten
+        valid_local_indices = selected_indices[budget_mask]  # (total_valid_elements,)
+
+        # Create row indices for valid elements
+        row_ids = (
+            torch.arange(num_rows, device=budgets.device)
+            .unsqueeze(1)
+            .expand(-1, max_budget)[budget_mask]
+        )
+
+        # Convert to global indices
+        final_indices = valid_local_indices + row_ids * seq_len_keys
+
+        # Create data with sampling probabilities
+        final_data = (
+            sampling_prob_flat.unsqueeze(1)
+            .expand(-1, max_budget)[budget_mask]
+            .to(dtype)
+        )
+    else:
+        # All budgets are 0
+        final_indices = torch.empty(0, dtype=torch.long, device=budgets.device)
+        final_data = torch.empty(0, dtype=dtype, device=budgets.device)
+
+    # Create ptr array using cumulative sum (vectorized)
+    final_ptr = torch.cat(
+        [
+            torch.zeros(1, dtype=torch.long, device=budgets.device),
+            torch.cumsum(effective_budgets, dim=0),
+        ]
+    )
+
+    # Create the sampling mask
+    sampling_mask = Mask.create_mask_from_indices(
+        shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
+        indices=final_indices,
+        ptr=final_ptr,
+        data=final_data,
+        dtype=dtype,
+    )
+
+    return sampling_mask
+
+
 def _compute_masked_exp_attention_weights(
     queries: torch.Tensor,
     keys: torch.Tensor,
