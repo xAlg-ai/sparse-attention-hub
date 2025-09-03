@@ -34,7 +34,29 @@ Sparse Attention Hub provides efficient implementations of sparse attention algo
 
 ## Installation
 
-### From Source
+### Using Poetry (Recommended)
+
+```bash
+# Install Poetry if you haven't already
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Clone and install the project
+git clone https://github.com/xAlg-ai/sparse-attention-hub.git
+cd sparse-attention-hub
+poetry install
+```
+
+### Development Installation
+
+```bash
+# Install with development dependencies
+poetry install --with dev
+
+# Install with all optional dependencies
+poetry install --with dev,docs,benchmarks
+```
+
+### From Source (pip)
 
 ```bash
 git clone https://github.com/xAlg-ai/sparse-attention-hub.git
@@ -42,13 +64,9 @@ cd sparse-attention-hub
 pip install -e .
 ```
 
-### Dependencies
+### Requirements
 
-The project requires Python 3.9+ and key dependencies include PyTorch, Transformers, and several benchmarking libraries. See `pyproject.toml` for the complete dependency list.
-
-```bash
-pip install -r requirements.txt
-```
+The project requires Python 3.9+ and key dependencies include PyTorch, Transformers, and several benchmarking libraries. All dependencies are managed through Poetry and defined in `pyproject.toml`.
 
 ## Quick Start
 
@@ -235,7 +253,10 @@ make test-coverage
 
 ```bash
 # Install development dependencies
-pip install -e ".[dev]"
+poetry install --with dev
+
+# Activate Poetry shell
+poetry shell
 
 # Format code
 bash scripts/format.sh

@@ -1,17 +1,18 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
-[project]
+[tool.poetry]
 name = "sparse-attention-hub"
 version = "0.1.0"
-description = "A comprehensive framework for sparse attention mechanisms"
-authors = [
-    {name = "AlexCuadron", email = "alex.cl.2000@gmail.com"}
-]
+description = "A framework for implementing and evaluating sparse attention mechanisms"
+authors = ["Aditya Desai <apdesai@berkeley.edu>", "AlexCuadron <alex.cl.2000@gmail.com>", "Kumar Krishna Agrawal <kagrawal@berkeley.edu>", "Luis Gaspar Schroeder <luis.gasparschroeder@gmail.com>"]
 readme = "README.md"
-license = {text = "MIT"}
-requires-python = ">=3.9"
+license = "MIT"
+homepage = "https://github.com/xAlg-ai/sparse-attention-hub"
+repository = "https://github.com/xAlg-ai/sparse-attention-hub"
+documentation = "https://sparse-attention-hub.readthedocs.io"
+keywords = ["attention", "sparse", "transformer", "deep-learning", "pytorch"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -19,86 +20,75 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-keywords = ["attention", "sparse", "transformer", "deep-learning", "pytorch"]
+packages = [{include = "sparse_attention_hub"}]
 
-dependencies = [
-    "torch>=1.9.0",
-    "numpy>=1.21.0",
-    "matplotlib>=3.5.0",
-    "seaborn>=0.11.0",
-    "datasets>=2.0.0",
-    "transformers>=4.20.0",
-    "scikit-learn>=1.0.0",
-    "rouge>=1.0.0",
-    "nltk>=3.8.0",
-    "bert-score>=0.3.0",
-    "jieba>=0.42.0",
-    "hf-transfer>=0.1.9",
-    "fuzzywuzzy>=0.18.0",
-    "pip>=25.1.1",
-    "pytest>=8.4.1",
-    "psutil>=7.0.0",
-    "plotly>=6.2.0",
-    "pandas>=2.3.1",
-    "pynvml>=12.0.0",
-    "colorama>=0.4.6",
-]
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+torch = ">=1.9.0"
+numpy = ">=1.21.0"
+matplotlib = ">=3.5.0"
+seaborn = ">=0.11.0"
+datasets = ">=2.0.0"
+transformers = ">=4.20.0"
+scikit-learn = ">=1.0.0"
+rouge = ">=1.0.0"
+nltk = ">=3.8.0"
+bert-score = ">=0.3.0"
+jieba = ">=0.42.0"
+hf-transfer = ">=0.1.9"
+fuzzywuzzy = ">=0.18.0"
+psutil = ">=7.0.0"
+plotly = ">=6.2.0"
+pandas = ">=2.3.1"
+pynvml = ">=12.0.0"
+colorama = ">=0.4.6"
 
-[project.optional-dependencies]
-dev = [
-    # Testing
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-xdist>=3.3.1",
-    "pytest-mock>=3.11.1",
-    "mock>=5.2.0",
-    # Linting and formatting
-    "black==22.10.0",
-    "isort==5.12.0",
-    "flake8==5.0.4",
-    "pylint==2.17.4",
-    "mypy==1.4.0",
-    "bandit>=1.7.5",
-    "pyupgrade>=3.10.1",
-    "docformatter>=1.7.5",
-    # Pre-commit hooks
-    "pre-commit>=3.3.3",
-    # Type stubs
-    "types-PyYAML>=6.0.12.11",
-    "types-requests>=2.31.0.2",
-    "types-setuptools>=68.0.0.3",
-]
-docs = [
-    "sphinx>=5.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "myst-parser>=0.18.0",
-]
-benchmarks = [
-    "wandb>=0.13.0",
-    "tqdm>=4.64.0",
-    "pandas>=1.5.0",
-]
+[tool.poetry.group.dev.dependencies]
+# Testing
+pytest = ">=7.4.0"
+pytest-cov = ">=4.1.0"
+pytest-xdist = ">=3.3.1"
+pytest-mock = ">=3.11.1"
+mock = ">=5.2.0"
+# Linting and formatting
+black = "22.10.0"
+isort = "5.12.0"
+flake8 = "5.0.4"
+pylint = "2.17.4"
+mypy = "1.4.0"
+bandit = ">=1.7.5"
+pyupgrade = ">=3.10.1"
+docformatter = ">=1.7.5"
+# Pre-commit hooks
+pre-commit = ">=3.3.3"
+# Type stubs
+types-PyYAML = ">=6.0.12.11"
+types-requests = ">=2.31.0.2"
+types-setuptools = ">=68.0.0.3"
 
-[project.urls]
-Homepage = "https://github.com/xAlg-ai/sparse-attention-hub"
-Repository = "https://github.com/xAlg-ai/sparse-attention-hub"
-Documentation = "https://sparse-attention-hub.readthedocs.io"
-"Bug Tracker" = "https://github.com/xAlg-ai/sparse-attention-hub/issues"
+[tool.poetry.group.docs]
+optional = true
 
-[project.scripts]
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=5.0.0"
+sphinx-rtd-theme = ">=1.0.0"
+myst-parser = ">=0.18.0"
+
+[tool.poetry.group.benchmarks]
+optional = true
+
+[tool.poetry.group.benchmarks.dependencies]
+wandb = ">=0.13.0"
+tqdm = ">=4.64.0"
+
+[tool.poetry.scripts]
 sparse-attention-benchmark = "sparse_attention_hub.benchmark.executor:main"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["sparse_attention_hub*"]
-exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -120,7 +110,7 @@ markers = [
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
+target-version = ["py39", "py310", "py311"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -143,7 +133,7 @@ line_length = 88
 known_first_party = ["sparse_attention_hub"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -156,6 +146,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+
 [[tool.mypy.overrides]]
 module = [
     "torch.*",
