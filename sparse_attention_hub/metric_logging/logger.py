@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Union
 @dataclass
 class LogEvent:
     """Log event data structure for metric logging.
-    
+
     Attributes:
         timestamp: When the event was logged.
         metric: Metric identifier string.
@@ -32,11 +32,11 @@ class LogEvent:
 
 class MicroMetricLogger:
     """Singleton logger for micro metrics with queue-based architecture.
-    
+
     This class provides a singleton pattern for logging micro metrics during
     sparse attention operations. It supports metric registration, sampling,
     and configurable limits on record count and flush behavior.
-    
+
     Attributes:
         log_path: Optional directory path where log files will be written.
         flush_every: Number of events after which to flush to disk.
@@ -64,7 +64,7 @@ class MicroMetricLogger:
         sampling_factor: float = 1.0,
     ) -> None:
         """Initialize the MicroMetricLogger.
-        
+
         Args:
             log_path: Optional directory path where log files will be written.
             flush_every: Number of events after which to flush to disk.
@@ -75,8 +75,12 @@ class MicroMetricLogger:
         """
         if not self._initialized:
             self._initialize_logger(
-                log_path, flush_every, flush_interval, 
-                enabled_metrics, max_records, sampling_factor
+                log_path,
+                flush_every,
+                flush_interval,
+                enabled_metrics,
+                max_records,
+                sampling_factor,
             )
         else:
             self._handle_reinitialization(log_path)
@@ -91,7 +95,7 @@ class MicroMetricLogger:
         sampling_factor: float,
     ) -> None:
         """Initialize logger instance for the first time.
-        
+
         Args:
             log_path: Directory path for log files.
             flush_every: Number of events before flushing.
@@ -100,7 +104,9 @@ class MicroMetricLogger:
             max_records: Maximum records limit.
             sampling_factor: Event sampling probability.
         """
-        self._set_configuration(log_path, flush_every, flush_interval, max_records, sampling_factor)
+        self._set_configuration(
+            log_path, flush_every, flush_interval, max_records, sampling_factor
+        )
         self._initialize_state()
         self._configure_logging_if_needed(log_path, enabled_metrics)
         MicroMetricLogger._initialized = True
@@ -114,7 +120,7 @@ class MicroMetricLogger:
         sampling_factor: float,
     ) -> None:
         """Set logger configuration parameters.
-        
+
         Args:
             log_path: Directory path for log files.
             flush_every: Number of events before flushing.
@@ -136,12 +142,10 @@ class MicroMetricLogger:
         self._total_records_logged: int = 0
 
     def _configure_logging_if_needed(
-        self, 
-        log_path: Optional[str], 
-        enabled_metrics: Union[List[str], str, None]
+        self, log_path: Optional[str], enabled_metrics: Union[List[str], str, None]
     ) -> None:
         """Configure logging if log path is provided.
-        
+
         Args:
             log_path: Directory path for log files.
             enabled_metrics: Metrics to enable initially.
@@ -152,7 +156,7 @@ class MicroMetricLogger:
 
     def _handle_reinitialization(self, log_path: Optional[str]) -> None:
         """Handle warning when logger is reinitialized.
-        
+
         Args:
             log_path: New log path being requested.
         """
@@ -178,7 +182,7 @@ class MicroMetricLogger:
     @classmethod
     def get_registered_metrics(cls) -> Dict[str, type]:
         """Get all registered metrics at class level.
-        
+
         Returns:
             Dictionary mapping metric identifiers to their expected data types.
         """
@@ -191,7 +195,7 @@ class MicroMetricLogger:
 
     def _get_calling_location(self) -> str:
         """Get the calling location using inspect module.
-        
+
         Returns:
             String representation of the calling location in format
             "module.class.method" or "module.function".
@@ -214,10 +218,10 @@ class MicroMetricLogger:
 
     def _get_module_name(self, frame: Any) -> str:
         """Get module name from frame.
-        
+
         Args:
             frame: Stack frame object.
-            
+
         Returns:
             Module name or "unknown" if not available.
         """
@@ -226,10 +230,10 @@ class MicroMetricLogger:
 
     def _get_class_name(self, frame: Any) -> Optional[str]:
         """Get class name from frame if it's a method call.
-        
+
         Args:
             frame: Stack frame object.
-            
+
         Returns:
             Class name if available, None otherwise.
         """
@@ -245,7 +249,7 @@ class MicroMetricLogger:
         """Enable logging for specific metrics.
 
         Args:
-            metrics: List of metric identifiers to enable, "all" for all registered 
+            metrics: List of metric identifiers to enable, "all" for all registered
                     metrics, or None to disable all metrics.
         """
         if metrics == "all":
@@ -257,21 +261,23 @@ class MicroMetricLogger:
 
     def _enable_selected_metrics(self, metrics: Union[List[str], set]) -> None:
         """Enable only the selected metrics that are registered.
-        
+
         Args:
             metrics: List or set of metric identifiers to enable.
         """
         valid_metrics = set(metrics) & set(self._registered_metrics.keys())
         invalid_metrics = set(metrics) - set(self._registered_metrics.keys())
-        
+
         if invalid_metrics:
             print(
                 f"Warning: Attempting to enable unregistered metrics: {invalid_metrics}"
             )
-        
+
         self.enabled_metrics = valid_metrics
 
-    def log(self, identifier: str, value: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def log(
+        self, identifier: str, value: Any, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Log a metric value with optional metadata.
 
         Location is auto-inferred from the calling context. This only works if log_path is defined.
@@ -295,10 +301,10 @@ class MicroMetricLogger:
 
     def _should_log_metric(self, identifier: str) -> bool:
         """Check if the metric should be logged based on configuration.
-        
+
         Args:
             identifier: Metric identifier to check.
-            
+
         Returns:
             True if the metric should be logged, False otherwise.
         """
@@ -319,7 +325,7 @@ class MicroMetricLogger:
 
     def _is_within_limits(self) -> bool:
         """Check if logging is within configured limits.
-        
+
         Returns:
             True if within limits, False if max records reached.
         """
@@ -330,25 +336,22 @@ class MicroMetricLogger:
 
     def _passes_sampling(self) -> bool:
         """Check if event passes sampling filter.
-        
+
         Returns:
             True if event should be logged based on sampling factor.
         """
         return self.sampling_factor >= 1.0 or random.random() <= self.sampling_factor
 
     def _create_log_event(
-        self, 
-        identifier: str, 
-        value: Any, 
-        metadata: Optional[Dict[str, Any]]
+        self, identifier: str, value: Any, metadata: Optional[Dict[str, Any]]
     ) -> LogEvent:
         """Create a log event from the provided data.
-        
+
         Args:
             identifier: Metric identifier.
             value: Metric value.
             metadata: Optional metadata.
-            
+
         Returns:
             LogEvent instance ready for logging.
         """
@@ -362,7 +365,7 @@ class MicroMetricLogger:
 
     def _add_event_and_flush_if_needed(self, event: LogEvent) -> None:
         """Add event to queue and flush if threshold is reached.
-        
+
         Args:
             event: LogEvent to add to the queue.
         """
@@ -395,9 +398,11 @@ class MicroMetricLogger:
         self._update_logging_limits(max_records, sampling_factor)
         self._total_records_logged = 0
 
-    def _update_logging_limits(self, max_records: Optional[int], sampling_factor: float) -> None:
+    def _update_logging_limits(
+        self, max_records: Optional[int], sampling_factor: float
+    ) -> None:
         """Update logging limits and sampling factor.
-        
+
         Args:
             max_records: Maximum records limit.
             sampling_factor: Event sampling probability.
@@ -407,7 +412,7 @@ class MicroMetricLogger:
 
     def flush(self) -> None:
         """Force flush the current queue to disk.
-        
+
         Writes all queued events to the log file in JSONL format.
         """
         if not self.log_queue or self.log_path is None:
@@ -419,7 +424,7 @@ class MicroMetricLogger:
 
     def _write_events_to_file(self, filepath: str) -> None:
         """Write all queued events to the specified file.
-        
+
         Args:
             filepath: Path to the log file.
         """
@@ -431,10 +436,10 @@ class MicroMetricLogger:
 
     def _serialize_event(self, event: LogEvent) -> Dict[str, Any]:
         """Serialize a log event to a dictionary.
-        
+
         Args:
             event: LogEvent to serialize.
-            
+
         Returns:
             Dictionary representation of the event.
         """
@@ -444,10 +449,10 @@ class MicroMetricLogger:
 
     def is_metric_enabled(self, identifier: str) -> bool:
         """Check if a specific metric is enabled for logging.
-        
+
         Args:
             identifier: Metric identifier to check.
-            
+
         Returns:
             True if the metric is enabled, False otherwise.
         """
@@ -455,7 +460,7 @@ class MicroMetricLogger:
 
     def get_enabled_metrics(self) -> set:
         """Get currently enabled metrics.
-        
+
         Returns:
             Set of enabled metric identifiers.
         """
@@ -463,7 +468,7 @@ class MicroMetricLogger:
 
     def is_logging_configured(self) -> bool:
         """Check if logging is configured.
-        
+
         Returns:
             True if log_path is set, False otherwise.
         """
@@ -471,7 +476,7 @@ class MicroMetricLogger:
 
     def get_total_records_logged(self) -> int:
         """Get the total number of records logged.
-        
+
         Returns:
             Number of records logged since initialization or last configure_logging call.
         """
@@ -479,7 +484,7 @@ class MicroMetricLogger:
 
     def is_max_records_reached(self) -> bool:
         """Check if the maximum number of records has been reached.
-        
+
         Returns:
             True if max records limit has been reached, False otherwise.
         """
@@ -499,7 +504,7 @@ class MicroMetricLogger:
 
     def get_sampling_factor(self) -> float:
         """Get the current sampling factor.
-        
+
         Returns:
             Current sampling factor (0.0-1.0).
         """
@@ -507,7 +512,7 @@ class MicroMetricLogger:
 
     def get_max_records(self) -> Optional[int]:
         """Get the current max_records limit.
-        
+
         Returns:
             Maximum records limit, or None if no limit is set.
         """

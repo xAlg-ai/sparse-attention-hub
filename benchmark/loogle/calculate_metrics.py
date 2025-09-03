@@ -76,7 +76,10 @@ def try_except_metric(metric_fn):
         try:
             return metric_fn(answer, predicted_answer)
         except Exception as e:
-            print(f"Cannot calculate metric: {e}" f" on answer:{answer} and predicted_answer:{predicted_answer}")
+            print(
+                f"Cannot calculate metric: {e}"
+                f" on answer:{answer} and predicted_answer:{predicted_answer}"
+            )
             return {key: 0.0 for key in metric_fn("Hi there", "hi there")}
 
     return wrapped_metric
@@ -93,21 +96,36 @@ def calculate_metrics(df: pd.DataFrame) -> dict:
                 ("exact", get_exact_match),
                 ("partial", get_partial_match),
             ]:
-                match, count = zip(*df_task.apply(lambda x: metric_fn(x["answer"], x["predicted_answer"]), axis=1))
+                match, count = zip(
+                    *df_task.apply(
+                        lambda x: metric_fn(x["answer"], x["predicted_answer"]), axis=1
+                    )
+                )
                 scores[task][f"{prefix}_match"] = round(sum(match) / sum(count), 4)
 
         else:
-            df["predicted_answer"] = df["predicted_answer"].apply(lambda x: x if isinstance(x, str) else "<NONE>")
+            df["predicted_answer"] = df["predicted_answer"].apply(
+                lambda x: x if isinstance(x, str) else "<NONE>"
+            )
 
             for metric_fn in [get_bleu_score, get_rouge_score, get_meteor_score]:  # type: ignore
                 metric_fn = try_except_metric(metric_fn)
 
-                metric_scores = [metric_fn(row["answer"], row["predicted_answer"]) for _, row in df_task.iterrows()]
+                metric_scores = [
+                    metric_fn(row["answer"], row["predicted_answer"])
+                    for _, row in df_task.iterrows()
+                ]
                 scores[task].update(pd.DataFrame(metric_scores).mean().to_dict())
 
             # BERT scores (batched)
             scores[task]["bert"] = (
-                score(df_task["answer"].to_list(), df_task["predicted_answer"].to_list(), lang="EN")[1].mean().item()
+                score(
+                    df_task["answer"].to_list(),
+                    df_task["predicted_answer"].to_list(),
+                    lang="EN",
+                )[1]
+                .mean()
+                .item()
             )
 
     return scores

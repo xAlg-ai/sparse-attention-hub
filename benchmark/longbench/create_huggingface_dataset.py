@@ -123,15 +123,27 @@ for task in [
 
     if task == "trec":
         dataset = dataset.map(
-            lambda x: {"input": question_template[task].format(input=x["input"].removesuffix("Type:"))}
+            lambda x: {
+                "input": question_template[task].format(
+                    input=x["input"].removesuffix("Type:")
+                )
+            }
         )
     elif task == "triviaqa":
         dataset = dataset.map(
-            lambda x: {"input": question_template[task].format(input=x["input"].removesuffix("Answer:"))}
+            lambda x: {
+                "input": question_template[task].format(
+                    input=x["input"].removesuffix("Answer:")
+                )
+            }
         )
     elif task == "samsum":
         dataset = dataset.map(
-            lambda x: {"input": question_template[task].format(input=x["input"].removesuffix("Summary:"))}
+            lambda x: {
+                "input": question_template[task].format(
+                    input=x["input"].removesuffix("Summary:")
+                )
+            }
         )
     else:
         dataset = dataset.map(lambda x: {"input": question_template[task].format(**x)})
@@ -170,15 +182,27 @@ for task in [
 
     if task == "trec":
         dataset = dataset.map(
-            lambda x: {"input": question_template[task].format(input=x["input"].removesuffix("Type:"))}
+            lambda x: {
+                "input": question_template[task].format(
+                    input=x["input"].removesuffix("Type:")
+                )
+            }
         )
     elif task == "triviaqa":
         dataset = dataset.map(
-            lambda x: {"input": question_template[task].format(input=x["input"].removesuffix("Answer:"))}
+            lambda x: {
+                "input": question_template[task].format(
+                    input=x["input"].removesuffix("Answer:")
+                )
+            }
         )
     elif task == "samsum":
         dataset = dataset.map(
-            lambda x: {"input": question_template[task].format(input=x["input"].removesuffix("Summary:"))}
+            lambda x: {
+                "input": question_template[task].format(
+                    input=x["input"].removesuffix("Summary:")
+                )
+            }
         )
     else:
         dataset = dataset.map(lambda x: {"input": question_template[task].format(**x)})
@@ -194,4 +218,6 @@ for task in [
 
     # Push to hub
     dataset = Dataset.from_pandas(df)
-    dataset.push_to_hub("xAlg-AI/att-hub-longbench", config_name=f"{task}_e", split="test")
+    dataset.push_to_hub(
+        "xAlg-AI/att-hub-longbench", config_name=f"{task}_e", split="test"
+    )

@@ -24,10 +24,10 @@ MicroMetricLogger.register_metric("research_attention_output_error", float)
 @dataclass
 class ResearchAttentionConfig(SparseAttentionConfig):
     """Configuration class for research attention mechanisms.
-    
+
     This configuration specifies the masker components that will be applied
     sequentially to create sparse attention patterns for research purposes.
-    
+
     Attributes:
         masker_configs: List of masker configurations to apply in sequence.
     """
@@ -37,11 +37,11 @@ class ResearchAttentionConfig(SparseAttentionConfig):
 
 class ResearchAttention(SparseAttention):
     """Base class for research attention mechanisms with configurable maskers.
-    
+
     This class implements sparse attention by applying a sequence of maskers
     to create custom attention patterns. It supports metrics logging and
     validation of masker configurations.
-    
+
     Attributes:
         maskers: List of research maskers to apply sequentially.
     """
@@ -68,10 +68,10 @@ class ResearchAttention(SparseAttention):
 
     def _validate_masker_configuration(self, maskers: List[ResearchMasker]) -> None:
         """Validate the masker configuration.
-        
+
         Args:
             maskers: List of maskers to validate.
-            
+
         Raises:
             ValueError: If more than one sampling masker is provided.
         """
@@ -124,9 +124,9 @@ class ResearchAttention(SparseAttention):
             sparse_meta_data=sparse_meta_data,
             **kwargs,
         )
-        
+
         self._log_attention_density(sparse_attention_mask, kwargs)
-        
+
         attention_output, attention_weights = self._compute_masked_attention(
             module=module,
             queries=queries,
@@ -138,7 +138,7 @@ class ResearchAttention(SparseAttention):
             sparse_attention_mask=sparse_attention_mask,
             **kwargs,
         )
-        
+
         self._log_attention_error(
             module=module,
             queries=queries,
@@ -155,11 +155,11 @@ class ResearchAttention(SparseAttention):
 
     def _create_initial_mask(self, queries: torch.Tensor, keys: torch.Tensor) -> Mask:
         """Create an initial empty mask for the attention computation.
-        
+
         Args:
             queries: Query tensor.
             keys: Key tensor.
-            
+
         Returns:
             Empty mask with appropriate shape.
         """
@@ -184,7 +184,7 @@ class ResearchAttention(SparseAttention):
         **kwargs: Dict[str, Any],
     ) -> Mask:
         """Apply all maskers sequentially to create the final sparse attention mask.
-        
+
         Args:
             sparse_attention_mask: Initial mask to start with.
             keys: Key tensor.
@@ -195,7 +195,7 @@ class ResearchAttention(SparseAttention):
             dropout: Dropout probability.
             sparse_meta_data: Additional metadata.
             **kwargs: Additional keyword arguments.
-            
+
         Returns:
             Final sparse attention mask after applying all maskers.
         """
@@ -213,9 +213,11 @@ class ResearchAttention(SparseAttention):
             )
         return sparse_attention_mask
 
-    def _log_attention_density(self, sparse_attention_mask: Mask, kwargs: Dict[str, Any]) -> None:
+    def _log_attention_density(
+        self, sparse_attention_mask: Mask, kwargs: Dict[str, Any]
+    ) -> None:
         """Log attention density metric if enabled.
-        
+
         Args:
             sparse_attention_mask: The sparse attention mask.
             kwargs: Keyword arguments containing layer information.
@@ -240,7 +242,7 @@ class ResearchAttention(SparseAttention):
         **kwargs: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Compute the masked attention output and weights.
-        
+
         Args:
             module: The attention module.
             queries: Query tensor.
@@ -251,7 +253,7 @@ class ResearchAttention(SparseAttention):
             dropout: Dropout probability.
             sparse_attention_mask: Sparse attention mask.
             **kwargs: Additional keyword arguments.
-            
+
         Returns:
             Tuple of attention output and attention weights.
         """
@@ -281,7 +283,7 @@ class ResearchAttention(SparseAttention):
         **kwargs: Dict[str, Any],
     ) -> None:
         """Log attention output error metric if enabled.
-        
+
         Args:
             module: The attention module.
             queries: Query tensor.
@@ -334,12 +336,14 @@ class ResearchAttention(SparseAttention):
         return cls(config, maskers)
 
     @classmethod
-    def _create_maskers_from_config(cls, masker_configs: List[MaskerConfig]) -> List[ResearchMasker]:
+    def _create_maskers_from_config(
+        cls, masker_configs: List[MaskerConfig]
+    ) -> List[ResearchMasker]:
         """Create research masker objects from their configurations.
-        
+
         Args:
             masker_configs: List of masker configurations.
-            
+
         Returns:
             List of configured research masker instances.
         """

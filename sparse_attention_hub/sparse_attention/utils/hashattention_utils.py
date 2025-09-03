@@ -57,13 +57,13 @@ def _convert_layer_weights(
     num_mlp_layers: int,
 ) -> Dict[str, List[torch.Tensor]]:
     """Convert weights for a single layer.
-    
+
     Args:
         usa_state_dict: USA checkpoint state dictionary.
         layer_idx: Index of the layer to process.
         num_heads: Number of attention heads.
         num_mlp_layers: Number of MLP layers.
-        
+
     Returns:
         Dictionary containing converted weights for the layer.
     """
@@ -116,7 +116,7 @@ def _extract_head_weights(
     key_biases_per_layer: List[List[torch.Tensor]],
 ) -> None:
     """Extract weights for a single attention head.
-    
+
     Args:
         usa_state_dict: USA checkpoint state dictionary.
         layer_idx: Index of the current layer.
@@ -132,15 +132,23 @@ def _extract_head_weights(
 
     # Extract weights from MLP layers (linear layers at indices 0, 2, 4, ...)
     linear_indices = [i * 2 for i in range(num_mlp_layers)]
-    
+
     for i, linear_idx in enumerate(linear_indices):
         _extract_query_weights(
-            usa_state_dict, query_prefix, linear_idx, i,
-            query_matrices_per_layer, query_biases_per_layer
+            usa_state_dict,
+            query_prefix,
+            linear_idx,
+            i,
+            query_matrices_per_layer,
+            query_biases_per_layer,
         )
         _extract_key_weights(
-            usa_state_dict, key_prefix, linear_idx, i,
-            key_matrices_per_layer, key_biases_per_layer
+            usa_state_dict,
+            key_prefix,
+            linear_idx,
+            i,
+            key_matrices_per_layer,
+            key_biases_per_layer,
         )
 
 
@@ -153,7 +161,7 @@ def _extract_query_weights(
     query_biases_per_layer: List[List[torch.Tensor]],
 ) -> None:
     """Extract query weights for a specific MLP layer.
-    
+
     Args:
         usa_state_dict: USA checkpoint state dictionary.
         query_prefix: Prefix for query weight keys.
@@ -187,7 +195,7 @@ def _extract_key_weights(
     key_biases_per_layer: List[List[torch.Tensor]],
 ) -> None:
     """Extract key weights for a specific MLP layer.
-    
+
     Args:
         usa_state_dict: USA checkpoint state dictionary.
         key_prefix: Prefix for key weight keys.
@@ -221,7 +229,7 @@ def _stack_head_weights(
     key_biases_per_layer: List[List[torch.Tensor]],
 ) -> None:
     """Stack weights from all heads for each MLP layer.
-    
+
     Args:
         layer_weights: Dictionary to store the stacked weights.
         num_mlp_layers: Number of MLP layers.
@@ -235,15 +243,9 @@ def _stack_head_weights(
             layer_weights["query_matrix"].append(
                 torch.stack(query_matrices_per_layer[i])
             )
-            layer_weights["query_bias"].append(
-                torch.stack(query_biases_per_layer[i])
-            )
-            layer_weights["key_matrix"].append(
-                torch.stack(key_matrices_per_layer[i])
-            )
-            layer_weights["key_bias"].append(
-                torch.stack(key_biases_per_layer[i])
-            )
+            layer_weights["query_bias"].append(torch.stack(query_biases_per_layer[i]))
+            layer_weights["key_matrix"].append(torch.stack(key_matrices_per_layer[i]))
+            layer_weights["key_bias"].append(torch.stack(key_biases_per_layer[i]))
 
 
 def create_hat_weights_file_from_usa(
@@ -282,11 +284,10 @@ def create_hat_weights_file_from_usa(
 
 
 def _save_weights_to_file(
-    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]], 
-    target_path: str
+    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]], target_path: str
 ) -> None:
     """Save HashAttention weights to a pickle file.
-    
+
     Args:
         hat_weights: Dictionary of HashAttention weights to save.
         target_path: Path where the weights file will be saved.
@@ -322,10 +323,10 @@ def load_hat_weights(
 
 def _load_weights_from_file(file_path: str) -> Dict[int, Dict[str, List[torch.Tensor]]]:
     """Load weights from a pickle file.
-    
+
     Args:
         file_path: Path to the pickle file.
-        
+
     Returns:
         Dictionary of loaded weights.
     """
@@ -334,11 +335,10 @@ def _load_weights_from_file(file_path: str) -> Dict[int, Dict[str, List[torch.Te
 
 
 def _move_weights_to_device(
-    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]], 
-    device: str
+    hat_weights: Dict[int, Dict[str, List[torch.Tensor]]], device: str
 ) -> None:
     """Move all weights to the specified device.
-    
+
     Args:
         hat_weights: Dictionary of HashAttention weights to move.
         device: Target device for the weights.

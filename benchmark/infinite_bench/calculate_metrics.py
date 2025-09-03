@@ -365,7 +365,9 @@ def get_score_one(pred: str, label: str, task_name: str, model_name: str) -> flo
         "math_calc": get_score_one_math_calc,
     }
     if task_name == "longbook_sum_eng":
-        raise AssertionError("Longbook sum task is not supported due to a conflict with rouge library. ")
+        raise AssertionError(
+            "Longbook sum task is not supported due to a conflict with rouge library. "
+        )
     assert task_name in NAME_TO_SCORE_GETTER, f"Invalid task name: {task_name}"
     score = NAME_TO_SCORE_GETTER[task_name](pred, label, model_name)
     return float(score)

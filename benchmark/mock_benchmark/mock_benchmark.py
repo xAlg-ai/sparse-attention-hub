@@ -27,11 +27,13 @@ class MockBenchmark(Benchmark):
     # Class attributes required by base Benchmark class
     all_datasets: List[str] = ["reading_comprehension"]
     benchmark_name: str = "mock_benchmark"
-    huggingface_dataset_id: str = "mock/dataset"  # Not actually used since we override _load_datasets
+    huggingface_dataset_id: str = (
+        "mock/dataset"  # Not actually used since we override _load_datasets
+    )
 
     def _load_datasets(self) -> pd.DataFrame:
         """Load mock dataset with hardcoded samples.
-        
+
         Returns:
             DataFrame containing 5 mock samples with context, question, and answers.
         """
@@ -51,7 +53,6 @@ class MockBenchmark(Benchmark):
                 in their leaves, where specialized organelles called chloroplasts contain the 
                 chlorophyll necessary for the process.
             """.strip(),
-            
             "history_context": """
                 The Renaissance was a period of cultural, artistic, and intellectual revival 
                 that began in Italy during the 14th century and spread throughout Europe. 
@@ -67,7 +68,6 @@ class MockBenchmark(Benchmark):
                 laid the foundation for the Scientific Revolution and the Enlightenment that 
                 would follow.
             """.strip(),
-            
             "geography_context": """
                 The Amazon rainforest, often called the "lungs of the Earth," is the world's 
                 largest tropical rainforest. Located primarily in Brazil, it also extends 
@@ -81,7 +81,7 @@ class MockBenchmark(Benchmark):
                 drainage basin. Unfortunately, the rainforest faces threats from deforestation, 
                 mining, and climate change, making its conservation critical for the health 
                 of our planet.
-            """.strip()
+            """.strip(),
         }
 
         # Create sample data - 5 samples total, 2 sharing the same context
@@ -89,46 +89,50 @@ class MockBenchmark(Benchmark):
             {
                 "context": contexts["science_context"],
                 "question": "What are the two main stages of photosynthesis?",
-                "answers": ["light-dependent reactions and light-independent reactions", 
-                          "light-dependent reactions and Calvin cycle"],
-                "task": "reading_comprehension"
+                "answers": [
+                    "light-dependent reactions and light-independent reactions",
+                    "light-dependent reactions and Calvin cycle",
+                ],
+                "task": "reading_comprehension",
             },
             {
                 "context": contexts["science_context"],  # Same context as sample 1
                 "question": "What gas is produced as a byproduct of photosynthesis?",
                 "answers": ["oxygen"],
-                "task": "reading_comprehension"
+                "task": "reading_comprehension",
             },
             {
                 "context": contexts["history_context"],
                 "question": "In which century did the Renaissance begin?",
                 "answers": ["14th century", "14th"],
-                "task": "reading_comprehension"
+                "task": "reading_comprehension",
             },
             {
                 "context": contexts["geography_context"],
                 "question": "Why is the Amazon rainforest called the 'lungs of the Earth'?",
-                "answers": ["because it absorbs carbon dioxide and produces oxygen", 
-                          "it regulates global climate by absorbing CO2 and producing oxygen"],
-                "task": "reading_comprehension"
+                "answers": [
+                    "because it absorbs carbon dioxide and produces oxygen",
+                    "it regulates global climate by absorbing CO2 and producing oxygen",
+                ],
+                "task": "reading_comprehension",
             },
             {
                 "context": contexts["geography_context"],
                 "question": "Which river flows through the Amazon rainforest?",
                 "answers": ["Amazon River", "the Amazon River"],
-                "task": "reading_comprehension"
-            }
+                "task": "reading_comprehension",
+            },
         ]
 
         # Convert to DataFrame
         df: pd.DataFrame = pd.DataFrame(sample_data)
-        
+
         # Add sample IDs for tracking
         df["sample_id"] = range(1, len(df) + 1)
-        
+
         print(f"Loaded {len(df)} mock samples")
         print(f"Unique contexts: {df['context'].nunique()}")
-        
+
         return df
 
     def post_run_evaluate(self, results_df: pd.DataFrame) -> Dict[str, Any]:
@@ -159,32 +163,38 @@ class MockBenchmark(Benchmark):
             predicted_answer: str = str(row["predicted_answer"]).strip().lower()
             ground_truth_answers: List[str] = row["answers"]
             sample_id: int = row["sample_id"]
-            
+
             # Check if prediction matches any ground truth answer
             is_correct: bool = False
             for gt_answer in ground_truth_answers:
                 gt_answer_normalized: str = str(gt_answer).strip().lower()
-                
+
                 # Check exact match or substring match
-                if (predicted_answer == gt_answer_normalized or 
-                    gt_answer_normalized in predicted_answer):
+                if (
+                    predicted_answer == gt_answer_normalized
+                    or gt_answer_normalized in predicted_answer
+                ):
                     is_correct = True
                     break
-            
+
             if is_correct:
                 correct_predictions += 1
-            
-            sample_scores.append({
-                "sample_id": sample_id,
-                "question": row["question"],
-                "predicted_answer": row["predicted_answer"],
-                "ground_truth": ground_truth_answers,
-                "correct": is_correct
-            })
+
+            sample_scores.append(
+                {
+                    "sample_id": sample_id,
+                    "question": row["question"],
+                    "predicted_answer": row["predicted_answer"],
+                    "ground_truth": ground_truth_answers,
+                    "correct": is_correct,
+                }
+            )
 
         # Calculate metrics
-        accuracy: float = correct_predictions / total_samples if total_samples > 0 else 0.0
-        
+        accuracy: float = (
+            correct_predictions / total_samples if total_samples > 0 else 0.0
+        )
+
         metrics: Dict[str, Any] = {
             "accuracy": round(accuracy, 3),
             "correct_predictions": correct_predictions,
@@ -194,8 +204,8 @@ class MockBenchmark(Benchmark):
                 "benchmark": self.benchmark_name,
                 "task": "reading_comprehension",
                 "unique_contexts": results_df["context"].nunique(),
-                "evaluation_method": "exact_match_and_substring"
-            }
+                "evaluation_method": "exact_match_and_substring",
+            },
         }
 
-        return metrics 
+        return metrics

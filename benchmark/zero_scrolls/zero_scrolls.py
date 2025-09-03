@@ -40,46 +40,61 @@ class ZeroScrolls(Benchmark):
     #     "book_sum_sort"
     # ]
     # all tasks are clubbed into a single subset on huggingface
-    all_datasets: List[str] = [ "default"] 
-    
+    all_datasets: List[str] = ["default"]
+
     benchmark_name: str = "zero_scrolls"
     huggingface_dataset_id: str = "simonjegou/zero_scrolls"
 
     def _load_datasets(self) -> pd.DataFrame:
         """Load ZeroScrolls datasets by individual configs.
-        
+
         ZeroScrolls requires loading each subset as a separate config.
-        
+
         Returns:
             Combined pandas DataFrame with all samples from subsets_to_run.
         """
         print(f"Loading ZeroScrolls datasets: {self.subsets_to_run}")
         dfs = []
-        
+
         for subset in self.subsets_to_run:
             try:
                 from datasets import load_dataset
-                subset_dataset = load_dataset(self.huggingface_dataset_id, subset, split="test")
+
+                subset_dataset = load_dataset(
+                    self.huggingface_dataset_id, subset, split="test"
+                )
                 subset_df = subset_dataset.to_pandas()
-                
+
                 # Process the data according to ZeroScrolls format
-                subset_df["context"] = subset_df.apply(lambda x: x["input"][: x["document_end_index"]], axis=1)
-                subset_df["question"] = subset_df.apply(lambda x: x["input"][x["document_end_index"] : x["query_end_index"]], axis=1)
-                subset_df["answer_prefix"] = subset_df.apply(lambda x: x["input"][x["query_end_index"] :], axis=1).str.strip()
-                subset_df["answer"] = ""  # ZeroScrolls doesn't provide ground truth answers
+                subset_df["context"] = subset_df.apply(
+                    lambda x: x["input"][: x["document_end_index"]], axis=1
+                )
+                subset_df["question"] = subset_df.apply(
+                    lambda x: x["input"][
+                        x["document_end_index"] : x["query_end_index"]
+                    ],
+                    axis=1,
+                )
+                subset_df["answer_prefix"] = subset_df.apply(
+                    lambda x: x["input"][x["query_end_index"] :], axis=1
+                ).str.strip()
+                subset_df["answer"] = (
+                    ""  # ZeroScrolls doesn't provide ground truth answers
+                )
                 subset_df["task"] = subset
-                
+
                 dfs.append(subset_df)
                 print(f"  ✓ Loaded {len(subset_df)} samples from {subset}")
             except Exception as subset_error:
                 print(f"  ❌ Failed to load {subset}: {str(subset_error)}")
                 continue
-        
+
         if not dfs:
             raise Exception("No ZeroScrolls subsets could be loaded successfully")
-        
+
         # Combine all subset DataFrames
         import pandas as pd
+
         combined_df = pd.concat(dfs, ignore_index=True)
         print(f"Combined {len(combined_df)} total samples from {len(dfs)} subsets")
         return combined_df
@@ -104,23 +119,25 @@ class ZeroScrolls(Benchmark):
         # Group results by task
         task_groups = results_df.groupby("task")
         task_stats: Dict[str, Dict[str, Any]] = {}
-        
+
         for task_name, task_df in task_groups:
             # Calculate basic statistics since no ground truth is available
-            avg_length = task_df["predicted_answer"].str.len().mean() if len(task_df) > 0 else 0
+            avg_length = (
+                task_df["predicted_answer"].str.len().mean() if len(task_df) > 0 else 0
+            )
             task_stats[task_name] = {
                 "num_samples": len(task_df),
                 "avg_response_length": round(avg_length, 2),
-                "note": "No ground truth available for evaluation"
+                "note": "No ground truth available for evaluation",
             }
-        
+
         overall_metrics: Dict[str, Any] = {
             "task_stats": task_stats,
             "summary": {
                 "total_tasks": len(task_stats),
                 "total_samples": len(results_df),
-                "note": "ZeroScrolls benchmark completed. No ground truth available for scoring."
-            }
+                "note": "ZeroScrolls benchmark completed. No ground truth available for scoring.",
+            },
         }
-        
-        return overall_metrics 
+
+        return overall_metrics

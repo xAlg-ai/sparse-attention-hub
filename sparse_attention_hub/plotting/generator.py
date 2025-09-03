@@ -12,17 +12,17 @@ from .granularity import Granularity
 
 class PlotGenerator:
     """Generates plots for sparse attention analysis.
-    
+
     This class provides functionality to generate various types of plots
     for analyzing sparse attention patterns at different granularities.
-    
+
     Attributes:
         storage_path: Directory path where generated plots will be saved.
     """
 
     def __init__(self, storage_path: str = "./plots") -> None:
         """Initialize the PlotGenerator.
-        
+
         Args:
             storage_path: Directory path for storing generated plots.
                 Defaults to "./plots".
@@ -57,7 +57,7 @@ class PlotGenerator:
 
         Returns:
             Absolute path to the generated plot file.
-            
+
         Raises:
             ValueError: If the specified granularity is not supported.
         """
@@ -87,18 +87,18 @@ class PlotGenerator:
             Path to the generated plot file.
         """
         fig, ax = plt.subplots(figsize=(10, 6))
-        
+
         if data is None:
             self._plot_sample_line_data(ax, granularity)
         else:
             self._plot_actual_line_data(ax, data)
-            
+
         self._configure_line_plot_axes(ax, granularity)
         return self._save_plot(fig, "plot", granularity, data)
 
     def _plot_sample_line_data(self, ax: plt.Axes, granularity: Granularity) -> None:
         """Plot sample line data for demonstration.
-        
+
         Args:
             ax: Matplotlib axes object to plot on.
             granularity: Granularity level for labeling.
@@ -109,7 +109,7 @@ class PlotGenerator:
 
     def _plot_actual_line_data(self, ax: plt.Axes, data: Dict[str, Any]) -> None:
         """Plot actual line data from provided data dictionary.
-        
+
         Args:
             ax: Matplotlib axes object to plot on.
             data: Data dictionary containing plot information.
@@ -120,12 +120,14 @@ class PlotGenerator:
 
     def _configure_line_plot_axes(self, ax: plt.Axes, granularity: Granularity) -> None:
         """Configure axes for line plots.
-        
+
         Args:
             ax: Matplotlib axes object to configure.
             granularity: Granularity level for title formatting.
         """
-        title = f"Sparse Attention Analysis - {granularity.value.replace('_', ' ').title()}"
+        title = (
+            f"Sparse Attention Analysis - {granularity.value.replace('_', ' ').title()}"
+        )
         ax.set_title(title)
         ax.set_xlabel("Position")
         ax.set_ylabel("Attention Weight")
@@ -147,38 +149,36 @@ class PlotGenerator:
 
         Returns:
             Path to the generated plot file.
-            
+
         Raises:
             ValueError: If data is provided but doesn't contain required attention_matrix.
         """
         fig, ax = plt.subplots(figsize=(8, 8))
-        
+
         attention_matrix = self._get_attention_matrix(granularity, data)
         self._create_heatmap(ax, attention_matrix)
         self._configure_heatmap_axes(ax, granularity)
-        
+
         return self._save_plot(fig, "heatmap", granularity, data)
 
     def _get_attention_matrix(
-        self, 
-        granularity: Granularity, 
-        data: Optional[Dict[str, Any]]
+        self, granularity: Granularity, data: Optional[Dict[str, Any]]
     ) -> np.ndarray:
         """Get attention matrix from data or generate sample data.
-        
+
         Args:
             granularity: Granularity level for determining matrix size.
             data: Optional data dictionary containing attention matrix.
-            
+
         Returns:
             Attention matrix as numpy array.
-            
+
         Raises:
             ValueError: If data is provided but doesn't contain attention_matrix.
         """
         if data is None:
             return self._generate_sample_attention_matrix(granularity)
-        
+
         attention_matrix = data.get("attention_matrix")
         if attention_matrix is None:
             raise ValueError("attention_matrix required in data for heatmap")
@@ -186,10 +186,10 @@ class PlotGenerator:
 
     def _generate_sample_attention_matrix(self, granularity: Granularity) -> np.ndarray:
         """Generate sample attention matrix for demonstration.
-        
+
         Args:
             granularity: Granularity level for determining matrix size.
-            
+
         Returns:
             Symmetric attention matrix.
         """
@@ -199,7 +199,7 @@ class PlotGenerator:
 
     def _create_heatmap(self, ax: plt.Axes, attention_matrix: np.ndarray) -> None:
         """Create heatmap visualization.
-        
+
         Args:
             ax: Matplotlib axes object to plot on.
             attention_matrix: Attention matrix to visualize.
@@ -215,7 +215,7 @@ class PlotGenerator:
 
     def _configure_heatmap_axes(self, ax: plt.Axes, granularity: Granularity) -> None:
         """Configure axes for heatmap plots.
-        
+
         Args:
             ax: Matplotlib axes object to configure.
             granularity: Granularity level for title formatting.
@@ -226,20 +226,20 @@ class PlotGenerator:
         ax.set_ylabel("Query Position")
 
     def _save_plot(
-        self, 
-        fig: plt.Figure, 
-        plot_type: str, 
-        granularity: Granularity, 
-        data: Optional[Dict[str, Any]]
+        self,
+        fig: plt.Figure,
+        plot_type: str,
+        granularity: Granularity,
+        data: Optional[Dict[str, Any]],
     ) -> str:
         """Save plot to file and close figure.
-        
+
         Args:
             fig: Matplotlib figure object to save.
             plot_type: Type of plot for filename.
             granularity: Granularity level for filename.
             data: Data used for generating unique filename hash.
-            
+
         Returns:
             Absolute path to the saved plot file.
         """
@@ -250,9 +250,7 @@ class PlotGenerator:
         return filepath
 
     def generate_comparison_plot(
-        self, 
-        data_dict: Dict[str, Any], 
-        granularity: Granularity
+        self, data_dict: Dict[str, Any], granularity: Granularity
     ) -> str:
         """Generate comparison plot for multiple datasets.
 
@@ -264,15 +262,15 @@ class PlotGenerator:
             Path to the generated comparison plot file.
         """
         fig, ax = plt.subplots(figsize=(12, 8))
-        
+
         self._plot_comparison_data(ax, data_dict)
         self._configure_comparison_axes(ax, granularity)
-        
+
         return self._save_plot(fig, "comparison", granularity, data_dict)
 
     def _plot_comparison_data(self, ax: plt.Axes, data_dict: Dict[str, Any]) -> None:
         """Plot comparison data for multiple datasets.
-        
+
         Args:
             ax: Matplotlib axes object to plot on.
             data_dict: Dictionary mapping labels to data.
@@ -282,9 +280,11 @@ class PlotGenerator:
             # This is a placeholder for future actual data plotting
             pass
 
-    def _configure_comparison_axes(self, ax: plt.Axes, granularity: Granularity) -> None:
+    def _configure_comparison_axes(
+        self, ax: plt.Axes, granularity: Granularity
+    ) -> None:
         """Configure axes for comparison plots.
-        
+
         Args:
             ax: Matplotlib axes object to configure.
             granularity: Granularity level for title formatting.

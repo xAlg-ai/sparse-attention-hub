@@ -29,22 +29,23 @@ class AIME2025(Benchmark):
 
     # AIME2025 has a single dataset
     all_datasets: List[str] = ["aime2025"]
-    
+
     benchmark_name: str = "aime2025"
     huggingface_dataset_id: str = "xAlg-AI/att-hub-aime2025"
 
     def _load_datasets(self) -> pd.DataFrame:
         """Load AIME2025 dataset.
-        
+
         AIME2025 uses a single dataset with all problems.
-        
+
         Returns:
             pandas DataFrame with all AIME2025 problems.
         """
         print(f"Loading AIME2025 dataset")
-        
+
         try:
             from datasets import load_dataset
+
             dataset = load_dataset(self.huggingface_dataset_id, split="test")
             df = dataset.to_pandas()
             df["task"] = "aime2025"  # Ensure task column exists
@@ -72,7 +73,7 @@ class AIME2025(Benchmark):
 
         # Use the calculate_metrics function from HashAttention evaluation
         metrics: Dict[str, Any] = calculate_metrics(results_df)
-        
+
         # Format the results for consistency with other benchmarks
         overall_metrics: Dict[str, Any] = {
             "overall_score": round(metrics["exact_match"], 4),
@@ -84,17 +85,20 @@ class AIME2025(Benchmark):
                 "aime2025": {
                     "exact_match": round(metrics["exact_match"], 4),
                     "extraction_rate": round(metrics["extraction_rate"], 4),
-                    "boxed_format_rate": round(metrics["boxed_format_rate"], 4)
+                    "boxed_format_rate": round(metrics["boxed_format_rate"], 4),
                 }
             },
-            "summary": {
-                "total_tasks": 1,
-                "total_samples": len(results_df)
-            }
+            "summary": {"total_tasks": 1, "total_samples": len(results_df)},
         }
-        
-        print(f"  ✓ AIME2025 Exact Match: {metrics['exact_match']:.3f} ({metrics['exact_match']*100:.1f}%)")
-        print(f"  ✓ Extraction Rate: {metrics['extraction_rate']:.3f} ({metrics['extraction_rate']*100:.1f}%)")
-        print(f"  ✓ Boxed Format Rate: {metrics['boxed_format_rate']:.3f} ({metrics['boxed_format_rate']*100:.1f}%)")
-        
-        return overall_metrics 
+
+        print(
+            f"  ✓ AIME2025 Exact Match: {metrics['exact_match']:.3f} ({metrics['exact_match']*100:.1f}%)"
+        )
+        print(
+            f"  ✓ Extraction Rate: {metrics['extraction_rate']:.3f} ({metrics['extraction_rate']*100:.1f}%)"
+        )
+        print(
+            f"  ✓ Boxed Format Rate: {metrics['boxed_format_rate']:.3f} ({metrics['boxed_format_rate']*100:.1f}%)"
+        )
+
+        return overall_metrics

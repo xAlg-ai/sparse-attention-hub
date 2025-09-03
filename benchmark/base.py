@@ -40,10 +40,10 @@ class Benchmark(ABC):
         ...     all_datasets = ["task1", "task2"]
         ...     benchmark_name = "my_benchmark"
         ...     huggingface_dataset_id = "my_org/my_dataset"
-        ...     
+        ...
         ...     def post_run_evaluate(self, results_df):
         ...         return {"accuracy": 0.95}
-        >>> 
+        >>>
         >>> benchmark = MyBenchmark(subsets_to_run=["task1"])
         >>> results = benchmark.run_benchmark(adapter, result_dir="/path/to/results", generation_kwargs={"max_new_tokens": 50}, request_kwargs={"max_context_length": 1024})
     """
@@ -63,11 +63,17 @@ class Benchmark(ABC):
             ValueError: If any subset in subsets_to_run is not in all_datasets.
         """
         if not self.all_datasets:
-            raise ValueError(f"Subclass {self.__class__.__name__} must define all_datasets")
+            raise ValueError(
+                f"Subclass {self.__class__.__name__} must define all_datasets"
+            )
         if not self.benchmark_name:
-            raise ValueError(f"Subclass {self.__class__.__name__} must define benchmark_name")
+            raise ValueError(
+                f"Subclass {self.__class__.__name__} must define benchmark_name"
+            )
         if not self.huggingface_dataset_id:
-            raise ValueError(f"Subclass {self.__class__.__name__} must define huggingface_dataset_id")
+            raise ValueError(
+                f"Subclass {self.__class__.__name__} must define huggingface_dataset_id"
+            )
 
         if subsets_to_run is None:
             self.subsets_to_run = self.all_datasets.copy()
@@ -112,7 +118,7 @@ class Benchmark(ABC):
             # Load the full dataset
             dataset = load_dataset(self.huggingface_dataset_id, split="test")
             df: pd.DataFrame = dataset.to_pandas()
-            
+
             # Filter to only include subsets we want to run
             if "task" in df.columns:
                 # Filter by task column if it exists
@@ -121,11 +127,13 @@ class Benchmark(ABC):
                 # If no task column, assume the dataset only contains our subsets
                 # This is a simplified assumption based on user guidance
                 pass
-            
+
             return df
-            
+
         except Exception as e:
-            raise Exception(f"Failed to load dataset {self.huggingface_dataset_id}: {str(e)}")
+            raise Exception(
+                f"Failed to load dataset {self.huggingface_dataset_id}: {str(e)}"
+            )
 
     def _validate_dataset_size(self, df: pd.DataFrame) -> None:
         """Validate dataset size and warn if too large.
@@ -137,15 +145,15 @@ class Benchmark(ABC):
             warnings.warn(
                 f"Dataset has {len(df)} rows (>10K). Repository not expected to handle "
                 "large datasets. If needed, request this feature.",
-                UserWarning
+                UserWarning,
             )
 
     def _process_all_requests(
-        self, 
-        adapter: ModelAdapter, 
+        self,
+        adapter: ModelAdapter,
         dataset_df: pd.DataFrame,
         generation_kwargs: Dict[str, Any],
-        request_kwargs: Dict[str, Any]
+        request_kwargs: Dict[str, Any],
     ) -> pd.DataFrame:
         """Process all samples through the model adapter using context grouping for efficiency.
 
@@ -164,47 +172,60 @@ class Benchmark(ABC):
 
         # Truncate dataset to max_requests
         dataset_df = dataset_df.head(max_requests)
-        
-        
+
         # Group by context for efficiency (following HashAttention approach)
         df_context = dataset_df.groupby("context")
-        
-        for context, df_group in tqdm(df_context, desc="Processing contexts", total=dataset_df["context"].nunique()):
+
+        for context, df_group in tqdm(
+            df_context,
+            desc="Processing contexts",
+            total=dataset_df["context"].nunique(),
+        ):
             questions: List[str] = df_group["question"].to_list()
-            
+
             try:
                 # Create request using current adapter interface (simplified)
                 answer_prefix = df_group["answer_prefix"].iloc[0]
-                request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
-                
+                request: Request = Request(
+                    context=context, questions=questions, answer_prefix=answer_prefix
+                )
+
                 # Process through adapter
-                response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
-                
+                response: RequestResponse = adapter.process_request(
+                    request, generation_kwargs, request_kwargs
+                )
+
                 # Assign responses back to DataFrame
                 if isinstance(response.responses, list):
-                    dataset_df.loc[df_group.index, "predicted_answer"] = response.responses
+                    dataset_df.loc[df_group.index, "predicted_answer"] = (
+                        response.responses
+                    )
                 else:
                     # Single response case
-                    dataset_df.loc[df_group.index, "predicted_answer"] = [response.responses] * len(df_group)
-                
+                    dataset_df.loc[df_group.index, "predicted_answer"] = [
+                        response.responses
+                    ] * len(df_group)
+
                 # Memory cleanup for large contexts
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                    
+
             except Exception as e:
                 # Log error but continue processing other contexts
                 print(f"Error processing context (length {len(context)}): {str(e)}")
                 # Fill with empty responses for failed contexts
-                dataset_df.loc[df_group.index, "predicted_answer"] = [""] * len(df_group)
-        
+                dataset_df.loc[df_group.index, "predicted_answer"] = [""] * len(
+                    df_group
+                )
+
         return dataset_df
 
     def run_benchmark(
-        self, 
-        adapter: ModelAdapter, 
+        self,
+        adapter: ModelAdapter,
         result_dir: str,
         generation_kwargs: Optional[Dict[str, Any]] = None,
-        request_kwargs: Optional[Dict[str, Any]] = None
+        request_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Main orchestration method for running complete benchmark.
 
@@ -222,54 +243,60 @@ class Benchmark(ABC):
             generation_kwargs = {}
         if request_kwargs is None:
             request_kwargs = {}
-            
+
         # Create result directory if it doesn't exist
         result_path: Path = Path(result_dir)
         result_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Load datasets
         print(f"Loading {self.benchmark_name} datasets: {self.subsets_to_run}")
         dataset_df: pd.DataFrame = self._load_datasets()
         print(f"Loaded {len(dataset_df)} samples")
         # Validate dataset size
         self._validate_dataset_size(dataset_df)
-        
+
         # Process all requests through the adapter
         print("Processing requests through adapter...")
-        results_df: pd.DataFrame = self._process_all_requests(adapter, dataset_df, generation_kwargs, request_kwargs)
-        
+        results_df: pd.DataFrame = self._process_all_requests(
+            adapter, dataset_df, generation_kwargs, request_kwargs
+        )
+
         # Compute evaluation metrics
         print("Computing evaluation metrics...")
         metrics: Dict[str, Any] = self.post_run_evaluate(results_df)
-        
+
         # Save results
         raw_results_path: Path = result_path / "raw_results.csv"
         save_dataframe_to_csv(results_df, str(raw_results_path), index=False)
         print(f"Saved raw results to {raw_results_path}")
-        
+
         # Save metrics
         metrics_path: Path = result_path / "metrics.json"
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
         print(f"Saved metrics to {metrics_path}")
-        
+
         # Save configuration parameters
         config_path: Path = result_path / "config.json"
-        
+
         config_data = {
-            "model_kwargs": make_serializable(getattr(adapter, 'model_kwargs', {})),
-            "tokenizer_kwargs": make_serializable(getattr(adapter, 'tokenizer_kwargs', {})),
-            "sparse_attention_config": make_serializable(getattr(adapter, 'sparse_attention_config', None)),
+            "model_kwargs": make_serializable(getattr(adapter, "model_kwargs", {})),
+            "tokenizer_kwargs": make_serializable(
+                getattr(adapter, "tokenizer_kwargs", {})
+            ),
+            "sparse_attention_config": make_serializable(
+                getattr(adapter, "sparse_attention_config", None)
+            ),
             "generation_kwargs": make_serializable(generation_kwargs),
             "request_kwargs": make_serializable(request_kwargs),
             "benchmark_name": self.benchmark_name,
             "subsets_to_run": self.subsets_to_run,
-            "huggingface_dataset_id": self.huggingface_dataset_id
+            "huggingface_dataset_id": self.huggingface_dataset_id,
         }
         with open(config_path, "w") as f:
             json.dump(config_data, f, indent=2)
         print(f"Saved configuration to {config_path}")
-        
+
         return metrics
 
     @abstractmethod
@@ -282,7 +309,7 @@ class Benchmark(ABC):
         Args:
             results_df: DataFrame containing input data and model outputs with columns:
                 - context: The input context
-                - question: The input question  
+                - question: The input question
                 - predicted_answer: Model's predicted answer
                 - Plus any other columns from the original dataset
 
@@ -290,6 +317,3 @@ class Benchmark(ABC):
             Dictionary containing computed metrics (e.g., {"accuracy": 0.95, "f1": 0.88}).
         """
         pass
-
-
-

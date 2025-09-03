@@ -156,7 +156,8 @@ for task in [
         df["context"] = df.apply(update_math_find_context, axis=1)
         df["context"] = df["context"].apply(
             lambda x: x.replace(
-                "You should answer with only one number, no other words. The largest number of the list is:", ""
+                "You should answer with only one number, no other words. The largest number of the list is:",
+                "",
             )
         )
     elif task == "code_run":
@@ -177,13 +178,19 @@ for task in [
 
         df["context"] = df.apply(update_context, axis=1)
     else:
-        df["context"] = df["context"].apply(lambda x: context_prefix[task].format(context=x))
+        df["context"] = df["context"].apply(
+            lambda x: context_prefix[task].format(context=x)
+        )
 
     if task in ["longbook_choice_eng", "code_debug"]:
         df["question"] = df["question"] + df["options"].apply(
-            lambda x: question_template[task].format(OPTION_A=x[0], OPTION_B=x[1], OPTION_C=x[2], OPTION_D=x[3])
+            lambda x: question_template[task].format(
+                OPTION_A=x[0], OPTION_B=x[1], OPTION_C=x[2], OPTION_D=x[3]
+            )
         )
-        df["answer"] = df.apply(lambda row: ["ABCD"[list(row.options).index(row.answer)]], axis=1)
+        df["answer"] = df.apply(
+            lambda row: ["ABCD"[list(row.options).index(row.answer)]], axis=1
+        )
 
     if task == "kv_retrieval":
         # moved to answer prefix

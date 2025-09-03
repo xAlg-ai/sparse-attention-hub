@@ -22,8 +22,12 @@ df_list = []
 for task, max_new_tokens in MAX_NEW_TOKENS.items():
     df = load_dataset("tau/zero_scrolls", task, split="test").to_pandas()
     df["context"] = df.apply(lambda x: x["input"][: x["document_end_index"]], axis=1)
-    df["question"] = df.apply(lambda x: x["input"][x["document_end_index"] : x["query_end_index"]], axis=1)
-    df["answer_prefix"] = df.apply(lambda x: x["input"][x["query_end_index"] :], axis=1).str.strip()
+    df["question"] = df.apply(
+        lambda x: x["input"][x["document_end_index"] : x["query_end_index"]], axis=1
+    )
+    df["answer_prefix"] = df.apply(
+        lambda x: x["input"][x["query_end_index"] :], axis=1
+    ).str.strip()
     df["answer"] = ""
     df["task"] = task
     df["max_new_tokens"] = max_new_tokens

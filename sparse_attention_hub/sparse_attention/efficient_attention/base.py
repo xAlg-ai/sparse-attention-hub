@@ -13,7 +13,7 @@ from ..base import SparseAttention, SparseAttentionConfig
 @dataclass
 class EfficientAttentionConfig(SparseAttentionConfig):
     """Configuration class for efficient attention mechanisms.
-    
+
     This is a base configuration class for production-ready sparse attention
     implementations that prioritize efficiency and performance.
     """
@@ -23,7 +23,7 @@ class EfficientAttentionConfig(SparseAttentionConfig):
 
 class EfficientAttention(SparseAttention):
     """Abstract base class for efficient attention mechanisms.
-    
+
     This class serves as the base for production-ready sparse attention
     implementations that are optimized for performance and memory efficiency,
     such as HashAttention and DoubleSparsity.
@@ -79,9 +79,11 @@ class EfficientAttention(SparseAttention):
         return concrete_class.create_from_config(config)
 
     @classmethod
-    def _get_implementation_registry(cls) -> Dict[Type[EfficientAttentionConfig], Type["EfficientAttention"]]:
+    def _get_implementation_registry(
+        cls,
+    ) -> Dict[Type[EfficientAttentionConfig], Type["EfficientAttention"]]:
         """Get the registry mapping config types to implementation classes.
-        
+
         Returns:
             Dictionary mapping config types to their corresponding implementation classes.
         """
@@ -100,19 +102,19 @@ class EfficientAttention(SparseAttention):
 
     @classmethod
     def _get_concrete_class(
-        cls, 
+        cls,
         config: EfficientAttentionConfig,
-        registry: Dict[Type[EfficientAttentionConfig], Type["EfficientAttention"]]
+        registry: Dict[Type[EfficientAttentionConfig], Type["EfficientAttention"]],
     ) -> Type["EfficientAttention"]:
         """Get the concrete implementation class for the given configuration.
-        
+
         Args:
             config: Configuration instance.
             registry: Registry mapping config types to implementation classes.
-            
+
         Returns:
             Concrete implementation class.
-            
+
         Raises:
             ValueError: If no implementation is found for the config type.
         """
