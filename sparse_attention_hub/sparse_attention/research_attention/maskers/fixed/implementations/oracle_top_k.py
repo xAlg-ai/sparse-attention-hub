@@ -37,8 +37,11 @@ class OracleTopKConfig(TopKMaskerConfig):
         """
         from ray import tune
 
-        return {"heavy_size": tune.grid_search([0.01, 0.025, 0.05])}
-        return {}
+        space_20 =  {"heavy_size": tune.grid_search([0.05, 0.1, 0.15])}
+        space_15 =  {"heavy_size": tune.grid_search([0.05, 0.075, 0.1])}
+        space_10 =  {"heavy_size": tune.grid_search([0.025, 0.05, 0.075])}
+        space_5 =  {"heavy_size": tune.grid_search([0.01, 0.02, 0.03])}
+        return space_20
 
 
 @MaskerRegistry.register(OracleTopKConfig)

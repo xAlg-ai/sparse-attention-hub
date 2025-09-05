@@ -122,10 +122,25 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
         """
         from ray import tune
 
+        base_5  =tune.grid_search([0.01, 0.02, 0.03])
+        base_10 =tune.grid_search([0.025, 0.05, 0.075])
+        base_15 =tune.grid_search([0.025, 0.05, 0.075, 0.1])
+        base_20 =tune.grid_search([0.05, 0.1, 0.15])
+
+        epsilon_5  =tune.grid_search([0.05, 0.1, 0.2, 0.3])
+        epsilon_10 =tune.grid_search([0.025, 0.05, 0.1, 0.2])
+        epsilon_15 =tune.grid_search([0.01, 0.025, 0.05, 0.1])
+        epsilon_20 =tune.grid_search([0.01, 0.025, 0.05, 0.1])
+
+        delta_5  =tune.grid_search([0.05, 0.1, 0.2, 0.3])
+        delta_10 =tune.grid_search([0.025, 0.05, 0.1, 0.2])
+        delta_15 =tune.grid_search([0.01, 0.025, 0.05, 0.1])
+        delta_20 =tune.grid_search([0.01, 0.025, 0.05, 0.1])
+
         return {
-            "base_rate_sampling": tune.grid_search([0.01, 0.025, 0.05]),
-            "epsilon": tune.grid_search([0.025, 0.05, 0.1, 0.2]),
-            "delta": tune.grid_search([0.025, 0.05, 0.1, 0.2]),
+            "base_rate_sampling": base_20,
+            "epsilon": epsilon_20,
+            "delta": delta_20,
         }
 
 

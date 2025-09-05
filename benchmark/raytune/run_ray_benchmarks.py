@@ -190,7 +190,9 @@ class GPUBenchmarkActor:
             metric_logger = MicroMetricLogger()
             metric_logger.configure_logging(
                 log_path=task.result_dir,
-                enabled_metrics=["research_attention_density", "research_attention_output_error"]
+                enabled_metrics=["research_attention_density", "research_attention_output_error"],
+                max_records=5000,
+                sampling_factor=0.1
             )
             
             # Run benchmark
