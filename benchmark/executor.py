@@ -217,12 +217,21 @@ def _benchmark_worker(
                     
                     # Import here to avoid issues with multiprocessing
                     from sparse_attention_hub.adapters.huggingface import ModelAdapterHF
+                    from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
+                    
+                    # Extract recovery settings if available
+                    recovery_kwargs = {}
+                    if isinstance(stub.sparse_attention_config, ResearchAttentionConfig):
+                        recovery_kwargs['recovery_enabled'] = stub.sparse_attention_config.recovery_enabled
+                        recovery_kwargs['recovery_interval'] = stub.sparse_attention_config.recovery_interval
+                        recovery_kwargs['recovery_dense_attention'] = stub.sparse_attention_config.recovery_dense_attention
                     
                     adapter = ModelAdapterHF(
                         model_name=stub.model_name,
                         sparse_attention_config=stub.sparse_attention_config,
                         model_kwargs=stub.adapter_config.model_kwargs,
-                        tokenizer_kwargs=stub.adapter_config.tokenizer_kwargs
+                        tokenizer_kwargs=stub.adapter_config.tokenizer_kwargs,
+                        **recovery_kwargs
                     )
                     
                     # Create benchmark instance

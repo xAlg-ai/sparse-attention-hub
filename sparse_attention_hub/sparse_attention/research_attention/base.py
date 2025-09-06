@@ -26,6 +26,9 @@ class ResearchAttentionConfig(SparseAttentionConfig):
     """Configuration class for research attention mechanisms."""
 
     masker_configs: List[MaskerConfig]
+    recovery_enabled: bool = False
+    recovery_interval: int = 400
+    recovery_dense_attention: Optional[str] = None
 
 
 class ResearchAttention(SparseAttention):

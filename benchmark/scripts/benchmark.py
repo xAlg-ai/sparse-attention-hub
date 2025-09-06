@@ -15,7 +15,7 @@ import torch
 from pathlib import Path
 
 # Add the project root to the path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from benchmark.executor import BenchmarkExecutor
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
@@ -23,31 +23,963 @@ from sparse_attention_hub.sparse_attention.research_attention import ResearchAtt
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
     LocalMaskerConfig, SinkMaskerConfig
 )
+from sparse_attention_hub.sparse_attention import (
+    ChannelConfig,
+    HashAttentionTopKMaskerConfig
+)
+
+from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+    AdaptiveSamplingMaskerConfig
+)
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
 # GPU Configuration
-GPUS = [0,2,7]  # Use all available GPUs
-MAX_CONCURRENT_RUNS = 3  # One per GPU
+GPUS = [0]  # Use all available GPUs
+MAX_CONCURRENT_RUNS = 1  # One per GPU
 
 # Model List
 MODELS = [
-    "microsoft/Phi-4-mini-instruct", 
-    "meta-llama/Llama-3.2-1B-Instruct",  
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 ]
+
+usa_weight_file = "/home/ubuntu/alex/sparse-attention-hub/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.pt"
+weight_file = "/home/ubuntu/alex/sparse-attention-hub/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+
+from sparse_attention_hub.sparse_attention.utils.hashattention_utils import create_hat_weights_file_from_usa
+create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
 
 # Sparse Attention Configurations
 SPARSE_CONFIGS = [
     # Dense baseline (no sparse attention)
-    ("dense", None),
-    
-    # StreamingLLM configurations
-    ("streaming_conservative", ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=4),
-        LocalMaskerConfig(window_size=16)
-    ])),
+    #("dense", None),
+    # hat2_NO_recovery_heavy_0.05 - 4 iterations
+    ("hat2_NO_recovery_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=False,
+    )),
+
+    ("hat2_NO_recovery_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=False,
+    )),
+
+    ("hat2_NO_recovery_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=False,
+    )),
+
+    ("hat2_NO_recovery_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=False,
+    )),
+
+    # hat2_recovery_10000_heavy_0.05 - 4 iterations
+    ("hat2_recovery_10000_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=10000,
+    )),
+
+    ("hat2_recovery_10000_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=10000,
+    )),
+
+    ("hat2_recovery_10000_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=10000,
+    )),
+
+    ("hat2_recovery_10000_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=10000,
+    )),
+
+    # hat2_recovery_100_heavy_0.05 - 4 iterations
+    ("hat2_recovery_100_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+
+    ("hat2_recovery_100_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+
+    ("hat2_recovery_100_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+
+    ("hat2_recovery_100_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+
+    # hat2_recovery_200_heavy_0.05 - 4 iterations
+    ("hat2_recovery_200_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=200,
+    )),
+
+    ("hat2_recovery_200_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=200,
+    )),
+
+    ("hat2_recovery_200_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=200,
+    )),
+
+    ("hat2_recovery_200_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=200,
+    )),
+
+    # hat2_recovery_300_heavy_0.05 - 4 iterations
+    ("hat2_recovery_300_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=300,
+    )),
+
+    ("hat2_recovery_300_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=300,
+    )),
+
+    ("hat2_recovery_300_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=300,
+    )),
+
+    ("hat2_recovery_300_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=300,
+    )),
+
+    # hat2_recovery_500_heavy_0.05 - 4 iterations
+    ("hat2_recovery_500_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=500,
+    )),
+
+    ("hat2_recovery_500_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=500,
+    )),
+
+    ("hat2_recovery_500_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=500,
+    )),
+
+    ("hat2_recovery_500_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=500,
+    )),
+
+    # hat2_recovery_1000_heavy_0.05 - 4 iterations
+    ("hat2_recovery_1000_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=1000,
+    )),
+
+    ("hat2_recovery_1000_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=1000,
+    )),
+
+    ("hat2_recovery_1000_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=1000,
+    )),
+
+    ("hat2_recovery_1000_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=1000,
+    )),
+
+    # hat2_recovery_2000_heavy_0.05 - 4 iterations
+    ("hat2_recovery_2000_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=2000,
+    )),
+
+    ("hat2_recovery_2000_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=2000,
+    )),
+
+    ("hat2_recovery_2000_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=2000,
+    )),
+
+    ("hat2_recovery_2000_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=2000,
+    )),
+
+    # hat2_recovery_5000_heavy_0.05 - 4 iterations
+    ("hat2_recovery_5000_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=5000,
+    )),
+
+    ("hat2_recovery_5000_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=5000,
+    )),
+
+    ("hat2_recovery_5000_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=5000,
+    )),
+
+    ("hat2_recovery_5000_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=5000,
+    )),
+
+    # hat2_recovery_10000_heavy_0.05 - 4 iterations (Note: This was duplicated earlier, so I'm placing it here in proper order)
+    ("hat2_recovery_20000_heavy_0.05_1", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=20000,
+    )),
+
+    ("hat2_recovery_20000_heavy_0.05_2", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=20000,
+    )),
+
+    ("hat2_recovery_20000_heavy_0.05_3", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=20000,
+    )),
+
+    ("hat2_recovery_20000_heavy_0.05_4", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
+            LocalMaskerConfig(window_size=128),       # Local attention window
+            HashAttentionTopKMaskerConfig(heavy_size=0.05, 
+                                        hat_bits=32, 
+                                        hat_mlp_layers=3, 
+                                        hat_mlp_hidden_size=128, 
+                                        hat_mlp_activation="silu",
+                                        hat_weight_file=weight_file,
+                                        hat_weights=None),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.05,              # 10% base sampling rate
+                epsilon=0.05,                         # 20% error bound
+                delta=0.05,                           # 20% confidence bound
+                init_offset=0.01,                       # Start sampling after local window
+                local_offset=0.01                      # Sample within local context
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=20000,
+    )),
 ]
 
 # Benchmark List
@@ -107,15 +1039,7 @@ mock_benchmark_config = BenchmarkConfig(
 
 # List of all sample configurations
 BENCHMARKS = [
-    infinite_bench_config,
-    ruler_config,
-    loogle_config,
-    zero_scrolls_config,
-    longbenchv2_config,
-    aime2024_config,
-    aime2025_config,
-    longbench_config,
-    mock_benchmark_config
+    aime2024_config
 ]
 
 
@@ -132,23 +1056,23 @@ ADAPTER_CONFIG = AdapterConfig(
 
 # Generation Parameters
 GENERATION_KWARGS = {
-    "max_new_tokens": 50,
-    "do_sample": False,
-    "temperature": 1.0,
-    "top_p": 1.0,
+    "max_new_tokens": 32768,
+    "do_sample": True,
+    "temperature": 0.6,
+    "top_p": 0.95,
     "pad_token_id": None,
 }
 
 # Request Parameters
 REQUEST_KWARGS = {
-    "max_context_length": 256,
-    "max_requests": 2,  # Limit for testing
+    "max_context_length": 32768,
+    "max_requests": 30,  # Limit for testing
 }
 
 # Execution Settings
 RESULT_DIR = "./benchmark_results"
 ENABLE_RESUMABILITY = True
-TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
+TIMEOUT_PER_BENCHMARK = 60 * 60 * 24  # 1 day
 
 # ============================================================================
 # MAIN EXECUTION
