@@ -10,3 +10,7 @@ python ./open_evolve_masker/openevolve/openevolve-run.py  ./sparse_attention_hub
 
 ```
 
+Dependencies:
+```
+pip install torch pyyaml numpy openai scipy transformers matplotlib pandas seaborn datasets rouge nltk bert_score jieba fuzzywuzzy python-Levenshtein flash_attn
+```
