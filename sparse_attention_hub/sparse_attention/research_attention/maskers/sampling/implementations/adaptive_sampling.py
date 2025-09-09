@@ -136,12 +136,41 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
         delta_10 =tune.grid_search([0.025, 0.05, 0.1, 0.2])
         delta_15 =tune.grid_search([0.01, 0.025, 0.05, 0.1])
         delta_20 =tune.grid_search([0.01, 0.025, 0.05, 0.1])
-
-        return {
+        
+        space_5 = {
+            "base_rate_sampling": base_5,
+            "epsilon": epsilon_5,
+            "delta": delta_5,
+        }
+        space_10 = {
+            "base_rate_sampling": base_10,
+            "epsilon": epsilon_10,
+            "delta": delta_10,
+        }
+        space_15 = {
+            "base_rate_sampling": base_15,
+            "epsilon": epsilon_15,
+            "delta": delta_15,
+        }
+        space_20 = {
             "base_rate_sampling": base_20,
             "epsilon": epsilon_20,
             "delta": delta_20,
         }
+        import os
+        sparsity = os.environ.get("TARGET_SPARSITY")
+        print("AdaptiveSamplingMasker Sparsity target is ", sparsity, flush=True)
+        if sparsity == "5":
+            return space_5
+        elif sparsity == "10":
+            return space_10
+        elif sparsity == "15":
+            return space_15
+        elif sparsity == "20":
+            return space_20
+        raise ValueError(f"Invalid sparsity: {sparsity}")
+
+
 
 
 @MaskerRegistry.register(AdaptiveSamplingMaskerConfig)

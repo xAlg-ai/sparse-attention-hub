@@ -756,7 +756,7 @@ def get_all_sparse_configs(weight_file: str = None, objective: str = "default") 
     #     ])
     #     optimal_configs.append((name, config, classes))
 
-    #3. HashAttention top k
+    # #3. HashAttention top k
     # for heavy_size in [0.05,0.1, 0.15, 0.2]:
     #     classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig]
     #     name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
@@ -787,22 +787,22 @@ def get_all_sparse_configs(weight_file: str = None, objective: str = "default") 
     ############################## to optimize configs ##############################
 
 
-    #1. Adaptive sampling with oracle top k
-    classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig, AdaptiveSamplingMaskerConfig]
-    name = get_masker_list_name(classes, other_params={"objective": objective})
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=0.10),  # Middle value from search space
-        AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.1,  # Middle value
-            epsilon=0.25,  # Middle value
-            delta=0.25,  # Middle value
-            init_offset=128,  # Middle value
-            local_offset=128  # Middle value
-        )
-    ])
-    to_optimize_configs.append((name, config, classes))
+    # #1. Adaptive sampling with oracle top k
+    # classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig, AdaptiveSamplingMaskerConfig]
+    # name = get_masker_list_name(classes, other_params={"objective": objective})
+    # config = ResearchAttentionConfig(masker_configs=[
+    #     SinkMaskerConfig(sink_size=128),
+    #     LocalMaskerConfig(window_size=128),
+    #     OracleTopKConfig(heavy_size=0.10),  # Middle value from search space
+    #     AdaptiveSamplingMaskerConfig(
+    #         base_rate_sampling=0.1,  # Middle value
+    #         epsilon=0.25,  # Middle value
+    #         delta=0.25,  # Middle value
+    #         init_offset=128,  # Middle value
+    #         local_offset=128  # Middle value
+    #     )
+    # ])
+    # to_optimize_configs.append((name, config, classes))
 
     # 2. Adaptive sampling with oracle top p
 
@@ -822,40 +822,40 @@ def get_all_sparse_configs(weight_file: str = None, objective: str = "default") 
     # ])
     # to_optimize_configs.append((name, config, classes))
     
-    #3. Adaptive sampling with HAT top k
-    classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig, AdaptiveSamplingMaskerConfig]
+    # #3. Adaptive sampling with HAT top k
+    # classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig, AdaptiveSamplingMaskerConfig]
+    # name = get_masker_list_name(classes, other_params={"objective": objective})
+    # config = ResearchAttentionConfig(masker_configs=[
+    #     SinkMaskerConfig(sink_size=128),
+    #     LocalMaskerConfig(window_size=128),
+    #     HashAttentionTopKMaskerConfig(
+    #         heavy_size=0.05,  # Required parameter
+    #         hat_bits=32,  # Required parameter
+    #         hat_mlp_layers=3,  # Required parameter
+    #         hat_mlp_hidden_size=128,  # Required parameter
+    #         hat_mlp_activation="silu",  # Required parameter
+    #         hat_weight_file=weight_file  # Weight file is required
+    #     ),
+    #     AdaptiveSamplingMaskerConfig(
+    #         base_rate_sampling=0.1,
+    #         epsilon=0.25,
+    #         delta=0.25,
+    #         init_offset=128,
+    #         local_offset=128
+    #     )
+    # ])
+    # to_optimize_configs.append((name, config, classes))
+    
+    
+    # 4. Oracle top p
+    classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopPMaskerConfig]
     name = get_masker_list_name(classes, other_params={"objective": objective})
     config = ResearchAttentionConfig(masker_configs=[
         SinkMaskerConfig(sink_size=128),
         LocalMaskerConfig(window_size=128),
-        HashAttentionTopKMaskerConfig(
-            heavy_size=0.05,  # Required parameter
-            hat_bits=32,  # Required parameter
-            hat_mlp_layers=3,  # Required parameter
-            hat_mlp_hidden_size=128,  # Required parameter
-            hat_mlp_activation="silu",  # Required parameter
-            hat_weight_file=weight_file  # Weight file is required
-        ),
-        AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.1,
-            epsilon=0.25,
-            delta=0.25,
-            init_offset=128,
-            local_offset=128
-        )
+        OracleTopPMaskerConfig(top_p=0.7)  # Default middle value from search space
     ])
     to_optimize_configs.append((name, config, classes))
-    
-    
-    # # 4. Oracle top p
-    # classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopPMaskerConfig]
-    # name = get_masker_list_name(classes)
-    # config = ResearchAttentionConfig(masker_configs=[
-    #     SinkMaskerConfig(sink_size=128),
-    #     LocalMaskerConfig(window_size=128),
-    #     OracleTopPMaskerConfig(top_p=0.7)  # Default middle value from search space
-    # ])
-    # to_optimize_configs.append((name, config, classes))
     
 
     # # 5. MagicPig config
@@ -899,16 +899,16 @@ def get_run_configuration(args: argparse.Namespace) -> dict:
                 # "infinite_bench/passkey",
                 # "ruler/4096",
                 # "loogle/longdep_summarization",
-                # "loogle/longdep_qa",
-                # "loogle/shortdep_qa",
-                # "loogle/shortdep_cloze",
+                # # "loogle/longdep_qa",
+                "loogle/shortdep_qa",
+                "loogle/shortdep_cloze",
                 # # "zero_scrolls/default",
                 # "longbenchv2/0shot",
                 # "longbenchv2/cot",
                 #"aime2024/aime2024",
-                # "aime2025/aime2025",
-                #"longbench/hotpotqa",
-                 "longbench/multifieldqa_en",
+                # # "aime2025/aime2025",
+                # "longbench/hotpotqa",
+                # "longbench/multifieldqa_en",
                 # "mock_benchmark/reading_comprehension",
                 # "ruler32k/qa_1",
                 # "ruler32k/qa_2",

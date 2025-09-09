@@ -189,6 +189,9 @@ class Benchmark(ABC):
                 answer_prefix = df_group["answer_prefix"].iloc[0]
                 request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
                 
+                max_new_tokens = df_group["max_new_tokens"].iloc[0]
+                generation_kwargs["max_new_tokens"] = min(generation_kwargs["max_new_tokens"], max_new_tokens)
+                
                 # Process through adapter
                 response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
                 

@@ -49,7 +49,20 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
         space_15 =  {"heavy_size": tune.grid_search([0.05, 0.075, 0.1])}
         space_10 =  {"heavy_size": tune.grid_search([0.025, 0.05, 0.075])}
         space_5 =  {"heavy_size": tune.grid_search([0.01, 0.02, 0.03])}
-        return space_20
+        import os 
+        sparsity = os.environ.get("TARGET_SPARSITY")
+        print("HashAttentionTopKMasker Sparsity target is ", sparsity, flush=True)
+
+        if sparsity == "20":
+            return space_20
+        elif sparsity == "15":
+            return space_15
+        elif sparsity == "10":
+            return space_10
+        elif sparsity == "5":
+            return space_5
+        raise ValueError(f"Invalid sparsity: {sparsity}")
+
 
 
 @MaskerRegistry.register(HashAttentionTopKMaskerConfig)
