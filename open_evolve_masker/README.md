@@ -12,5 +12,7 @@ python ./open_evolve_masker/openevolve/openevolve-run.py  ./sparse_attention_hub
 
 Dependencies:
 ```
-pip install torch pyyaml numpy openai scipy transformers matplotlib pandas seaborn datasets rouge nltk bert_score jieba fuzzywuzzy python-Levenshtein flash_attn
+/workspace/audrey/miniconda3/bin/conda init
+pip install torch pyyaml numpy openai scipy transformers matplotlib pandas seaborn datasets rouge nltk
+pip install bert_score jieba fuzzywuzzy python-Levenshtein flash_attn
 ```
