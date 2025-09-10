@@ -120,6 +120,8 @@ class ModelAdapterHF(ModelAdapter):
         with torch.no_grad():
             for question in questions:
                 sparse_meta_data: Dict[str, Any] = {}
+                if "dense_layers" in request_kwargs.keys():
+                    sparse_meta_data["dense_layers"] = request_kwargs["dense_layers"]
 
                 question_tokens = self.tokenizer.encode(question, return_tensors="pt")
                 if self.device is not None:

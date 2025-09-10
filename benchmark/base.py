@@ -164,6 +164,14 @@ class Benchmark(ABC):
 
         # Truncate dataset to max_requests
         dataset_df = dataset_df.head(max_requests)
+
+        if "process_question_via_dense" in request_kwargs.keys():
+            process_question_via_dense = request_kwargs["process_question_via_dense"]
+        else:
+            process_question_via_dense = False
+        if process_question_via_dense:
+            dataset_df["context"] = dataset_df["context"] + dataset_df["question"]
+            dataset_df["question"] = ""
         
         
         # Group by context for efficiency (following HashAttention approach)

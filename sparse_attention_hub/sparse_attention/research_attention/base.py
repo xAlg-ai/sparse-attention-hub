@@ -99,18 +99,26 @@ class ResearchAttention(SparseAttention):
         )
 
         # Apply all maskers sequentially, each one on the output of the previous one
-        for masker in self.maskers:
-            sparse_attention_mask = masker.add_mask(
-                keys=keys,
-                queries=queries,
-                values=values,
-                attention_mask=attention_mask,
-                scaling=scaling,
-                dropout=dropout,
-                sparse_meta_data=sparse_meta_data,
-                previous_mask=sparse_attention_mask,
-                **kwargs,
-            )
+        layer_idx = kwargs["layer_idx"]
+        is_dense = False
+        if "dense_layers" in sparse_meta_data.keys():
+            is_dense = layer_idx in sparse_meta_data["dense_layers"]
+
+        if is_dense:
+            sparse_attention_mask = Mask.create_full_mask(mask_shape, dtype=queries.dtype)
+        else:
+            for masker in self.maskers:
+                sparse_attention_mask = masker.add_mask(
+                    keys=keys,
+                    queries=queries,
+                    values=values,
+                    attention_mask=attention_mask,
+                    scaling=scaling,
+                    dropout=dropout,
+                    sparse_meta_data=sparse_meta_data,
+                    previous_mask=sparse_attention_mask,
+                    **kwargs,
+                )
 
         if MicroMetricLogger().is_metric_enabled("research_attention_density"):
             MicroMetricLogger().log(
