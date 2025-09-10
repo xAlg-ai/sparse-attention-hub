@@ -304,32 +304,24 @@ class OpenEvolveMasker(ResearchMasker):
         # NEW – extra sparsification while keeping statistical guarantees
         # ------------------------------------------------------------------ #
 
-        # --- DENSITY-BOOSTING STRATEGY ---
-        # Make budget scaling adaptive based on error feedback if available, or use more aggressive static scaling.
-        # Aim: Reduce density without hurting error.
+        # (1) Aggressively shrink the statistical budget
+        budget = torch.ceil(budget.float() * 0.62).long()
 
-        # (1) Scale budget more aggressively (tuned lower empirically).
-        budget = torch.ceil(budget.float() * 0.54).long()
-
-        # (2) Use slightly higher minimum base (helps std and very sparse zones)
-        min_base = max(num_base_samples, 4)
+        # (2) Increase base sample count for better std estimation at low density
+        min_base = max(num_base_samples, 3)
         budget = torch.clamp(budget, min=min_base)
 
-        # (3) Tight cap: at most 8% of available keys per row
-        max_budget = max(min_base, int(0.08 * sampling_range))
+        # (3) More aggressive cap: at most 10 % of the available keys per row
+        max_budget = max(min_base, int(0.10 * sampling_range))
         budget = torch.clamp(budget, max=max_budget)
 
-        # (4) Enforce a sensible minimum (2 for very short sequence regions)
+        # (4) Set even lower bound for budget for short sequence regions
         budget = torch.clamp(budget, min=2)
 
-        # (5) (optional) If static_denominator is very large, lower sampling even more for ultra-sparse attention
-        if torch.median(static_denominator) > 5.0:
-            budget = torch.clamp(budget, max=max(min_base, int(0.06 * sampling_range)))
-
-        # (6) Sampling probabilities re-computed after tightening caps
+        # Re-compute sampling probabilities after final budget adjustment
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
 
-        # Create adaptive mask and merge with previous one
+        # Create adaptive mask and merge with the previous one
         adaptive_mask = create_sampling_mask_with_per_head_budget(
             budgets=budget,
             sampling_probability=sampling_probabilities,

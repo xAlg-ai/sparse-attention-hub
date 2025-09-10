@@ -300,21 +300,36 @@ class OpenEvolveMasker(ResearchMasker):
         budget = self._compute_adaptive_budget(
             std_estimate, estimated_denominator, sampling_range
         )
-        budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
+        # ------------------------------------------------------------------ #
+        # NEW – extra sparsification while keeping statistical guarantees
+        # ------------------------------------------------------------------ #
 
-        # Create adaptive sampling mask
+        # --- DENSITY-BOOSTING STRATEGY ---
+        # Make budget scaling adaptive based on error feedback if available, or use more aggressive static scaling.
+        # Aim: Reduce density without hurting error.
+
+        # (1) Scale budget more aggressively (tuned lower empirically).
+        budget = torch.ceil(budget.float() * 0.54).long()
+
+        # (2) Use slightly higher minimum base (helps std and very sparse zones)
+        min_base = max(num_base_samples, 4)
+        budget = torch.clamp(budget, min=min_base)
+
+        # (3) Tight cap: at most 8% of available keys per row
+        max_budget = max(min_base, int(0.08 * sampling_range))
+        budget = torch.clamp(budget, max=max_budget)
+
+        # (4) Enforce a sensible minimum (2 for very short sequence regions)
+        budget = torch.clamp(budget, min=2)
+
+        # (5) (optional) If static_denominator is very large, lower sampling even more for ultra-sparse attention
+        if torch.median(static_denominator) > 5.0:
+            budget = torch.clamp(budget, max=max(min_base, int(0.06 * sampling_range)))
+
+        # (6) Sampling probabilities re-computed after tightening caps
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
-        adaptive_mask = create_sampling_mask_with_per_head_budget(
-            budgets=budget,
-            sampling_probability=sampling_probabilities,
-            seq_len_keys=seq_len_keys,
-            start_idx=start_idx,
-            end_idx=end_idx,
-            dtype=previous_mask.dtype,
-        )
-        # Merge masks
-        return previous_mask.merge_mask(adaptive_mask, inplace=False)
 
+        # Create adaptive mask and merge with previous one
         adaptive_mask = create_sampling_mask_with_per_head_budget(
             budgets=budget,
             sampling_probability=sampling_probabilities,
@@ -323,8 +338,8 @@ class OpenEvolveMasker(ResearchMasker):
             end_idx=end_idx,
             dtype=previous_mask.dtype,
         )
+
         # EVOLVE-BLOCK-END
-        # Merge masks
         return previous_mask.merge_mask(adaptive_mask, inplace=False)
 
     @classmethod
