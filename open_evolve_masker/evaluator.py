@@ -92,8 +92,8 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     from pathlib import Path
     from sparse_attention_hub.adapters import ModelAdapterHF
     from benchmark import LongBench
-    from benchmark import Ruler
-    from benchmark import Loogle
+    from benchmark.ruler import Ruler
+    from benchmark.loogle import Loogle
     from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
     
     # Model configuration
@@ -162,7 +162,7 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
             adapter,
             bench_dir,
             request_kwargs={
-                "max_requests": 10,
+                "max_requests": 2,
                 "max_context_length": 16000
             }
         )
@@ -190,8 +190,8 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
 
 def evaluate(program_path: str):
     old_path = os.getcwd()
-    os.chdir("/home/apd10/code/sparse-attention-hub/")
-    sys.path.insert(0, "/home/apd10/code/sparse-attention-hub/")
+    os.chdir("/workspace/audrey/sparse-attention-hub/")
+    sys.path.insert(0, "/workspace/audrey/sparse-attention-hub/")
 
     if not os.path.isfile(program_path):
         raise FileNotFoundError(f"No such file: {program_path}")
