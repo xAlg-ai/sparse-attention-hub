@@ -92,6 +92,8 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     from pathlib import Path
     from sparse_attention_hub.adapters import ModelAdapterHF
     from benchmark import LongBench
+    from benchmark import Ruler
+    from benchmark import Loogle
     from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
     
     # Model configuration
@@ -115,7 +117,7 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     result_dir = base_result_dir / str(next_dir_num)
     result_dir.mkdir(exist_ok=True)
     
-    print(f"Running benchmark in {result_dir}")
+    print(f"Running benchmarks in {result_dir}")
     
     # Setup metric logger
     logger = MicroMetricLogger()
@@ -144,24 +146,41 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     )
     
     
-    # Setup benchmark
-    benchmark = LongBench(["passage_retrieval_en"])
-    
-    # Run benchmark
-    benchmark.run_benchmark(
-        adapter, 
-        result_dir, 
-        request_kwargs={
-            "max_requests": 2, 
-            "max_context_length": 32000
+    # Setup benchmarks (minimal subsets for quick signal)
+    benchmarks = [
+        ("longbench", LongBench(["passage_retrieval_en"])),
+        ("ruler", Ruler(["4096"])),
+        ("loogle", Loogle(["shortdep_qa"]))
+    ]
+
+    # Run each benchmark into its own subdirectory and collect micro-metrics
+    collected: list[dict] = []
+    for name, bench in benchmarks:
+        bench_dir = result_dir / name
+        bench_dir.mkdir(exist_ok=True)
+        bench.run_benchmark(
+            adapter,
+            bench_dir,
+            request_kwargs={
+                "max_requests": 10,
+                "max_context_length": 16000
+            }
+        )
+        logger.flush()
+        collected.append(read_micro_metrics(str(bench_dir)))
+
+    # Aggregate metrics across benchmarks by simple average
+    if collected:
+        avg_density = sum(m["density"] for m in collected) / len(collected)
+        avg_error = sum(m["error"] for m in collected) / len(collected)
+        metrics = {
+            "density": avg_density,
+            "error": avg_error,
+            "combined_score": (avg_density + avg_error) / 2,
         }
-    )
-    
-    # Flush logger to ensure all metrics are written
-    logger.flush()
-    
-    # Read and return metrics
-    metrics = read_micro_metrics(str(result_dir))
+    else:
+        metrics = {"density": 0.0, "error": 0.0, "combined_score": 0.0}
+
     print(metrics)
     del adapter.model
     del adapter
