@@ -38,7 +38,11 @@ def read_micro_metrics(result_dir: str):
     for path in result_path.rglob("micro_metrics.jsonl"):
         micro_metrics_file = path
         break
-    if not micro_metrics_file.exists():
+    if micro_metrics_file is None or not micro_metrics_file.exists():
+        # Debug: list all files in the directory
+        print(f"Debug: Files in {result_dir}:")
+        for file_path in result_path.rglob("*"):
+            print(f"  {file_path}")
         raise FileNotFoundError(f"micro_metrics.jsonl not found in {result_dir}")
     
     density_values: list[float] = []
@@ -158,6 +162,14 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     for name, bench in benchmarks:
         bench_dir = result_dir / name
         bench_dir.mkdir(exist_ok=True)
+        
+        # Configure logger for this specific benchmark
+        bench_logger = MicroMetricLogger()
+        bench_logger.configure_logging(
+            log_path=str(bench_dir),
+            enabled_metrics=["research_attention_density", "research_attention_output_error"]
+        )
+        
         bench.run_benchmark(
             adapter,
             bench_dir,
@@ -166,7 +178,7 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
                 "max_context_length": 16000
             }
         )
-        logger.flush()
+        bench_logger.flush()
         collected.append(read_micro_metrics(str(bench_dir)))
 
     # Aggregate metrics across benchmarks by simple average
