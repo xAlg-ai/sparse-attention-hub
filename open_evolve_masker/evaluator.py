@@ -97,7 +97,6 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     from sparse_attention_hub.adapters import ModelAdapterHF
     from benchmark import LongBench
     from benchmark.ruler import Ruler
-    from benchmark.loogle import Loogle
     from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
     
     # Model configuration
@@ -153,8 +152,7 @@ def run_benchmark_and_collect_metrics(sparse_attention_config):
     # Setup benchmarks (minimal subsets for quick signal)
     benchmarks = [
         ("longbench", LongBench(["passage_retrieval_en"])),
-        ("ruler", Ruler(["4096"])),
-        ("loogle", Loogle(["shortdep_qa"]))
+        ("ruler", Ruler(["4096"]))
     ]
 
     # Run each benchmark into its own subdirectory and collect micro-metrics
