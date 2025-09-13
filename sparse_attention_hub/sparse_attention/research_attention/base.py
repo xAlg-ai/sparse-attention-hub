@@ -90,6 +90,8 @@ class ResearchAttention(SparseAttention):
         Returns:
             Tuple of attention output and optional attention weights.
         """
+        #if kwargs["layer_idx"] == 0:
+        #    print(f"ResearchAttention.custom_attention called", flush=True)
         # Create an empty Mask object
         mask_shape: Tuple[int, int, int, int] = (
             queries.shape[0],

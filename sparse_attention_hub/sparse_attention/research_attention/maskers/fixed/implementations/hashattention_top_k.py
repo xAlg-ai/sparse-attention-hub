@@ -327,7 +327,7 @@ class HashAttentionTopKMasker(TopKMasker):
             concatenated_signatures: torch.Tensor = torch.cat(
                 [cached_signatures, new_signatures], dim=2
             )
-            sparse_meta_data["key"][layer_idx] = concatenated_signatures
+            #sparse_meta_data["key"][layer_idx] = concatenated_signatures
             return concatenated_signatures
 
     def _compute_hashattention_score(

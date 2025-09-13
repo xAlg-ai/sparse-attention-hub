@@ -431,6 +431,7 @@ class ModelAdapterHF(ModelAdapter):
                 if hasattr(module, "config") and hasattr(
                     module.config, "_attn_implementation"
                 ):
+                    #print(f"Switching to sparse attention for {name}", module.config._attn_implementation, "->", custom_attention_name, flush=True)
                     module.config._attn_implementation = custom_attention_name
 
             yield
@@ -439,6 +440,7 @@ class ModelAdapterHF(ModelAdapter):
             # Restore original implementations
             for name, module in self.model.named_modules():
                 if name in original_implementations:
+                    #print(f"Restoring original implementation for {name}", module.config._attn_implementation, "->", original_implementations[name], flush=True)
                     module.config._attn_implementation = original_implementations[name]
 
             # Clean up instance variable
@@ -523,7 +525,7 @@ class ModelAdapterHF(ModelAdapter):
         else:
             print("Greedy decoding enabled")
 
-        for i in range(max_new_tokens - 1):
+        for i in tqdm(range(max_new_tokens - 1)):
             with torch.no_grad():
                 outputs = self.model(
                     input_ids=generated_ids[-1].unsqueeze(0).unsqueeze(0),
@@ -636,12 +638,10 @@ class ModelAdapterHF(ModelAdapter):
         print("Forcing dense attention for regeneration")
 
         # Store current sparse implementations and switch to dense implementations
-        current_sparse_implementations: Dict[str, str] = {}
         for name, module in self.model.named_modules():
             has_config = hasattr(module, "config")
             has_attn_impl = has_config and hasattr(module.config, "_attn_implementation")
             if name in original_implementations and has_attn_impl:
-                current_sparse_implementations[name] = module.config._attn_implementation
                 # Use override if provided, otherwise use original implementation
                 dense_implementation = (
                     self.recovery_dense_attention or original_implementations[name]
@@ -661,6 +661,7 @@ class ModelAdapterHF(ModelAdapter):
         finally:
             # Restore sparse attention implementations
             for name, module in self.model.named_modules():
-                if name in current_sparse_implementations:
-                    module.config._attn_implementation = current_sparse_implementations[name]
-            print("Restored sparse attention mode")
+                if hasattr(module, "config") and hasattr(
+                    module.config, "_attn_implementation"
+                ):
+                    module.config._attn_implementation = self._registered_attention_name
