@@ -25,13 +25,16 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
 )
 from sparse_attention_hub.sparse_attention import (
     ChannelConfig,
-    HashAttentionTopKMaskerConfig
+    HashAttentionTopKMaskerConfig,
 )
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
     AdaptiveSamplingMaskerConfig
 )
 
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
+    OracleTopKConfig
+)
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -52,7 +55,7 @@ from sparse_attention_hub.sparse_attention.utils.hashattention_utils import crea
 create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
 
 # Sparse Attention Configurations
-SPARSE_CONFIGS = [
+ALEX_SPARSE_CONFIGS = [
     # Dense baseline (no sparse attention)
     #("dense", None),
     # hat2_NO_recovery_heavy_0.05 - 4 iterations
@@ -985,30 +988,72 @@ SPARSE_CONFIGS = [
 
 SPARSE_CONFIGS = [
     #("dense", None),
-    ("test_hat_adpative_hat", ResearchAttentionConfig(
-    masker_configs=[
-        SinkMaskerConfig(sink_size=128),           # Keep first 128 tokens (sink attention)
-        LocalMaskerConfig(window_size=128),       # Local attention window
-        HashAttentionTopKMaskerConfig(heavy_size=0.05, 
-                                    hat_bits=64, 
-                                    hat_mlp_layers=2, 
-                                    hat_mlp_hidden_size=128, 
-                                    hat_mlp_activation="silu",
-                                    hat_weight_file=weight_file,
-                                    hat_weights=None),
-        AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.05,              # 10% base sampling rate
-            epsilon=0.025,                         # 20% error bound
-            delta=0.025,                           # 20% confidence bound
-            init_offset=128,                       # Start sampling after local window
-            local_offset=128                      # Sample within local context
-        )
-    ],
-    recovery_enabled=True,
-    recovery_interval=25,
+    ("test_oracle_topk_adaptive_norecovery", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=0.025),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.025,
+                epsilon=0.05,
+                delta=0.05,
+                init_offset=128,
+                local_offset=128
+            )
+        ],
+        recovery_enabled=False,
+        recovery_interval=32000,
     )),
-
+    ("test_oracle_topk_adaptive_recovery_100", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=0.025),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.025,
+                epsilon=0.05,
+                delta=0.05,
+                init_offset=128,
+                local_offset=128
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+    ("test_oracle_topk_adaptive_recovery_400", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=0.025),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.025,
+                epsilon=0.05,
+                delta=0.05,
+                init_offset=128,
+                local_offset=128
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=400,
+    )),
+    ("test_oracle_topk_adaptive_recovery_800", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=0.025),
+            AdaptiveSamplingMaskerConfig(
+                base_rate_sampling=0.025,
+                epsilon=0.05,
+                delta=0.05,
+                init_offset=128,
+                local_offset=128
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=800,
+    )),
 ]
+
 
 
 
@@ -1096,11 +1141,11 @@ GENERATION_KWARGS = {
 # Request Parameters
 REQUEST_KWARGS = {
     "max_context_length": 32768,
-    "max_requests": 30,  # Limit for testing
+    "max_requests": 2,  # Limit for testing
 }
 
 # Execution Settings
-RESULT_DIR = "./benchmark_results_test"
+RESULT_DIR = "./benchmark_results_test.1"
 ENABLE_RESUMABILITY = True
 TIMEOUT_PER_BENCHMARK = 60 * 60 * 24  # 1 day
 
