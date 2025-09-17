@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from typing import Optional
 import math
+import time
 from ref_vAttention import *
 import pickle
 
@@ -63,7 +64,8 @@ def run_mha_example():
     hat_mlp_hidden_size = 128
     hat_mlp_activation = "silu"
     # present in HashAttention-1.0 repo in xAlg-ai
-    hat_weight_file = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+    # hat_weight_file = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+    hat_weight_file = "/FirstIntelligence/home/shuo/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
 
     # adaptive sampling masker config parameters
     base_rate_sampling = 0.05
@@ -99,6 +101,103 @@ def run_mha_example():
     )
 
 
+def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
+    """
+    Simple micro-benchmark for ref_vAttention_fwd to measure average runtime (milliseconds) on GPU.
+    """
+    import time
+    from scipy.stats import norm
+
+    batch_size = 1
+    query_heads = 32
+    kv_heads = 32
+    query_len = 1
+    kv_len = 10240
+    d_model = 128
+
+    torch.manual_seed(0)
+    torch.cuda.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    # Attention tensors
+    queries = torch.randn(batch_size, query_heads, query_len, d_model, dtype=torch.float32).to("cuda")
+    keys = torch.randn(batch_size, kv_heads, kv_len, d_model, dtype=torch.float32).to("cuda")
+    values = torch.randn(batch_size, kv_heads, kv_len, d_model, dtype=torch.float32).to("cuda")
+
+    # vAttention configuration
+    sink_size = 0.05
+    window_size = 0.05
+    heavy_size = 0.05
+    hat_bits = 32
+    hat_mlp_layers = 3
+    hat_mlp_hidden_size = 128
+    hat_mlp_activation = "silu"
+    hat_weight_file = "/FirstIntelligence/home/shuo/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+
+    base_rate_sampling = 0.05
+    epsilon = 0.25
+    delta = 0.25
+
+    hat_weights_query_matrix, hat_weights_query_bias, hat_weights_key_matrix, hat_weights_key_bias = extract_layer_weights(
+        hat_weight_file, 0, dtype=torch.float32, device="cuda"
+    )
+
+    # Warm-up runs to stabilize kernels
+    for _ in range(warmup_runs):
+        _ = ref_vAttention_fwd(
+            queries=queries.squeeze(2),
+            keys=keys,
+            values=values,
+            cached_key_signatures=None,
+            sink_size=sink_size,
+            window_size=window_size,
+            heavy_size=heavy_size,
+            hat_bits=hat_bits,
+            hat_mlp_layers=hat_mlp_layers,
+            hat_mlp_hidden_size=hat_mlp_hidden_size,
+            hat_mlp_activation=hat_mlp_activation,
+            hat_weights_query_matrix=hat_weights_query_matrix,
+            hat_weights_query_bias=hat_weights_query_bias,
+            hat_weights_key_matrix=hat_weights_key_matrix,
+            hat_weights_key_bias=hat_weights_key_bias,
+            base_rate_sampling=base_rate_sampling,
+            epsilon=epsilon,
+            delta_ppf=norm.ppf(1 - delta),
+        )
+        torch.cuda.synchronize()
+
+    # Benchmark timed runs
+    torch.cuda.synchronize()
+    start_time = time.time()
+    for _ in range(num_runs):
+        _ = ref_vAttention_fwd(
+            queries=queries.squeeze(2),
+            keys=keys,
+            values=values,
+            cached_key_signatures=None,
+            sink_size=sink_size,
+            window_size=window_size,
+            heavy_size=heavy_size,
+            hat_bits=hat_bits,
+            hat_mlp_layers=hat_mlp_layers,
+            hat_mlp_hidden_size=hat_mlp_hidden_size,
+            hat_mlp_activation=hat_mlp_activation,
+            hat_weights_query_matrix=hat_weights_query_matrix,
+            hat_weights_query_bias=hat_weights_query_bias,
+            hat_weights_key_matrix=hat_weights_key_matrix,
+            hat_weights_key_bias=hat_weights_key_bias,
+            base_rate_sampling=base_rate_sampling,
+            epsilon=epsilon,
+            delta_ppf=norm.ppf(1 - delta),
+        )
+        torch.cuda.synchronize()
+    avg_ms = (time.time() - start_time) * 1000 / num_runs
+    print(f"ref_vAttention_fwd average runtime over {num_runs} runs: {avg_ms:.2f} ms")
+
+
 if __name__ == "__main__":
     run_mha_example()
+    benchmark_vattention()
     
