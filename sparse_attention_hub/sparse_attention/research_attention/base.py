@@ -26,6 +26,9 @@ class ResearchAttentionConfig(SparseAttentionConfig):
     """Configuration class for research attention mechanisms."""
 
     masker_configs: List[MaskerConfig]
+    recovery_enabled: bool = False
+    recovery_interval: int = 400
+    recovery_dense_attention: Optional[str] = None
 
 
 class ResearchAttention(SparseAttention):
@@ -87,6 +90,8 @@ class ResearchAttention(SparseAttention):
         Returns:
             Tuple of attention output and optional attention weights.
         """
+        #if kwargs["layer_idx"] == 0:
+        #    print(f"ResearchAttention.custom_attention called", flush=True)
         # Create an empty Mask object
         mask_shape: Tuple[int, int, int, int] = (
             queries.shape[0],

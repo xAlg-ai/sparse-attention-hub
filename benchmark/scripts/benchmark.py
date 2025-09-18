@@ -15,7 +15,7 @@ import torch
 from pathlib import Path
 
 # Add the project root to the path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from benchmark.executor import BenchmarkExecutor
 from benchmark.executor_config import BenchmarkConfig, AdapterConfig
@@ -23,32 +23,98 @@ from sparse_attention_hub.sparse_attention.research_attention import ResearchAtt
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
     LocalMaskerConfig, SinkMaskerConfig
 )
+from sparse_attention_hub.sparse_attention import (
+    ChannelConfig,
+    HashAttentionTopKMaskerConfig,
+)
 
+from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+    AdaptiveSamplingMaskerConfig
+)
+
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
+    OracleTopKConfig
+)
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
 # GPU Configuration
-GPUS = [0,2,7]  # Use all available GPUs
-MAX_CONCURRENT_RUNS = 3  # One per GPU
+GPUS = [0]  # Use all available GPUs
+MAX_CONCURRENT_RUNS = 1  # One per GPU
 
 # Model List
 MODELS = [
-    "microsoft/Phi-4-mini-instruct", 
-    "meta-llama/Llama-3.2-1B-Instruct",  
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 ]
 
+usa_weight_file = "/nvme/sparse-attention-hub/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K.pt"
+weight_file = "/nvme/sparse-attention-hub/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K.hat_weights.pkl"
+
+from sparse_attention_hub.sparse_attention.utils.hashattention_utils import create_hat_weights_file_from_usa
+create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
+
 # Sparse Attention Configurations
+
 SPARSE_CONFIGS = [
-    # Dense baseline (no sparse attention)
-    ("dense", None),
-    
-    # StreamingLLM configurations
-    ("streaming_conservative", ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=4),
-        LocalMaskerConfig(window_size=16)
-    ])),
+    #("dense", None),
+    ("test_oracle_topk_norecovery", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=0.05),
+        ],
+        recovery_enabled=False,
+        recovery_interval=32000,
+    )),
+
+    ("test_oracle_topk_recovery_100", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            OracleTopKConfig(heavy_size=0.05),
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+    ("test_hat_topk_recovery_100", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            HashAttentionTopKMaskerConfig(
+                heavy_size=0.05,
+                hat_bits=32,
+                hat_mlp_layers=3,
+                hat_mlp_hidden_size=128,
+                hat_mlp_activation="silu",
+                hat_weight_file=weight_file,
+                hat_weights=None
+            )
+        ],
+        recovery_enabled=True,
+        recovery_interval=100,
+    )),
+    ("test_hat_topk_no_recovery", ResearchAttentionConfig(
+        masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            HashAttentionTopKMaskerConfig(
+                heavy_size=0.05,
+                hat_bits=32,
+                hat_mlp_layers=3,
+                hat_mlp_hidden_size=128,
+                hat_mlp_activation="silu",
+                hat_weight_file=weight_file,
+                hat_weights=None
+            )
+        ],
+        recovery_enabled=False,
+        recovery_interval=32000,
+    ))
 ]
+
+
+
 
 # Benchmark List
 # 1. InfiniteBench - using passkey task
@@ -107,15 +173,7 @@ mock_benchmark_config = BenchmarkConfig(
 
 # List of all sample configurations
 BENCHMARKS = [
-    infinite_bench_config,
-    ruler_config,
-    loogle_config,
-    zero_scrolls_config,
-    longbenchv2_config,
-    aime2024_config,
-    aime2025_config,
-    longbench_config,
-    mock_benchmark_config
+    aime2024_config
 ]
 
 
@@ -132,23 +190,23 @@ ADAPTER_CONFIG = AdapterConfig(
 
 # Generation Parameters
 GENERATION_KWARGS = {
-    "max_new_tokens": 50,
-    "do_sample": False,
-    "temperature": 1.0,
-    "top_p": 1.0,
+    "max_new_tokens": 32768,
+    "do_sample": True,
+    "temperature": 0.6,
+    "top_p": 0.95,
     "pad_token_id": None,
 }
 
 # Request Parameters
 REQUEST_KWARGS = {
-    "max_context_length": 256,
+    "max_context_length": 32768,
     "max_requests": 2,  # Limit for testing
 }
 
 # Execution Settings
-RESULT_DIR = "./benchmark_results"
+RESULT_DIR = "./benchmark_results_test.1"
 ENABLE_RESUMABILITY = True
-TIMEOUT_PER_BENCHMARK = 3600.0  # 1 hour
+TIMEOUT_PER_BENCHMARK = 60 * 60 * 24  # 1 day
 
 # ============================================================================
 # MAIN EXECUTION
