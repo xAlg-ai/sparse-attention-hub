@@ -51,6 +51,7 @@ dependencies = [
     "colorama>=0.4.6",
     "ray[tune]>=2.48.0",
     "hyperopt>=0.2.7",
+    "sentencepiece>=0.2.1",
 ]
 
 [project.optional-dependencies]

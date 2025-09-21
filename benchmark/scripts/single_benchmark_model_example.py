@@ -40,7 +40,7 @@ from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         SinkMaskerConfig(sink_size=128),
