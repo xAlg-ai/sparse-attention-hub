@@ -24,15 +24,15 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/sparse-attention-hub')
-sys.path.insert(0, '/workspace/sparse-attention-hub')
+os.chdir('/workspace/parallel_run/sparse-attention-hub')
+sys.path.insert(0, '/workspace/parallel_run/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
     LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-    AdaptiveSamplingMaskerConfig
+    AdaptiveSamplingMaskerConfig, MagicPigConfig
 )
 
 from benchmark.ruler32k import Ruler32K
@@ -43,27 +43,29 @@ def main():
     device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=128),
-        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128)
-    ])
+         SinkMaskerConfig(sink_size=128),
+         LocalMaskerConfig(window_size=128),
+         MagicPigConfig(
+             lsh_l=75,  # Default value from search space
+             lsh_k=8   # Default value from search space
+         )
+     ])
     
     print("  ✓ Loading model...")
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16},
-        generate_kwargs={"max_new_tokens": 32},
+        model_kwargs= {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_2"},
         device=device
     )
     
-    benchmark = Ruler32K(['vt'])
+    benchmark = Ruler32K(['niah_multivalue'])
 
-    result_dir = Path("./test_results.5cpt.topk.2/")
+    result_dir = Path("./magicpig.ruler32k/")
     result_dir.mkdir(exist_ok=True)
-
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 16384, "dense_layers": [0, 16], "process_question_via_dense": True})
+    import pdb; pdb.set_trace()
+    benchmark.run_benchmark(adapter, result_dir, generation_kwargs={"max_new_tokens": 1000 }, 
+                            request_kwargs={"max_requests": 10, "max_context_length": 32768, "dense_layers": [0, 16], "process_question_via_dense": True})
     
 if __name__ == "__main__":
     main() 
