@@ -1,0 +1,68 @@
+AIME VATT Data - Average Plots Summary
+==================================================
+
+Dataset Overview:
+- Total examples: 7
+- Total data points: 2,525,390
+- Average points per example: 360770
+- Layers per example: 32 (0-31)
+
+Example Details:
+------------------------------
+Example 0:
+  Data points: 1,048,576
+  Sequence length: 32,768
+  Density range: 0.056546 - 1.000000
+  Error range: 0.002426 - 0.769531
+  Plot file: example_0_average_density_error.png
+
+Example 1:
+  Data points: 157,312
+  Sequence length: 4,916
+  Density range: 0.097966 - 1.000000
+  Error range: 0.001877 - 0.691406
+  Plot file: example_1_average_density_error.png
+
+Example 2:
+  Data points: 85,952
+  Sequence length: 2,686
+  Density range: 0.137384 - 1.000000
+  Error range: 0.001945 - 0.648438
+  Plot file: example_2_average_density_error.png
+
+Example 3:
+  Data points: 345,056
+  Sequence length: 10,783
+  Density range: 0.071781 - 1.000000
+  Error range: 0.002609 - 0.718750
+  Plot file: example_3_average_density_error.png
+
+Example 4:
+  Data points: 245,632
+  Sequence length: 7,676
+  Density range: 0.080880 - 1.000000
+  Error range: 0.002380 - 0.761719
+  Plot file: example_4_average_density_error.png
+
+Example 5:
+  Data points: 482,528
+  Sequence length: 15,079
+  Density range: 0.065357 - 1.000000
+  Error range: 0.002502 - 0.871094
+  Plot file: example_5_average_density_error.png
+
+Example 6:
+  Data points: 160,334
+  Sequence length: 5,010
+  Density range: 0.097232 - 1.000000
+  Error range: 0.002625 - 0.972656
+  Plot file: example_6_average_density_error.png
+
+Plot Description:
+--------------------
+Each plot shows two subplots:
+1. Top: Average density vs sequence position
+2. Bottom: Average error vs sequence position
+
+All values are averaged across the 32 layers (0-31) at each sequence position.
+Sequence position represents the progression through the generation process.
