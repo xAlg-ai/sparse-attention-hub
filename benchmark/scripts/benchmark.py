@@ -48,65 +48,21 @@ MODELS = [
     "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 ]
 
-usa_weight_file = "/nvme/sparse-attention-hub/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K.pt"
-weight_file = "/nvme/sparse-attention-hub/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K.hat_weights.pkl"
+usa_weight_file = "/workspace/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K.pt"
+weight_file = "/workspace/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K.hat_weights.pkl"
 
-from sparse_attention_hub.sparse_attention.utils.hashattention_utils import create_hat_weights_file_from_usa
-create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
+#from sparse_attention_hub.sparse_attention.utils.hashattention_utils import create_hat_weights_file_from_usa
+#create_hat_weights_file_from_usa(usa_weight_file, weight_file, num_layers=32, num_heads=32, device="cpu")
 
 # Sparse Attention Configurations
 
 SPARSE_CONFIGS = [
     #("dense", None),
-    ("test_oracle_topk_norecovery", ResearchAttentionConfig(
+    ("test_oracle_topk_norecovery_10pct_r1", ResearchAttentionConfig(
         masker_configs=[
             SinkMaskerConfig(sink_size=128),
             LocalMaskerConfig(window_size=128),
-            OracleTopKConfig(heavy_size=0.05),
-        ],
-        recovery_enabled=False,
-        recovery_interval=32000,
-    )),
-
-    ("test_oracle_topk_recovery_100", ResearchAttentionConfig(
-        masker_configs=[
-            SinkMaskerConfig(sink_size=128),
-            LocalMaskerConfig(window_size=128),
-            OracleTopKConfig(heavy_size=0.05),
-        ],
-        recovery_enabled=True,
-        recovery_interval=100,
-    )),
-    ("test_hat_topk_recovery_100", ResearchAttentionConfig(
-        masker_configs=[
-            SinkMaskerConfig(sink_size=128),
-            LocalMaskerConfig(window_size=128),
-            HashAttentionTopKMaskerConfig(
-                heavy_size=0.05,
-                hat_bits=32,
-                hat_mlp_layers=3,
-                hat_mlp_hidden_size=128,
-                hat_mlp_activation="silu",
-                hat_weight_file=weight_file,
-                hat_weights=None
-            )
-        ],
-        recovery_enabled=True,
-        recovery_interval=100,
-    )),
-    ("test_hat_topk_no_recovery", ResearchAttentionConfig(
-        masker_configs=[
-            SinkMaskerConfig(sink_size=128),
-            LocalMaskerConfig(window_size=128),
-            HashAttentionTopKMaskerConfig(
-                heavy_size=0.05,
-                hat_bits=32,
-                hat_mlp_layers=3,
-                hat_mlp_hidden_size=128,
-                hat_mlp_activation="silu",
-                hat_weight_file=weight_file,
-                hat_weights=None
-            )
+            OracleTopKConfig(heavy_size=0.1),
         ],
         recovery_enabled=False,
         recovery_interval=32000,
@@ -182,6 +138,7 @@ ADAPTER_CONFIG = AdapterConfig(
     adapter_name="huggingface",
     model_kwargs={
         "torch_dtype": torch.bfloat16,
+        "attn_implementation" : "flash_attention_2"
     },
     tokenizer_kwargs={
         "padding_side": "left",
@@ -200,7 +157,7 @@ GENERATION_KWARGS = {
 # Request Parameters
 REQUEST_KWARGS = {
     "max_context_length": 32768,
-    "max_requests": 2,  # Limit for testing
+    "max_requests": 30,  # Limit for testing
 }
 
 # Execution Settings

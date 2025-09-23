@@ -13,6 +13,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from ..sparse_attention.base import SparseAttention, SparseAttentionConfig
 from ..sparse_attention.research_attention.base import ResearchAttention
 from .base import ModelAdapter, Request, RequestResponse
+from tqdm import tqdm
 
 INT_MAX = 2**31 - 1
 
