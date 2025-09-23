@@ -50,93 +50,161 @@ class PQCache(TopKMasker):
     ) -> Mask:
         """Add PQ cache mask."""
         
-        layer_idx: int = kwargs.get("layer_idx")
+        layer_idx: int = kwargs.get("layer_idx") #get indx
         if layer_idx is None:
             raise ValueError("layer_idx must be provided in kwargs")
-        
-        #get current current layer index
 
-        #sparse_meta_data to manage state across calls
+        #manage state across calls
         if "pq_structures" not in sparse_meta_data:
             sparse_meta_data["pq_structures"] = {}
         if "kv_cache" not in sparse_meta_data:
             sparse_meta_data["kv_cache"] = {}
-        #prefilling vs decoding phase detect
 
-        is_prefilling = keys.shape[2] > 1
-        #assume prefilling phase is first call where sequence is > 1 
 
-        if layer_idx not in sparse_meta_data["pq_structures"] and is_prefilling:
-            #prefilling phase builds the pq structurs and offloads the kvcache
+        #check for prefilling/deconding phase
+        is_prefill = keys.shape[2] > 1
 
-            ##offload uncompressed kvs to the cpu
-
+        if layer_idx not in sparse_meta_data["pq_structures"] and is_prefill:
+            #prefilling phase
+            #offload KVcache to CPU
             sparse_meta_data["kv_cache"][layer_idx] = {
                 "keys": keys.detach().cpu(),
                 "values": values.detach().cpu(),
             }
-            
-            centroids, codes = self._pq_construct(keys)
-            #_pq_construct to be implemente
+
+            centroids, codes = self._pq_construct(keys) #to implement below, construct it though
 
             sparse_meta_data["pq_structures"][layer_idx] = {
                 "centroids": centroids,
                 "codes": codes,
             }
-            #set up pq structures for this layer\
 
             return previous_mask
 
         else:
-            #decoding
-
-            #evict oldest token
+            #decoding perform pq search fetch topk tokens
             current_query = queries[:, :, -1:, :]  # (B, num_heads, 1, head_dim)
-
             pq_centroids = sparse_meta_data["pq_structures"][layer_idx]["centroids"].to(queries.device)
             pq_codes = sparse_meta_data["pq_structures"][layer_idx]["codes"].to(queries.device)
 
-            #perform pqsearch to get approx scores
-            approx_scores = self._pq_search(current_query, pq_centroids, pq_codes)
+            approx_scores = self._pq_search(current_query, pq_centroids, pq_codes) #to implement below
 
-            #pq_searhc need to implement
+            topk_indices = torch.topk(approx_scores, self.heavy_size, dim=-1, sorted=False).indices  # (B, num_heads, 1, heavy_size)
 
-            #get indcies of topk tokens from full sequence
-            topk_indices = torch.topk(approx_scores, k=self.heavy_size, dim=-1, sorted=False).indices
-
-            #fetch full kv pairs for topk tokens
+            #update full key cache
             full_keys_cache = sparse_meta_data["kv_cache"][layer_idx]["keys"]
-            full_values_cache = sparse_meta_data["kv_cache"][layer_idx]["values"]
+            #handle case with sequence length changes
+            topk_indices = torch.clamp(topk_indices, 0, full_keys_cache.shape[2]-1)
+
+            #create dense mask to merge
+            mask_shape = (queries.shape[0], queries.shape[1], queries.shape[2], keys[2])
+            dense_mask = torch.zeros(mask_shape, dtype=torch.bool, device=queries.device)
+
+            for p in range(queries.shape[0]):
+                for d in range(queries.shape[1]):
+                    head_indices = topk_indices[p, d, :]
+                    dense_mask[p, d, -1, head_indices] = 1
+
+            return previous_mask.merge_mask(Mask(None, None, dense_mask), inplace=False)
+            #inplace due 
 
 
-            max_idx = full_keys_cache.shape[2]
-            topk_indices = torch.clamp(topk_indices, 0, max_idx - 1)
+    def _pq_construct(self, keys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        performs pqconstruct on batch of keys
+        args: 
+        keys (tensor shape(batch size, num_heads, seq_len, head_dim)
+
+        returns:
+        tuple of centroids (num_heads, num_partitions, num_centroids, sub_dim)
+        codes: tensor of shape (batch size, num_heads, seq_len, num_partitions)
+        """
+        B, H, L, D = keys.shape
+        num_partitions = D // self.pq_sub_dim
+
+        if D % self.pq_sub_dim != 0:
+            raise ValueError("head_dim must be divisible by pq_sub_dim")
+
+        #pq construct needs to ru non the CPU to offload GPU work
+        keys_cpu = keys.detach().cpu()
+
+        all_heads_centroids = []
+        all_heads_codes = []
 
 
-            #handle broadcasting issues so flatten indices for batch fetch then reshape
-            topk_keys = full_keys_cache[:, :, topk_indices, :].to(queries.device)
-            topk_values = full_values_cache[:, :, topk_indices, :].to(queries.device)
+        #nonparallel for nwo
+        for head_idx in range(h):
+            head_centroids = []
+            head_codes = []
 
-            #create dense mask for tokens
-            mask_shape = (queries.shape[0], queries.shape[1], queries.shape[2], keys.shape[2])
-            dense_mask = torch.zeros(mask_shape, dtype=torch.bool, device = queries.device)
+            #reshape keys for this head B*L, D -> B*L, num_partitions, sub_dim
+            head_keys_partitions = keys_cpu[:, head_idx, :, :].reshape(B*L, num_partitions, self.pq_sub_dim)
 
-            #current query only previous tokens
-            #we want to map topk to full sequence
+            for partition_idx in range(num_partitions):
+                partition_data = head_keys_partitions[:, partition_idx, :].contiguous() #B*L, sub_dim
 
-            for b in range(queries.shape[0]):
-                for h in range(queries.shape[1]):
-                    #get current batch and head index
-                    head_indices = topk_indices[b, h, :]
-                    dense_mask[b, h, -1, head_indices] = 1
 
-            final_mask = previous_mask.merge_mask(
-                Mask(None, None, dense_mask),
-                inplace=False
-            )
+                #run kmeans on partition data
+                kmeans = torch.kmeans(
+                    partition_data,
+                    num_clusters=self.num_centroids,
+                    distance="euclidean",
+                    device="cpu", #ensure on cpu
+                    iter_limit=20,
+                    verbose=False,
+                )
+                centroids = kmeans.centroids #num_centroids, sub_dim
+                codes = kmeans.labels #B*L
+                head_centroids.append(centroids)
+                head_codes.append(codes)
+            #stack centroids and codes for this head
+            head_centroids_tensor = torch.stack(head_centroids, dim=0) #num_part
+            head_codes_tensor = torch.stack(head_codes, dim=1).reshape(B, L, num_partitions) #B, L, num_partitions
+            all_heads_centroids.append(head_centroids_tensor)
+            all_heads_codes.append(head_codes_tensor)
+        #stack all heads
+        all_heads_centroids_tensor = torch.stack(all_heads_centroids, dim=0) #
+        all_heads_codes_tensor = torch.stack(all_heads_codes, dim=0) #H, B, L, num_partitions
+        all_heads_codes_tensor = all_heads_codes_tensor.permute(1,0,2,3).contiguous() #B, H, L, num_partitions  
+        return all_heads_centroids_tensor, all_heads_codes_tensor
 
-            return final_mask
-        
+    def _pq_search(self, query: torch.Tensor, centroids: torch.Tensor, codes: torch.Tensor) -> torch.Tensor:
+        """
+        perform PQ search to approximate dot product between query and a set of keys
+        args:
+        query: current query tensor of shape (B, num_heads, 1, head_dim)
+        centroids: tensor of shape (num_heads, num_partitions, num_centroids, sub_dim)
+        codes: tensor of shape (B, num_heads, seq_len, num_partitions)
+
+        returns:
+        approximate scores: tensor of shape (B, num_heads, seq_len)
+
+        """
+        B, H, _, D = query.shape
+        _, _, L, num_partitions = codes.shape
+
+        #reshape query to B, H, num_partitions, sub_dim
+        partitioned_query = query.reshape(B, H, num_partitions, self.pq_sub_dim)
+
+        #reshape centroids to 1, H, num_partitions, num_centroids, sub_dim
+        reshaped_centroids = centroids.reshape(1, H, num_partitions, self.num_centroids, self.pq_sub_dim)
+
+        #compute dot product between query partitions and centroids
+        #need to squeeze the sequence length dim from partitinoed query
+        sim_to_centroids = torch.matmul(partitioned_query.squeeze(2), reshaped_centroids.transpose(-2, -1)) #B, H, num_partitions, num_centroids
+
+        #gather scores using pq codes
+        #reshape sim to centroids
+        sim_to_centroids_reshaped = sim_to_centroids.unsqueeze(2)
+
+        #codes tensor acts as indices
+        gathered_sims = torch.gather(sim_to_centroids_reshaped, dim=-1, index=codes.unsqueeze(-1)).squeeze(-1)
+
+        #sum scores across partitions
+        approx_scores = gathered_sims.sum(dim=-1)
+
+        return approx_scores
+
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "PQCache":
@@ -147,75 +215,3 @@ class PQCache(TopKMasker):
     
 
 
-    def _pq_construct(self, keys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Performs PQ construction on a batch of key tensors.
-
-        Args:
-            keys: key tensor of shape (batch_size, num_heads, seq_len, head_dim)
-
-        Returns:
-            tuple of (centroids, codes)
-                centroids: tensor of shape (num_heads, num_partitions, num_centroids, sub_dim)
-                codes: tensor of shape (batch_size, num_heads, seq_len, num_partitions)
-        """
-
-        bs, h, s, dh = keys.shape
-        num_partitions = dh // self.pq_sub_dim
-
-        if dh % self.pq_sub_dim != 0:
-            raise ValueError("head_dim must be divisible by pq_sub_dim")
-
-        keys_cpu = keys.detach().cpu()
-
-        all_heads_centroids = []
-        all_heads_codes = []
-
-        for head_idx in range(h):
-            head_centroids = []
-            head_codes = []
-
-            # Partition keys for this head
-            head_keys_partitions = keys_cpu[:, head_idx, :, :].reshape(bs * s, num_partitions, self.pq_sub_dim)
-
-            for partition_idx in range(num_partitions):
-                partition_data = head_keys_partitions[:, partition_idx, :].contiguous()
-                
-                # K-Means clustering
-                centroids_tensor = partition_data[torch.randperm(partition_data.shape[0])[:self.num_centroids]]
-                max_iters = 100
-                for _ in range(max_iters):
-                    distances = torch.cdist(partition_data, centroids_tensor)
-                    nearest_centroid_indices = torch.argmin(distances, dim=1)
-                    
-                    new_centroids_tensor = torch.zeros_like(centroids_tensor)
-                    counts = torch.zeros(self.num_centroids, dtype=torch.int)
-                    
-                    for j in range(self.num_centroids):
-                        points_in_cluster = partition_data[nearest_centroid_indices == j]
-                        if len(points_in_cluster) > 0:
-                            new_centroids_tensor[j] = points_in_cluster.mean(dim=0)
-                            counts[j] = len(points_in_cluster)
-                        else:
-                            new_centroids_tensor[j] = centroids_tensor[j]
-                            counts[j] = 1
-                    
-                    if torch.allclose(centroids_tensor, new_centroids_tensor, atol=1e-4):
-                        break
-                    
-                    centroids_tensor = new_centroids_tensor
-
-                distances = torch.cdist(partition_data, centroids_tensor)
-                codes_for_partition = torch.argmin(distances, dim=1)
-
-                head_centroids.append(centroids_tensor.unsqueeze(0))
-                head_codes.append(codes_for_partition.reshape(bs, s).unsqueeze(0))
-
-            all_heads_centroids.append(torch.cat(head_centroids, dim=0).unsqueeze(0))
-            all_heads_codes.append(torch.cat(head_codes, dim=0).unsqueeze(0))
-        
-        # Stack to get final shapes
-        centroids_tensor = torch.cat(all_heads_centroids, dim=0)
-        codes_tensor = torch.cat(all_heads_codes, dim=0).permute(1, 0, 2, 3)
-
-        return centroids_tensor, codes_tensor
