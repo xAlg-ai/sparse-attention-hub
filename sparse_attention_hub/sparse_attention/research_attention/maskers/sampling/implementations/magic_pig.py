@@ -48,6 +48,7 @@ class MagicPigConfig(SamplingMaskerConfig):
     center: bool = True  # whether to center keys and queries before LSH
     packing: Literal["int64", "float32"] = "int64"
     seed: Optional[int] = 42  # random seed for reproducible projections
+    ips_transformation: Literal["neyshabur_asym", "none"] = "neyshabur_asym"
 
     def __post_init__(self) -> None:
         """Validate LSH parameters after initialization."""
@@ -128,6 +129,7 @@ class MagicPig(SamplingMasker):
         self.center = config.center
         self.packing = config.packing
         self.seed = config.seed
+        self.ips_transformation = config.ips_transformation
 
     def _pack_bits(self, signatures: torch.Tensor) -> torch.Tensor:
         """Packs binary signatures into int64 tensors."""
@@ -147,6 +149,7 @@ class MagicPig(SamplingMasker):
         """Computes signatures for given vectors, with optional packing."""
         total_bits: int = self.lsh_l * self.lsh_k
         batch_size, num_heads, seq_len, head_dim = vectors.shape
+        vectors = vectors.contiguous()
         vectors_flat: torch.Tensor = vectors.view(-1, head_dim)
         projection = sparse_meta_data["projections"][layer_idx]
 
@@ -579,9 +582,14 @@ class MagicPig(SamplingMasker):
         keys_centered, queries_centered = self._center_KQ(
             keys, queries, sparse_meta_data, layer_idx
         )
-        keys_transformed, queries_transformed = self._transform_for_mips(
-            keys_centered, queries_centered
-        )
+        if self.ips_transformation == "neyshabur_asym":
+            keys_transformed, queries_transformed = self._transform_for_mips(
+                    keys_centered, queries_centered
+                )
+        else:
+            keys_transformed = keys_centered
+            queries_transformed = queries_centered
+        
 
         probabilities: torch.Tensor = self._compute_probabilities(
             keys_transformed, queries_transformed

@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/parallel_run/sparse-attention-hub')
-sys.path.insert(0, '/workspace/parallel_run/sparse-attention-hub')
+os.chdir('/home/ubuntu/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -47,7 +47,8 @@ def main():
          LocalMaskerConfig(window_size=128),
          MagicPigConfig(
              lsh_l=75,  # Default value from search space
-             lsh_k=8   # Default value from search space
+             lsh_k=8,   # Default value from search space
+             ips_transformation="none"
          )
      ])
     
@@ -59,13 +60,13 @@ def main():
         device=device
     )
     
-    benchmark = Ruler32K(['niah_multivalue'])
-
-    result_dir = Path("./magicpig.ruler32k/")
-    result_dir.mkdir(exist_ok=True)
-    import pdb; pdb.set_trace()
-    benchmark.run_benchmark(adapter, result_dir, generation_kwargs={"max_new_tokens": 1000 }, 
-                            request_kwargs={"max_requests": 10, "max_context_length": 32768, "dense_layers": [0, 16], "process_question_via_dense": True})
+    #for dataset in  [ 'niah_single_1', 'niah_single_2', 'niah_single_3', 'niah_multikey_2', 'niah_multikey_3']:
+    for dataset in  [  'niah_multikey_1', 'niah_multiquery', 'vt', 'cwe', 'fwe', 'qa_1', 'qa_2']:
+        benchmark = Ruler32K([dataset])
+        result_dir = Path("./magicpig.cosine/"+dataset)
+        result_dir.mkdir(exist_ok=True)
+        benchmark.run_benchmark(adapter, result_dir, generation_kwargs={"max_new_tokens": 1000 }, 
+                            request_kwargs={"max_requests": 50, "max_context_length": 32768, "dense_layers": [0, 16], "process_question_via_dense": True})
     
 if __name__ == "__main__":
     main() 
