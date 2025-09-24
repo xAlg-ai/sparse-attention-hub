@@ -4,9 +4,9 @@ alwaysApply: true
 ---
 Every project is associated with a conda environment. before starting to run any commands, run the following
 ```
-bash
+source /workspace/anaconda3/bin/activate
 ```
 followed by
 ```
-conda activate sparse_attention_hub
+conda activate parallel_sat
 ```

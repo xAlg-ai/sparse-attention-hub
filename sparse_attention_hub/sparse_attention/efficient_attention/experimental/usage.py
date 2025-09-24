@@ -64,8 +64,7 @@ def run_mha_example():
     hat_mlp_hidden_size = 128
     hat_mlp_activation = "silu"
     # present in HashAttention-1.0 repo in xAlg-ai
-    # hat_weight_file = "/home/apd10/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
-    hat_weight_file = "/FirstIntelligence/home/shuo/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
+    hat_weight_file = "/workspace/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
 
     # adaptive sampling masker config parameters
     base_rate_sampling = 0.05
@@ -78,12 +77,19 @@ def run_mha_example():
 
     from scipy.stats import norm
     hat_weights_query_matrix, hat_weights_query_bias, hat_weights_key_matrix, hat_weights_key_bias = extract_layer_weights(hat_weight_file, layer_idx, dtype=torch.float32, device="cuda")
+    cached_key_signatures = hat_get_signatures_4d(
+        keys[:,:,:-1, :],
+        hat_bits,
+        ACTIVATION_FNS[hat_mlp_activation],
+        hat_weights_key_matrix,
+        hat_weights_key_bias,
+    )
 
     ref_pytorch_answer = ref_vAttention_fwd(
         queries = queries.squeeze(2), # [1, 32, 128]
         keys = keys, # [1, 32, 1024, 128]
         values = values, # [1, 32, 1024, 128]
-        cached_key_signatures=None, # [1, 32, 1, 1024]
+        cached_key_signatures=cached_key_signatures, # [1, 32, 1, 1024]
         sink_size = init_offset,
         window_size = local_offset,
         heavy_size= heavy_size,
@@ -112,7 +118,7 @@ def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
     query_heads = 32
     kv_heads = 32
     query_len = 1
-    kv_len = 10240
+    kv_len = 262144 
     d_model = 128
 
     torch.manual_seed(0)
@@ -126,6 +132,7 @@ def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
     keys = torch.randn(batch_size, kv_heads, kv_len, d_model, dtype=torch.float32).to("cuda")
     values = torch.randn(batch_size, kv_heads, kv_len, d_model, dtype=torch.float32).to("cuda")
 
+
     # vAttention configuration
     sink_size = 0.05
     window_size = 0.05
@@ -134,8 +141,7 @@ def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
     hat_mlp_layers = 3
     hat_mlp_hidden_size = 128
     hat_mlp_activation = "silu"
-    hat_weight_file = "/FirstIntelligence/home/shuo/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
-
+    hat_weight_file = "/workspace/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl"
     base_rate_sampling = 0.05
     epsilon = 0.25
     delta = 0.25
@@ -144,13 +150,22 @@ def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
         hat_weight_file, 0, dtype=torch.float32, device="cuda"
     )
 
+    # all except last key signture is cached for decoding.
+    cached_key_signatures = hat_get_signatures_4d(
+        keys[:,:,:-1, :],
+        hat_bits,
+        ACTIVATION_FNS[hat_mlp_activation],
+        hat_weights_key_matrix,
+        hat_weights_key_bias,
+    )
+
     # Warm-up runs to stabilize kernels
     for _ in range(warmup_runs):
         _ = ref_vAttention_fwd(
             queries=queries.squeeze(2),
             keys=keys,
             values=values,
-            cached_key_signatures=None,
+            cached_key_signatures=cached_key_signatures,
             sink_size=sink_size,
             window_size=window_size,
             heavy_size=heavy_size,
@@ -176,7 +191,7 @@ def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
             queries=queries.squeeze(2),
             keys=keys,
             values=values,
-            cached_key_signatures=None,
+            cached_key_signatures=cached_key_signatures,
             sink_size=sink_size,
             window_size=window_size,
             heavy_size=heavy_size,
