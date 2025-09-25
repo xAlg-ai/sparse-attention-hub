@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple
+from matplotlib.ticker import FormatStrFormatter
 
 
 def get_quality_data() -> Dict[str, pd.DataFrame]:
@@ -182,7 +183,7 @@ def create_main_paper_plot() -> None:
     dataset_names = ['QA_2 RULER 32K', 'HotpotQA LongBench', 'ShortDep Cloze Loogle']
     
     # Create figure with 2x3 subplots
-    fig, axes = plt.subplots(2, 3, figsize=(24, 16))
+    fig, axes = plt.subplots(2, 3, figsize=(32, 16))
     
     # Define colors matching both scripts exactly
     colors = {
@@ -244,13 +245,13 @@ def create_main_paper_plot() -> None:
                 
                 all_methods.add(column)
         
-        ax.set_xlabel('Density', fontsize=18)
-        ax.set_ylabel('Quality', fontsize=18)
-        ax.tick_params(axis='both', which='major', labelsize=16)
+        ax.set_xlabel('Density', fontsize=27)
+        ax.set_ylabel('Quality', fontsize=27)
+        ax.tick_params(axis='both', which='major', labelsize=24)
         ax.grid(True, alpha=0.3)
         
         # Add dataset name as column title for top row
-        ax.set_title(dataset_name, fontsize=20, fontweight='bold', pad=20)
+        ax.set_title(dataset_name, fontsize=30, fontweight='bold', pad=20)
         
         # Set axis limits with padding
         density_values = df['density'].dropna()
@@ -258,6 +259,9 @@ def create_main_paper_plot() -> None:
             x_min = density_values.min() - 0.01
             x_max = density_values.max() + 0.01
             ax.set_xlim(x_min, x_max)
+        
+        # Format x-axis to show 2 decimal places (0.00 precision)
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         
         numeric_data = df.select_dtypes(include=[np.number]).drop(columns=['density'])
         if not numeric_data.empty:
@@ -287,9 +291,9 @@ def create_main_paper_plot() -> None:
             
             all_methods.add(quality_method_name)
         
-        ax.set_xlabel('Density', fontsize=18)
-        ax.set_ylabel('Error', fontsize=18)
-        ax.tick_params(axis='both', which='major', labelsize=16)
+        ax.set_xlabel('Density', fontsize=27)
+        ax.set_ylabel('Error', fontsize=27)
+        ax.tick_params(axis='both', which='major', labelsize=24)
         ax.grid(True, alpha=0.3)
         
         # Set axis limits
@@ -322,7 +326,7 @@ def create_main_paper_plot() -> None:
     # Add legend at the top
     fig.legend(handles=legend_elements, 
               loc='upper center', bbox_to_anchor=(0.5, 0.98),
-              ncol=len(legend_elements), fontsize=18, frameon=True,
+              ncol=len(legend_elements), fontsize=27, frameon=True,
               borderaxespad=0, columnspacing=1.5, handletextpad=0.8)
     
     # Adjust layout to make room for legend with reduced vertical spacing
