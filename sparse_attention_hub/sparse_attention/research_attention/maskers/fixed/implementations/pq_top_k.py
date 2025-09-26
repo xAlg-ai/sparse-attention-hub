@@ -1,7 +1,7 @@
 """PQ cache top-K masker implementation."""
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 
@@ -10,6 +10,10 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
     MaskerRegistry,
 )
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
+from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
+    get_masked_attention_output,
+    get_true_attention_output,
+)
 
 from ..base import TopKMasker, TopKMaskerConfig
 
@@ -32,8 +36,6 @@ class PQCache(TopKMasker):
         self.heavy_size = config.heavy_size
         self.pq_sub_dim = config.pq_sub_dim
         self.pq_bits = config.pq_bits
-        self.num_centroids = 2**self.pq_bits
-
 
 
     def add_mask(
@@ -48,163 +50,190 @@ class PQCache(TopKMasker):
         previous_mask: Mask,
         **kwargs: Dict[str, Any],
     ) -> Mask:
-        """Add PQ cache mask."""
         
-        layer_idx: int = kwargs.get("layer_idx") #get indx
-        if layer_idx is None:
-            raise ValueError("layer_idx must be provided in kwargs")
+        
+        # get module from kwargs
+        module = kwargs.get('module')
+        
+        # handle head dimension mismatch  stubborn erorr
+        if queries.shape[1] != keys.shape[1]:
+            ##repeat key/value heads to match query heads
+            repeat_factor = queries.shape[1] // keys.shape[1]
+            keys = keys.repeat_interleave(repeat_factor, dim=1)
+            values = values.repeat_interleave(repeat_factor, dim=1)
+    
+        #build PQ structures during decoding phase when module is available?
+        
 
-        #manage state across calls
-        if "pq_structures" not in sparse_meta_data:
-            sparse_meta_data["pq_structures"] = {}
-        if "kv_cache" not in sparse_meta_data:
-            sparse_meta_data["kv_cache"] = {}
+        L = queries.shape[2] #length of input token sequence
 
+        LocalKVCache = [] #set empty
+        #decoding phase
+        is_decoding: bool = (queries.shape[2] == 1) and ("PQ" in sparse_meta_data) and ("KVCache" in sparse_meta_data)
+        if is_decoding:
+            PQ = sparse_meta_data["PQ"]  # list of (centroids, codes)
+            KVCache = sparse_meta_data["KVCache"]  # list of (K, V))
 
-        #check for prefilling/deconding phase
-        is_prefill = keys.shape[2] > 1
+            L_pq: int = len(PQ)
+            Q = queries[:, :, -1, :]  # last-step query (B,H,D)
+            last_topk_idx: Optional[torch.Tensor] = None
 
-        if layer_idx not in sparse_meta_data["pq_structures"] and is_prefill:
-            #prefilling phase
-            #offload KVcache to CPU
-            sparse_meta_data["kv_cache"][layer_idx] = {
-                "keys": keys.detach().cpu(),
-                "values": values.detach().cpu(),
-            }
+            for i in range(0, L_pq):
+                if LocalKVCache:
+                    EvictK, EvictV = LocalKVCache.pop(0)
+                    _ = self._pq_encode(EvictK, PQ[i][0])
 
-            centroids, codes = self._pq_construct(keys) #to implement below, construct it though
+                K = keys[:, :, -1, :]
+                V = values[:, :, -1, :]
+                LocalKVCache.append((K, V))
 
-            sparse_meta_data["pq_structures"][layer_idx] = {
-                "centroids": centroids,
-                "codes": codes,
-            }
+                Centroids = PQ[i][0]
+                Codes_i = PQ[i][1].to(queries.device)
 
-            return previous_mask
+                TopKIdx = self._pq_search(Q, Centroids, Codes_i, self.heavy_size)
+                TopkK, TopkV = self._sync_fetch_kv(KVCache, TopKIdx)
+                last_topk_idx = TopKIdx
 
-        else:
-            #decoding perform pq search fetch topk tokens
-            current_query = queries[:, :, -1:, :]  # (B, num_heads, 1, head_dim)
-            pq_centroids = sparse_meta_data["pq_structures"][layer_idx]["centroids"].to(queries.device)
-            pq_codes = sparse_meta_data["pq_structures"][layer_idx]["codes"].to(queries.device)
+                # built AllKV = InitKV + TopkKV + LocalKV
+                def _stack_kv(kv_list: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
+                    if not kv_list:
+                        B, H, D = keys.shape[0], keys.shape[1], keys.shape[-1]
+                        empty = keys.new_zeros((B, H, 0, D))
+                        return empty, empty
+                    K_parts = [k.unsqueeze(2) if k.dim() == 3 else k for (k, _) in kv_list]
+                    V_parts = [v.unsqueeze(2) if v.dim() == 3 else v for (_, v) in kv_list]
+                    return torch.cat(K_parts, dim=2), torch.cat(V_parts, dim=2)
+ 
+                InitKV = sparse_meta_data.get("InitKV", [])
+                MidKV = sparse_meta_data.get("MidKV", [])
+                K_init, V_init = _stack_kv(InitKV)
+                K_mid, V_mid = _stack_kv(MidKV)
 
-            approx_scores = self._pq_search(current_query, pq_centroids, pq_codes) #to implement below
+                # accumulated in localkv this step
+                K_local, V_local = _stack_kv(LocalKVCache)
 
-            topk_indices = torch.topk(approx_scores, self.heavy_size, dim=-1, sorted=False).indices  # (B, num_heads, 1, heavy_size)
+                # ensure TopkKV has a sequence dimension
+                if TopkK.dim() == 3:
+                    TopkK = TopkK.unsqueeze(2)
+                    TopkV = TopkV.unsqueeze(2)
 
-            #update full key cache
-            full_keys_cache = sparse_meta_data["kv_cache"][layer_idx]["keys"]
-            #handle case with sequence length changes
-            topk_indices = torch.clamp(topk_indices, 0, full_keys_cache.shape[2]-1)
+                K_all = torch.cat([K_init, K_mid, TopkK, K_local], dim=2)
+                V_all = torch.cat([V_init, V_mid, TopkV, V_local], dim=2)
 
-            #create dense mask to merge
-            mask_shape = (queries.shape[0], queries.shape[1], queries.shape[2], keys[2])
-            dense_mask = torch.zeros(mask_shape, dtype=torch.bool, device=queries.device)
-
-            for p in range(queries.shape[0]):
-                for d in range(queries.shape[1]):
-                    head_indices = topk_indices[p, d, :]
-                    dense_mask[p, d, -1, head_indices] = 1
-
-            return previous_mask.merge_mask(Mask(None, None, dense_mask), inplace=False)
-            #inplace due 
-
-
-    def _pq_construct(self, keys: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        performs pqconstruct on batch of keys
-        args: 
-        keys (tensor shape(batch size, num_heads, seq_len, head_dim)
-
-        returns:
-        tuple of centroids (num_heads, num_partitions, num_centroids, sub_dim)
-        codes: tensor of shape (batch size, num_heads, seq_len, num_partitions)
-        """
-        B, H, L, D = keys.shape
-        num_partitions = D // self.pq_sub_dim
-
-        if D % self.pq_sub_dim != 0:
-            raise ValueError("head_dim must be divisible by pq_sub_dim")
-
-        #pq construct needs to ru non the CPU to offload GPU work
-        keys_cpu = keys.detach().cpu()
-
-        all_heads_centroids = []
-        all_heads_codes = []
-
-
-        #nonparallel for nwo
-        for head_idx in range(h):
-            head_centroids = []
-            head_codes = []
-
-            #reshape keys for this head B*L, D -> B*L, num_partitions, sub_dim
-            head_keys_partitions = keys_cpu[:, head_idx, :, :].reshape(B*L, num_partitions, self.pq_sub_dim)
-
-            for partition_idx in range(num_partitions):
-                partition_data = head_keys_partitions[:, partition_idx, :].contiguous() #B*L, sub_dim
-
-
-                #run kmeans on partition data
-                kmeans = torch.kmeans(
-                    partition_data,
-                    num_clusters=self.num_centroids,
-                    distance="euclidean",
-                    device="cpu", #ensure on cpu
-                    iter_limit=20,
-                    verbose=False,
+                # x = AttnFFN(Q, AllKV) using dense attention utility
+                Q_last = queries[:, :, -1:, :]
+                
+                # handle none module case - create mask based on PQ search results
+                if module is None:
+                    # create mask that selects the top-K positions found by PQ search
+                    if last_topk_idx is not None:
+                        B, H, _k = last_topk_idx.shape
+                        keys_len: int = keys.shape[2]
+                        last_pos = (keys_len - 1)
+                        last_idx = torch.full((B, H, 1), last_pos, dtype=last_topk_idx.dtype, device=last_topk_idx.device)
+                        row_wise_idx = torch.cat([last_topk_idx.clamp_max(keys_len - 1), last_idx], dim=-1)
+                        #add sequence dimension to make it 4D: (B, H, 1, k+1)
+                        row_wise_idx = row_wise_idx.unsqueeze(2)  #B, H, 1, k+1)
+                        data = torch.ones_like(row_wise_idx, dtype=queries.dtype)
+                        new_mask = Mask.create_from_row_wise_idx(
+                            shape=(B, H, 1, keys_len),
+                            row_wise_idx=row_wise_idx,
+                            data=data,
+                            type="index",
+                            dtype=queries.dtype,
+                        )
+                        merged = previous_mask.merge_mask(new_mask, inplace=False)
+                        return merged
+                    else:
+                        return previous_mask
+                
+                result = get_true_attention_output(
+                    module=module,
+                    queries=Q_last,
+                    keys=K_all,
+                    values=V_all,
+                    attention_mask=attention_mask,
+                    scaling=scaling,
+                    dropout=dropout,
                 )
-                centroids = kmeans.centroids #num_centroids, sub_dim
-                codes = kmeans.labels #B*L
-                head_centroids.append(centroids)
-                head_codes.append(codes)
-            #stack centroids and codes for this head
-            head_centroids_tensor = torch.stack(head_centroids, dim=0) #num_part
-            head_codes_tensor = torch.stack(head_codes, dim=1).reshape(B, L, num_partitions) #B, L, num_partitions
-            all_heads_centroids.append(head_centroids_tensor)
-            all_heads_codes.append(head_codes_tensor)
-        #stack all heads
-        all_heads_centroids_tensor = torch.stack(all_heads_centroids, dim=0) #
-        all_heads_codes_tensor = torch.stack(all_heads_codes, dim=0) #H, B, L, num_partitions
-        all_heads_codes_tensor = all_heads_codes_tensor.permute(1,0,2,3).contiguous() #B, H, L, num_partitions  
-        return all_heads_centroids_tensor, all_heads_codes_tensor
+                x, _ = result
 
-    def _pq_search(self, query: torch.Tensor, centroids: torch.Tensor, codes: torch.Tensor) -> torch.Tensor:
-        """
-        perform PQ search to approximate dot product between query and a set of keys
-        args:
-        query: current query tensor of shape (B, num_heads, 1, head_dim)
-        centroids: tensor of shape (num_heads, num_partitions, num_centroids, sub_dim)
-        codes: tensor of shape (B, num_heads, seq_len, num_partitions)
+                #token = classifier(x) pseduo
+                classifier_cfg: Dict[str, Any] = sparse_meta_data.get("classifier", {})
+                W_vocab: Optional[torch.Tensor] = classifier_cfg.get("weight")
+                b_vocab: Optional[torch.Tensor] = classifier_cfg.get("bias")
+                if W_vocab is not None:
+                    token = self._classifier(x, W_vocab, b_vocab)
+                    sparse_meta_data["token"] = token
 
-        returns:
-        approximate scores: tensor of shape (B, num_heads, seq_len)
+            # build a new sparse mask selecting TopK positions (union approximated by last shard)
+            if last_topk_idx is not None:
+                B, H, _k = last_topk_idx.shape
+                keys_len: int = keys.shape[2]
+                last_pos = (keys_len - 1)
+                last_idx = torch.full((B, H, 1), last_pos, dtype=last_topk_idx.dtype, device=last_topk_idx.device)
+                row_wise_idx = torch.cat([last_topk_idx.clamp_max(keys_len - 1), last_idx], dim=-1)
+                data = torch.ones_like(row_wise_idx, dtype=queries.dtype)
+                new_mask = Mask.create_from_row_wise_idx(
+                    shape=(B, H, 1, keys_len),
+                    row_wise_idx=row_wise_idx,
+                    data=data,
+                    type="index",
+                    dtype=queries.dtype,
+                )
+                merged = previous_mask.merge_mask(new_mask, inplace=False)
+                return merged
 
-        """
-        B, H, _, D = query.shape
-        _, _, L, num_partitions = codes.shape
 
-        #reshape query to B, H, num_partitions, sub_dim
-        partitioned_query = query.reshape(B, H, num_partitions, self.pq_sub_dim)
+        #decoding
 
-        #reshape centroids to 1, H, num_partitions, num_centroids, sub_dim
-        reshaped_centroids = centroids.reshape(1, H, num_partitions, self.num_centroids, self.pq_sub_dim)
 
-        #compute dot product between query partitions and centroids
-        #need to squeeze the sequence length dim from partitinoed query
-        sim_to_centroids = torch.matmul(partitioned_query.squeeze(2), reshaped_centroids.transpose(-2, -1)) #B, H, num_partitions, num_centroids
 
-        #gather scores using pq codes
-        #reshape sim to centroids
-        sim_to_centroids_reshaped = sim_to_centroids.unsqueeze(2)
+        #prefilling first
+        ProcComm = []
+        ProcPQ = []
+        KVCache = []
+        PQ = []
 
-        #codes tensor acts as indices
-        gathered_sims = torch.gather(sim_to_centroids_reshaped, dim=-1, index=codes.unsqueeze(-1)).squeeze(-1)
+        # prefilling computation on GPU
+        for i in range(0, L-1):
+            #we are already given q,k,v in the add_mask
+            #we want to get the query at the ith position
+            q = queries[:, :, i, :]
+            k = keys[:, :, i, :]
+            v = values[:, :, i, :]
 
-        #sum scores across partitions
-        approx_scores = gathered_sims.sum(dim=-1)
+            #asynchronously offload from GPU to CPU, add to ProcComm for monitoring
+            # Keep on GPU for now to avoid device mismatch issues
+            ProcComm.append((k.detach(), v.detach()))
+            
+            # Store K,V for PQ construction
+        
 
-        return approx_scores
 
+        #launch pq construction on same device as input
+        for i in range(0, L-1):
+            k, v = ProcComm[i]
+            KVCache.append((k, v))
+            # enqueue PQ construction task for this k
+            ProcPQ.append(
+                self._AsyncPQConstruct(
+                    k, L, self.pq_sub_dim, self.pq_bits
+                )
+            )
+            
+        
+        #wait for pq construction in the next decoding phase
+        for i in range(0, L-1):
+            centroids, codes = ProcPQ[i].sync()
+            PQ.append((centroids, codes))
+        
+        #store results for the decoding phase and return the mask
+        sparse_meta_data["PQ"] = PQ
+        sparse_meta_data["KVCache"] = KVCache
+        
+        #need to retunr  the previous mask for prefilling phase
+        return previous_mask
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "PQCache":
@@ -212,6 +241,169 @@ class PQCache(TopKMasker):
         if not isinstance(config, PQCacheConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
+
+
+
+    def _classifier(
+        self,
+        X: torch.Tensor,
+        W_vocab: torch.Tensor,
+        b_vocab: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """ classifier: matmul + softmax + argmax.
+
+        Returns token ids (B,) without probabilities and handles shapes minimally.
+        """
+        if X.dim() == 4:
+            X = X[:, :, -1, :].mean(dim=1)  # (B, D)
+        elif X.dim() == 3:
+            X = X[:, -1, :]  # (B, D)
+
+        logits: torch.Tensor = X @ W_vocab.t()
+        if b_vocab is not None:
+            logits = logits + b_vocab
+
+        token: torch.Tensor = torch.softmax(logits, dim=-1, dtype=torch.float32).argmax(dim=-1)
+        return token
+
+    
+    class _Sync:
+        def __init__(self, k: torch.Tensor, v: torch.Tensor) -> None:
+            self._k = k
+            self._v = v
+        def sync(self) -> tuple[torch.Tensor, torch.Tensor]:
+            return self._k, self._v
+
+    class _AsyncPQConstruct:
+        def __init__(
+            self,
+            K: torch.Tensor,
+            L: int,
+            pq_sub_dim: int,
+            pq_bits: int,
+        ) -> None:
+            self._K = K
+            self._L = L
+            self._pq_sub_dim = pq_sub_dim
+            self._pq_bits = pq_bits
+
+        def sync(self) -> tuple[torch.Tensor, torch.Tensor]:
+            """
+            Construct a simple PQ: return (centroids, codes).
+
+            centroids: (H, num_subspaces, 2**pq_bits, pq_sub_dim)
+            codes: (B, H, S, num_subspaces) with integer codes per subspace
+            """
+            K = self._K  # expected shape (B, H, D)
+            if K.dim() == 4:
+                # if shape (B, H, S, D), reduce S by last step
+                K = K[:, :, -1, :]
+
+            B, H, D = K.shape
+            assert D % self._pq_sub_dim == 0, "D must be divisible by pq_sub_dim"
+            num_sub = D // self._pq_sub_dim
+            num_centroids = 1 << self._pq_bits
+
+            #reshape into subspaces like (B, H, num_sub, pq_sub_dim)
+            K_sub = K.view(B, H, num_sub, self._pq_sub_dim)
+
+            #simple uniform binning centroids per subspace/head based on our data range
+            k_min = K_sub.amin(dim=0, keepdim=True)  #1, H, num_sub, pq_sub_dim)
+            k_max = K_sub.amax(dim=0, keepdim=True)  #(1, H, num_sub, pq_sub_dim)
+            # build centroids as evenly spaced points between min and max
+            t = torch.linspace(0, 1, steps=num_centroids, device=K.device, dtype=K.dtype)
+            # (1, 1, num_centroids, 1) for proper broadcasting with (H, num_sub, pq_sub_dim)
+            t = t.view(1, 1, num_centroids, 1)
+            # broadcast with : (H, num_sub, num_centroids, pq_sub_dim) format below
+            k_min_squeezed = k_min.squeeze(0)  
+            k_max_squeezed = k_max.squeeze(0)  
+            centroids = k_min_squeezed.unsqueeze(2) + (k_max_squeezed - k_min_squeezed).unsqueeze(2) * t
+            # rearrange to (H, num_sub, num_centroids, pq_sub_dim)
+
+            #assign codes by nearest centroid (L2) per (B,H,num_sub)
+            #expand K_sub to (B,H,num_sub,1,pq_sub_dim)
+            # centroids is structure H, num_sub, num_centroids, pq_sub_dim)
+            #K_sub is (B, H, num_sub, pq_sub_dim)
+            diff = K_sub.unsqueeze(3) - centroids.unsqueeze(0)
+            dists = (diff * diff).sum(dim=-1)  #(B,H,num_sub,num_centroids)
+            codes = dists.argmin(dim=-1)  #(B,H,num_sub)
+
+            return centroids, codes
+
+    class _AsyncCPU2GPU:
+        def __init__(self, tensor_cpu: torch.Tensor, device: torch.device) -> None:
+            self._tensor_cpu = tensor_cpu
+            self._device = device
+
+        def sync(self) -> torch.Tensor:
+            return self._tensor_cpu.to(self._device, non_blocking=True)
+
+    def _pq_encode(self, k: torch.Tensor, centroids: torch.Tensor) -> torch.Tensor:
+        if k.dim() == 2:
+            k = k.unsqueeze(0)
+        elif k.dim() == 4:  # need to handle (B,H,S,D) case
+            k = k[:, :, -1, :]  # use the last timestep
+        B, H, D = k.shape
+        num_sub: int = centroids.shape[1]
+        d_sub: int = centroids.shape[3]
+        assert D % d_sub == 0 and (D // d_sub) == num_sub, "D must be divisible by d_sub and the result must be equal to num_sub"
+        k_sub = k.view(B, H, num_sub, d_sub)  # changed K to k
+        #nearest centroid per subspace
+        #diff: (B, H, num_sub, d_sub)
+        
+        diff = k_sub.unsqueeze(3) - centroids.unsqueeze(0)  # Changed K to k
+        dists = (diff * diff).sum(dim=-1)
+        codes = dists.argmin(dim=-1)
+        return codes
+
+        
+    def _pq_search(
+        self,
+        q: torch.Tensor,                 ##(B,H,D) last-step query
+        centroids: torch.Tensor,         #(H, num_sub, C, d_sub)
+        codes: torch.Tensor,             # cached: (Bc,H,num_sub) codes per cached position
+        topk: int,
+    ) -> torch.Tensor:
+        #make q into subspaces
+        B, H, D = q.shape
+        num_sub, d_sub = centroids.shape[1], centroids.shape[3]
+        q_sub = q.view(B, H, num_sub, d_sub)
+
+        # closest centroid ids for q
+        diff = q_sub.unsqueeze(3) - centroids.unsqueeze(0)        # (B,H,num_sub,C,d_sub)
+        dists = (diff * diff).sum(dim=-1)                         # (B,H,num_sub,C)
+        q_codes = dists.argmin(dim=-1)                            # (B,H,num_sub)
+
+        # measure score cache positions by subspace code matches
+        Bc = codes.shape[0]
+        q_codes_exp = q_codes.unsqueeze(2).expand(B, H, Bc, num_sub)
+        codes_exp = codes.unsqueeze(0).permute(0, 2, 1, 3).expand(B, H, Bc, num_sub)
+        matches = (q_codes_exp == codes_exp).sum(dim=-1)          # (B,H,Bc)
+
+        k = min(topk, Bc)
+        _, idx = matches.topk(k, dim=-1)                          # (B,H,k)
+        return idx
+
+    def _sync_fetch_kv(
+        self,
+        kv_cache: list[tuple[torch.Tensor, torch.Tensor]],  # lenght=Bc, each (B,H,D)
+        indices: torch.Tensor,                              # (B,H,k)
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        B, H, k = indices.shape
+        D = kv_cache[0][0].shape[-1]
+        
+        # stack the cache along position dim
+        K_stack = torch.stack([kv_cache[i][0] for i in range(len(kv_cache))], dim=2)  # (B,H,Bc,D)
+        V_stack = torch.stack([kv_cache[i][1] for i in range(len(kv_cache))], dim=2)  # (B,H,Bc,D)
+        gather_idx = indices.unsqueeze(-1).expand(B, H, k, D)
+        K_sel = K_stack.gather(dim=2, index=gather_idx)  # (B,H,k,D)
+        V_sel = V_stack.gather(dim=2, index=gather_idx)  # (B,H,k,D)
+        return K_sel, V_sel
+
+
+
+
+
     
 
-
+        
