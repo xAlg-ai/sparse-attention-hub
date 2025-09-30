@@ -472,7 +472,6 @@ class TestHuggingFaceSpecificMethods:
         # Test getting model with device info
         kwargs = {"torch_dtype": torch.float16}
         model, device_info = self.server.get_model_with_device_info("gpt2", 0, kwargs)
-
         assert model == mock_model
         assert device_info == "cuda:0"  # Should infer from gpu_id
 

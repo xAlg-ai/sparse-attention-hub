@@ -32,6 +32,7 @@ def mock_dataset_df() -> pd.DataFrame:
             "answers": [["Answer 1a"], ["Answer 1b"], ["Answer 2"]],
             "all_classes": [[], [], []],
             "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
+            "max_new_tokens": [10, 10, 10],
         }
     )
 
