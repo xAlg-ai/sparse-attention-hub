@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 from ray import tune
+
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     AttentionTensorDimensions,
     MaskerConfig,
@@ -32,10 +33,13 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     hat_mlp_activation: str
     hat_weights: Optional[Dict[int, Dict[str, List[torch.Tensor]]]] = None
     hat_weight_file: Optional[str] = None
-    search_space: Dict[str, Any] = field(default_factory=lambda: {
-        "heavy_size": tune.grid_search([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
-    })
-
+    search_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "heavy_size": tune.grid_search(
+                [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+            )
+        }
+    )
 
 
 @MaskerRegistry.register(HashAttentionTopKMaskerConfig)

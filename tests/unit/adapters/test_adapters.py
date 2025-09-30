@@ -13,12 +13,13 @@ from sparse_attention_hub.adapters import (
     RequestResponse,
     SparseAttentionAdapterInterface,
 )
+from sparse_attention_hub.adapters.model_servers.base import ModelServer
 from sparse_attention_hub.sparse_attention import (
     LocalMaskerConfig,
     ResearchAttentionConfig,
     SparseAttentionConfig,
 )
-from sparse_attention_hub.adapters.model_servers.base import ModelServer
+
 
 @pytest.mark.unit
 class TestRequest:
@@ -147,12 +148,14 @@ class TestModelAdapterHF:
             masker_configs=[self.masker_config]
         )
         ModelServer._instance = None
-        
+
     def teardown_method(self) -> None:
         """Clean up after each test."""
         ModelServer._instance = None
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_create_model(self, mock_tokenizer, mock_model) -> None:
         """Test model creation."""
@@ -186,7 +189,9 @@ class TestModelAdapterHF:
             "test-model", torch_dtype=torch.float16
         )
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_create_model_with_torch_dtype(self, mock_tokenizer, mock_model) -> None:
         """Test model creation with torch_dtype parameter."""
@@ -217,7 +222,9 @@ class TestModelAdapterHF:
         # Check that adapter was created successfully
         assert adapter is not None
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_create_model_with_existing_pad_token(
         self, mock_tokenizer, mock_model
@@ -243,7 +250,9 @@ class TestModelAdapterHF:
         # Check that pad_token was not changed
         assert adapter.tokenizer.pad_token == "<PAD>"
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_get_custom_attention_function(self, mock_tokenizer, mock_model) -> None:
         """Test get_custom_attention_function returns a callable."""
@@ -265,7 +274,9 @@ class TestModelAdapterHF:
         custom_fn = adapter.get_custom_attention_function(adapter.sparse_attention)
         assert callable(custom_fn)
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_generate_unique_attention_name(self, mock_tokenizer, mock_model) -> None:
         """Test unique attention name generation."""
@@ -290,7 +301,9 @@ class TestModelAdapterHF:
         assert name2.startswith("sparse_attention_")
         assert name1 != name2  # Should be unique
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_enable_sparse_mode_when_not_available(
         self, mock_tokenizer, mock_model
@@ -317,7 +330,9 @@ class TestModelAdapterHF:
             exc_info.value
         )
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_enable_sparse_and_dense_modes(self, mock_tokenizer, mock_model) -> None:
         """Test enable_sparse_mode and enable_dense_mode context managers."""
@@ -352,7 +367,9 @@ class TestModelAdapterHF:
 
         assert first_name == second_name
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_inheritance(self, mock_tokenizer, mock_model) -> None:
         """Test that ModelAdapterHF properly inherits from ModelAdapter."""
@@ -372,7 +389,9 @@ class TestModelAdapterHF:
         assert isinstance(adapter, ModelHubAdapterInterface)
         assert isinstance(adapter, SparseAttentionAdapterInterface)
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_adapter_properties(self, mock_tokenizer, mock_model) -> None:
         """Test adapter properties are set correctly."""

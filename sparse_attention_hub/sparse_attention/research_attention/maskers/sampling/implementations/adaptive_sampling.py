@@ -14,8 +14,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Union
 
 import torch
-from scipy.stats import norm
 from ray import tune
+from scipy.stats import norm
+
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
     MaskerRegistry,
@@ -56,11 +57,13 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
     delta: float  # Confidence bound (0,1)
     init_offset: Union[int, float]  # Start index
     local_offset: Union[int, float]  # End offset
-    search_space: Dict[str, Any] = field(default_factory=lambda: {
-        "base_rate_sampling": tune.grid_search([0.01, 0.02, 0.03]),
-        "epsilon": tune.grid_search([0.05, 0.1, 0.2, 0.3]),
-        "delta": tune.grid_search([0.05, 0.1, 0.2, 0.3])
-    })
+    search_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "base_rate_sampling": tune.grid_search([0.01, 0.02, 0.03]),
+            "epsilon": tune.grid_search([0.05, 0.1, 0.2, 0.3]),
+            "delta": tune.grid_search([0.05, 0.1, 0.2, 0.3]),
+        }
+    )
 
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
@@ -114,9 +117,6 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
             raise ValueError(
                 f"local_offset must be int or float, got {type(self.local_offset)}"
             )
-
-
-
 
 
 @MaskerRegistry.register(AdaptiveSamplingMaskerConfig)
