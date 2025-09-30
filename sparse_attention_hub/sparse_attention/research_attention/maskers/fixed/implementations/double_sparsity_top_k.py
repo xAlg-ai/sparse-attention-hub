@@ -1,6 +1,6 @@
 """Double sparsity top-K masker implementation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Union
 
 import torch
@@ -28,6 +28,7 @@ class DoubleSparsityTopKMaskerConfig(TopKMaskerConfig):
     group_factor: int
     label_bits: int
     channel_config: ChannelConfig  # config with stats required for double sparsity
+    search_space: Dict[str, Any] = field(default_factory=dict)
 
 
 @MaskerRegistry.register(DoubleSparsityTopKMaskerConfig)

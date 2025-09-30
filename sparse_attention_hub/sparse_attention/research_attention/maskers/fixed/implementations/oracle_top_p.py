@@ -1,10 +1,10 @@
 """Oracle top-P masker implementation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 import torch
-
+from ray import tune
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     AttentionTensorDimensions,
     MaskerConfig,
@@ -23,7 +23,9 @@ from ..base import TopPMasker, TopPMaskerConfig
 class OracleTopPMaskerConfig(TopPMaskerConfig):
     """Configuration for OracleTopPMasker."""
 
-    pass  # Inherits top_p from parent with validation
+    search_space: Dict[str, Any] = field(default_factory=lambda: {
+        "top_p": tune.grid_search([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99])
+    })
 
 
 @MaskerRegistry.register(OracleTopPMaskerConfig)
