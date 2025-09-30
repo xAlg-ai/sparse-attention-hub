@@ -92,6 +92,8 @@ class ModelAdapterHF(ModelAdapter):
             response: The response to the request
         """
         max_context_length: int = request_kwargs.get("max_context_length", INT_MAX)
+        max_new_tokens: int = generation_kwargs.get("max_new_tokens", INT_MAX)
+        print(" Processing request with max_context_length: ", max_context_length, " and max_new_tokens: ", max_new_tokens, flush=True)
 
         questions: List[str] = (
             request.questions

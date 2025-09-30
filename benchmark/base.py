@@ -169,13 +169,30 @@ class Benchmark(ABC):
         # Group by context for efficiency (following HashAttention approach)
         df_context = dataset_df.groupby("context")
         
-        for context, df_group in tqdm(df_context, desc="Processing contexts", total=dataset_df["context"].nunique()):
+        # Track total questions processed
+        total_questions = len(dataset_df)
+        questions_processed = 0
+
+        pbar = tqdm(df_context, desc="Processing contexts", total=dataset_df["context"].nunique())
+        for idx, (context, df_group) in enumerate(pbar):
             questions: List[str] = df_group["question"].to_list()
+            questions_processed += len(questions)
+            # Update progress bar suffix to show number of questions
+            pbar.set_postfix({
+                'ctx': idx+1,
+                'q': len(questions),
+                'total_q': f"{questions_processed}/{total_questions}"
+            })
             
             try:
                 # Create request using current adapter interface (simplified)
                 answer_prefix = df_group["answer_prefix"].iloc[0]
                 request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
+                
+                # using the first record for getting max new tokens
+                max_new_tokens = df_group["max_new_tokens"].iloc[0]
+                param_max_new_tokens = generation_kwargs.get("max_new_tokens", sys.maxsize)
+                generation_kwargs["max_new_tokens"] = min(param_max_new_tokens, max_new_tokens)
                 
                 # Process through adapter
                 response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
