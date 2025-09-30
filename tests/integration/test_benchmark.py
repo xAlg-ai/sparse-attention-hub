@@ -245,6 +245,7 @@ class TestEndToEndBenchmarkWorkflow:
                 "answers": [["A1a"], ["A1b"], ["A2"]],
                 "all_classes": [[], [], []],
                 "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
+                "max_new_tokens": [10, 10, 10],
             }
         )
 
@@ -312,6 +313,7 @@ class TestEndToEndBenchmarkWorkflow:
                 "answers": [["A1"], ["A2"], ["A3"], ["A4"], ["A5"], ["A6"]],
                 "all_classes": [[], [], [], [], [], []],
                 "answer_prefix": ["Answer: "] * 6,
+                "max_new_tokens": [10, 10, 10, 10, 10, 10],
             }
         )
 
@@ -411,6 +413,7 @@ class TestErrorHandlingIntegration:
                 "answers": [["A1"], ["A2"], ["A3"]],
                 "all_classes": [[], [], []],
                 "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
+                "max_new_tokens": [10, 10, 10],
             }
         )
 
@@ -453,6 +456,7 @@ class TestErrorHandlingIntegration:
                 "answers": [["A"]],
                 "all_classes": [[]],
                 "answer_prefix": ["Answer: "],
+                "max_new_tokens": [10],
             }
         )
 

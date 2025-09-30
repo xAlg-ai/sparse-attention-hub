@@ -61,7 +61,7 @@ class ModelServerHF(ModelServer):
                     if type(gpu_id) == str and gpu_id.startswith("cuda"):
                         device = gpu_id
                     else:
-                        device = f"cuda: {gpu_id}"
+                        device = f"cuda:{gpu_id}"
                     self.logger.debug(f"Moving model {model_name} to device: {device}")
                     model = model.to(device)
                 else:
@@ -219,7 +219,7 @@ class ModelServerHF(ModelServer):
         if hasattr(model, "device"):
             device_info = str(model.device)
         elif gpu is not None:
-            device_info = f"cuda: {gpu}" if torch.cuda.is_available() else "cpu"
+            device_info = f"cuda:{gpu}" if torch.cuda.is_available() else "cpu"
         else:
             device_info = "cpu"
 
@@ -243,7 +243,7 @@ class ModelServerHF(ModelServer):
 
             # Test GPU access
             with torch.cuda.device(gpu_id):
-                test_tensor = torch.zeros(1, device=f"cuda: {gpu_id}")
+                test_tensor = torch.zeros(1, device=f"cuda:{gpu_id}")
                 del test_tensor
                 torch.cuda.empty_cache()
 
