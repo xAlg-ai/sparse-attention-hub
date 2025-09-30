@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict
 
 import torch
-from ray import tune
+
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
     MaskerRegistry,
@@ -39,14 +39,13 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
 
     sampling_rate: float  # Float in range [0,1] representing fraction of indices to sample
     search_space: Dict[str, Any] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
         """Validate sampling_rate after initialization."""
         if not (0.0 <= self.sampling_rate <= 1.0):
             raise ValueError(
                 f"sampling_rate must be in range [0, 1], got {self.sampling_rate}"
             )
-
-    
 
 
 @MaskerRegistry.register(RandomSamplingMaskerConfig)

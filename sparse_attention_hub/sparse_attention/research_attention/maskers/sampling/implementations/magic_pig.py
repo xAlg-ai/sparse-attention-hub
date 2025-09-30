@@ -11,6 +11,7 @@ from typing import Any, Dict, Literal, Optional, Tuple
 
 import torch
 from ray import tune
+
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
     MaskerRegistry,
@@ -48,10 +49,12 @@ class MagicPigConfig(SamplingMaskerConfig):
     center: bool = True  # whether to center keys and queries before LSH
     packing: Literal["int64", "float32"] = "int64"  # packing strategy for signatures
     seed: Optional[int] = 42  # random seed for reproducible projections
-    search_space: Dict[str, Any] = field(default_factory=lambda: {
-        "lsh_l": tune.grid_search([16, 32, 64, 128]),
-        "lsh_k": tune.grid_search([4, 8, 16, 32]),
-    })
+    search_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "lsh_l": tune.grid_search([16, 32, 64, 128]),
+            "lsh_k": tune.grid_search([4, 8, 16, 32]),
+        }
+    )
 
     def __post_init__(self) -> None:
         """Validate LSH parameters after initialization."""
@@ -69,7 +72,6 @@ class MagicPigConfig(SamplingMaskerConfig):
             )
         if self.seed is None:
             raise ValueError("seed cannot be None")
-
 
 
 @MaskerRegistry.register(MagicPigConfig)
