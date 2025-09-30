@@ -1,10 +1,10 @@
 """Oracle top-K masker implementation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Union
 
 import torch
-
+from ray import tune
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     AttentionTensorDimensions,
     MaskerConfig,
@@ -22,8 +22,9 @@ from ..base import TopKMasker, TopKMaskerConfig
 @dataclass
 class OracleTopKConfig(TopKMaskerConfig):
     """Configuration for OracleTopK masker."""
-
-    pass
+    search_space: Dict[str, Any] = field(default_factory=lambda: {
+        "heavy_size": tune.grid_search([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]),
+    })
 
 
 @MaskerRegistry.register(OracleTopKConfig)

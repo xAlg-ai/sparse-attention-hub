@@ -1,6 +1,6 @@
 """Basic fixed pattern masker implementations."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Union
 
 import torch
@@ -20,6 +20,7 @@ class LocalMaskerConfig(FixedMaskerConfig):
     """Configuration for LocalMasker."""
 
     window_size: Union[float, int]
+    search_space: Dict[str, Any] = field(default_factory=dict)
 
 
 @MaskerRegistry.register(LocalMaskerConfig)
@@ -167,6 +168,7 @@ class SinkMaskerConfig(FixedMaskerConfig):
     """Configuration for SinkMasker."""
 
     sink_size: Union[float, int]
+    search_space: Dict[str, Any] = field(default_factory=dict)
 
 
 @MaskerRegistry.register(SinkMaskerConfig)
