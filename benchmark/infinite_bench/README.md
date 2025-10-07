@@ -1,4 +1,4 @@
-# Infinitebench dataset
+# Infinitebench dataset (Adapted from KVPress from NVIDIA)
 
 [Infinitebench](https://github.com/OpenBMB/InfiniteBench) is composed of 12 major tasks. 
 

@@ -1,4 +1,4 @@
-# Loogle dataset
+# Loogle dataset (Adapted from KVPress from NVIDIA)
 
 [Loogle](https://github.com/bigai-nlco/LooGLE/tree/main) is composed of 7 major tasks to evaluate LLMs' ability to understand both short and long dependency content. 
 
