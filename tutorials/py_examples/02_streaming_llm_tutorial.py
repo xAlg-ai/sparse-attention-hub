@@ -1,9 +1,23 @@
-import os
-os.chdir('/data/apdesai/code/sparse-attention-hub')
+#!/usr/bin/env python3
+"""
+StreamingLLM Tutorial
 
+Demonstrates how to use StreamingLLM (Sink + Local attention) with sparse-attention-hub.
+StreamingLLM maintains performance on long sequences while reducing memory usage.
+
+Usage:
+    python 02_streaming_llm_tutorial.py
+"""
+
+import os
+import sys
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import time
+
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -25,10 +39,12 @@ print(f"✅ StreamingLLM config: Sink(4) + Local(16)")
 # model_name = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
 model_name = "meta-llama/Llama-3.1-8B-Instruct"
 
-adapter = ModelAdapterHF(model_name=model_name,
-                         sparse_attention_config=research_config,
-                         model_kwargs={"torch_dtype": torch.bfloat16, "device_map": "cuda"},
-                         device="cuda")
+adapter = ModelAdapterHF(
+    model_name=model_name,
+    sparse_attention_config=research_config,
+    model_kwargs={"torch_dtype": torch.bfloat16},
+    device=device
+)
 
 from sparse_attention_hub.adapters import Request
 
