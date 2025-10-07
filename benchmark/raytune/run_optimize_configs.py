@@ -448,17 +448,20 @@ def run_search(config: dict, actors_per_gpu: int = 1) -> Dict[str, OptimalConfig
 ################################################################# CONFIGURE YOUR RUN HERE #################################################################
 
 # Model configurations
+# Weight files are loaded from SPARSE_ATTENTION_WEIGHTS_DIR environment variable
+# Set it to the directory containing your HashAttention weight files
+weights_dir = os.environ.get("SPARSE_ATTENTION_WEIGHTS_DIR", "./weights")
 MODEL_CONFIGS = {
     "llama": {
-        "weight_file": "/home/ubuntu/HashAttention-1.0/artifacts/llama3.1-8b-patch.64K.v1.hat_weights.pkl",
+        "weight_file": os.path.join(weights_dir, "llama3.1-8b-patch.64K.v1.hat_weights.pkl"),
         "model_name": "meta-llama/Llama-3.1-8B-Instruct"
     },
     "deepseek": {
-        "weight_file": "/home/ubuntu/HashAttention-1.0/artifacts/DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K_hat_weights.pkl",
+        "weight_file": os.path.join(weights_dir, "DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K_hat_weights.pkl"),
         "model_name": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
     },
     "mistral": {
-        "weight_file": "/home/ubuntu/HashAttention-1.0/artifacts/Mistral-7B-Instruct-v0.3.24K.20.500.hat_weights.pkl",
+        "weight_file": os.path.join(weights_dir, "Mistral-7B-Instruct-v0.3.24K.20.500.hat_weights.pkl"),
         "model_name": "mistralai/Mistral-7B-Instruct-v0.3"
     }
 }
