@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/sparse-attention-hub')
-sys.path.insert(0, '/workspace/sparse-attention-hub')
+os.chdir('/home/ubuntu/TEMP/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/TEMP/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -37,16 +37,18 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
 
 from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
+from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         SinkMaskerConfig(sink_size=128),
         LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=128),
-        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
+
+        #OracleTopKConfig(heavy_size=128),
+        #AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
         PQCacheConfig(heavy_size=512,pq_sub_dim=128//2, pq_bits=6)
     ])
 
@@ -59,13 +61,20 @@ def main():
         generate_kwargs={"max_new_tokens": 32},
         device=device
     )
+
+    metric_logger = MicroMetricLogger()
+    metric_logger.configure_logging(
+             log_path="./test_results",
+             enabled_metrics=["research_attention_density", "research_attention_output_error"],
+    )
+
     
     benchmark = Ruler32K(['vt'])
 
     result_dir = Path("./test_results")
     result_dir.mkdir(exist_ok=True)
 
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 1000000})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests":10, "max_context_length": 1000000})
     
 if __name__ == "__main__":
     main() 

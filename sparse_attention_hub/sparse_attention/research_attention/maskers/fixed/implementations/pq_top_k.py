@@ -177,34 +177,7 @@ class PQCache(TopKMasker):
         final_mask = mask & attention_mask.to(torch.bool)
 
         return Mask(mask_qk = final_mask, heavy_size = self.heavy_size)
-        
 
-
-
-        
-
-        
-
-
-
-
-
-
-
-
-
-            
-
-
-                
-
-
-
-
-
-
-        
-        
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "PQCache":
