@@ -29,7 +29,7 @@ sys.path.insert(0, '/workspace/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig
+    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, PQCacheConfig
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
     AdaptiveSamplingMaskerConfig
@@ -46,8 +46,10 @@ def main():
         SinkMaskerConfig(sink_size=128),
         LocalMaskerConfig(window_size=128),
         OracleTopKConfig(heavy_size=128),
-        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128)
+        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
+        PQCacheConfig(heavy_size=512,pq_sub_dim=128//2, pq_bits=6)
     ])
+
     
     print("  ✓ Loading model...")
     adapter = ModelAdapterHF(
