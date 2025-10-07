@@ -2,6 +2,18 @@
 
 A distributed benchmark suite for sparse attention configurations using Ray for parallel execution.
 
+## Setup
+
+### Environment Variables
+
+For HashAttention configurations, set the weights directory:
+
+```bash
+export SPARSE_ATTENTION_WEIGHTS_DIR=/path/to/your/hashattention/weights
+```
+
+The directory should contain the HashAttention weight files for your models (e.g., `llama3.1-8b-patch.64K.v1.hat_weights.pkl`).
+
 ## Quick Start
 
 ### 1. Optimize Configurations
