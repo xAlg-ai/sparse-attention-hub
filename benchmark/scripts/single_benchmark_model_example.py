@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/ubuntu/TEMP/sparse-attention-hub')
-sys.path.insert(0, '/home/ubuntu/TEMP/sparse-attention-hub')
+os.chdir('/home/ubuntu/prithvi/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/prithvi/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -49,7 +49,7 @@ def main():
 
         #OracleTopKConfig(heavy_size=128),
         #AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
-        PQCacheConfig(heavy_size=512,pq_sub_dim=128//2, pq_bits=6)
+        PQCacheConfig(heavy_size=64,pq_sub_dim=16, pq_bits=3, kmeans_iters=10)
     ])
 
     
