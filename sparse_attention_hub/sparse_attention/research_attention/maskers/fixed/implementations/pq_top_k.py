@@ -73,7 +73,7 @@ class PQCache(TopKMasker):
         #assign codes and store results
 
         #check if index built
-        if "pq_centroids" in sparse_meta_data and pq_s == keys.shape[2]:
+        if "pq_centroids" in sparse_meta_data and "pq_codes" in sparse_meta_data:# and pq_s == keys.shape[2]:
             pass #skip to search
 
         else:
@@ -105,6 +105,7 @@ class PQCache(TopKMasker):
 
                 #iterate for fixed number of epochs
                 for _ in range(self.kmeans_iters):
+
                     #L2 distance betwen each vector to all centroids
                     distances = torch.cdist(sub_vectors_to_cluster, centroids_i, p=2)
                     if torch.isnan(distances).any():
@@ -136,25 +137,32 @@ class PQCache(TopKMasker):
         #pq search phase
         centroids = sparse_meta_data["pq_centroids"]
         codes = sparse_meta_data["pq_codes"]
+
         #partitoin the query first
+        if torch.isnan(queries).any():
+            print(f"NaNs found in queries after reshape at sub-vector")
         queries_partitioned = queries.reshape(n, h_q, lq, num_sub_vectors, dm)
+        if torch.isnan(queries_partitioned).any():
+            print(f"NaNs found in queries_partitioned after reshape at sub-vector")
         #lq up in line 57
 
         ##compute similarity using matmul naive rn
         scores_per_centroid = torch.zeros(n, h_q, lq, num_sub_vectors, num_centroids, device=keys.device, dtype=dtype)
         for i in range(num_sub_vectors):
             q_sub = queries_partitioned[:, :, :, i, :] #shape n, h, lq, dm
+            
             #get centroids for this dimension
             c_set = centroids[i, :, :] #shape num_centroids, dm
+            
             #calcualte dot product
             #reshape q_sub to (n*h*lq,dm) for batched matmul
             q_su_flat = q_sub.reshape(-1, dm)
+            
             #transpose c_set to (dm, num_centroids) for matumul
             c_set_transposed = c_set.T
             #matmul result is (n*h*lq, num_centroids)
             scores = torch.matmul(q_su_flat, c_set_transposed)
-            if torch.isnan(scores).any():
-                print(f"NaNs found in scores after matmul at sub-vector {i}")
+
             scores_per_centroid[:, :, :, i, :] = scores.reshape(n, h_q, lq, num_centroids)
 
         #gather and reduce
@@ -178,14 +186,12 @@ class PQCache(TopKMasker):
             codes_expanded = codes_for_sub_dim.unsqueeze(2).expand(n, h_q, lq, s)
             #gather scores
             gathered_scores = torch.gather(scores_expanded, dim=4, index=codes_expanded.unsqueeze(4)).squeeze(4)
-            if torch.isnan(gathered_scores).any():
-                print(f"NaNs found in gathered scores after gather at sub-vector {i}")
+
             #add scroes to tottal
             total_scores += gathered_scores
 
 
-        if torch.isnan(total_scores).any():
-            print(f"NaNs found in total scores after adding scores at sub-vector {i}")
+        
         #total scores now has shape n, h, lq, s 
         top_k_scores, top_k_indices = torch.topk(total_scores, self.heavy_size, dim=-1)
        
