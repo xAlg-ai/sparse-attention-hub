@@ -49,7 +49,7 @@ def main():
 
         #OracleTopKConfig(heavy_size=128),
         #AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
-        PQCacheConfig(heavy_size=64,pq_sub_dim=16, pq_bits=3, kmeans_iters=10)
+        PQCacheConfig(heavy_size=1024,pq_sub_dim=64, pq_bits=7, kmeans_iters=25)
     ])
 
     

@@ -73,7 +73,7 @@ class PQCache(TopKMasker):
         #assign codes and store results
 
         #check if index built
-        if "pq_centroids" in sparse_meta_data and "pq_codes" in sparse_meta_data:# and pq_s == keys.shape[2]:
+        if "pq_centroids" in sparse_meta_data and "pq_codes" in sparse_meta_data and pq_s == keys.shape[2]:
             pass #skip to search
 
         else:
@@ -108,8 +108,6 @@ class PQCache(TopKMasker):
 
                     #L2 distance betwen each vector to all centroids
                     distances = torch.cdist(sub_vectors_to_cluster, centroids_i, p=2)
-                    if torch.isnan(distances).any():
-                        print(f"NaNs found in distances after cdist at sub-vector {i}")
                     codes_i = torch.argmin(distances, dim=1)
 
                     #closest centroid for each vector
@@ -122,8 +120,6 @@ class PQCache(TopKMasker):
 
                     counts[counts == 0] = 1
                     centroids_i = new_centroids / counts.unsqueeze(1)
-                    if torch.isnan(centroids_i).any():
-                        print(f"NaNs found in centroids after update at sub-vector {i}")
 
                 all_centroids[i, :, :] = centroids_i
                 all_codes[:, :, :, i] = codes_i.reshape(n, h_kv, s)
@@ -138,12 +134,9 @@ class PQCache(TopKMasker):
         centroids = sparse_meta_data["pq_centroids"]
         codes = sparse_meta_data["pq_codes"]
 
-        #partitoin the query first
-        if torch.isnan(queries).any():
-            print(f"NaNs found in queries after reshape at sub-vector")
-        queries_partitioned = queries.reshape(n, h_q, lq, num_sub_vectors, dm)
-        if torch.isnan(queries_partitioned).any():
-            print(f"NaNs found in queries_partitioned after reshape at sub-vector")
+        #partition the query first - work on a copy to avoid modifying the original queries tensor
+        queries_copy = queries.clone()  # Create a copy to avoid modifying the original
+        queries_partitioned = queries_copy.reshape(n, h_q, lq, num_sub_vectors, dm)
         #lq up in line 57
 
         ##compute similarity using matmul naive rn
@@ -201,14 +194,16 @@ class PQCache(TopKMasker):
         #set topk indicies to true
         mask.scatter_(-1, top_k_indices, True)
         #combine with original mask
-        final_mask = mask & attention_mask.to(torch.bool)
-
-
-
+        #final_mask = mask & attention_mask.to(torch.bool)
         mask_shape = (n, h_q, lq, s)
-        dense_mask = final_mask
+        new_mask = Mask.create_mask_from_dense_mask(mask_shape, mask.to(torch.float32), dtype=previous_mask.dtype)
 
-        return Mask.create_mask_from_dense_mask(mask_shape, dense_mask.to(torch.float32), dtype=previous_mask.dtype)
+
+        #mask_shape = (n, h_q, lq, s)
+        #dense_mask = final_mask
+        return previous_mask.merge_mask(new_mask, inplace=False)
+
+        #return Mask.create_mask_from_dense_mask(mask_shape, dense_mask.to(torch.float32), dtype=previous_mask.dtype)
         # return Mask(mask_qk = final_mask, heavy_size = self.heavy_size)
 
 
