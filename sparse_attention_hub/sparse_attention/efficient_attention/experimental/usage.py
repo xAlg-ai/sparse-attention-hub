@@ -80,7 +80,6 @@ def run_mha_example():
     cached_key_signatures = hat_get_signatures_4d(
         keys[:,:,:-1, :],
         hat_bits,
-        ACTIVATION_FNS[hat_mlp_activation],
         hat_weights_key_matrix,
         hat_weights_key_bias,
     )
@@ -154,7 +153,6 @@ def benchmark_vattention(num_runs: int = 20, warmup_runs: int = 5):
     cached_key_signatures = hat_get_signatures_4d(
         keys[:,:,:-1, :],
         hat_bits,
-        ACTIVATION_FNS[hat_mlp_activation],
         hat_weights_key_matrix,
         hat_weights_key_bias,
     )

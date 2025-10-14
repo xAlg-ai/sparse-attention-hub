@@ -16,12 +16,19 @@ ACTIVATION_FNS = {
 
 
 @lru_cache(maxsize=None)
-def return_idx_in_row(sampling_range, device, seed):
-    print("return idx run", flush=True)
+def return_idx_in_row(sampling_range: int, device: torch.device, seed: int) -> torch.Tensor:
     generator = torch.Generator(device=device)
     generator.manual_seed(seed)   
     idx_in_row = torch.randperm(sampling_range, device=device, dtype=torch.long, generator=generator)
     return idx_in_row
+
+@lru_cache(maxsize=None)
+def get_sampling_indices(B: int, H: int, base_num_tokens: int, start_idx: int, end_idx: int, device: torch.device, seed: int) -> torch.Tensor:
+    generator = torch.Generator(device=device)
+    generator.manual_seed(seed)
+    sampling_indices = torch.randint(start_idx, end_idx, (B, H, base_num_tokens,), device=device, generator=generator)
+    return sampling_indices
+
 
 def ref_dense_attention_with_weights_fwd(query: torch.Tensor, # [B, H, D]
                             key: torch.Tensor, # [B, H // gqa, S, D]
@@ -151,8 +158,8 @@ void bit_count_kernel_long(const unsigned long long int* input, unsigned long lo
 }
 ''', 'bit_count_kernel_long')
 
-
-def gpu_bit_count_long(input_tensor, output_tensor):
+@torch.jit.ignore
+def gpu_bit_count_long(input_tensor: torch.Tensor, output_tensor: torch.Tensor):
     if not isinstance(input_tensor, torch.Tensor):
         raise ValueError("Input must be a PyTorch tensor")
     
@@ -172,13 +179,12 @@ def gpu_bit_count_long(input_tensor, output_tensor):
     bit_count_kernel_long((blocks_per_grid,), (threads_per_block,),
                           (input_cp, output_cp, total_elements))
 
-
+@torch.jit.script
 def hat_get_signatures_4d(
-        input_tensor,
-        hat_bits,
-        hat_mlp_activation_fn,
-        matrix_list,
-        bias_list,
+        input_tensor: torch.Tensor,
+        hat_bits: int,
+        matrix_list: List[torch.Tensor],
+        bias_list: List[torch.Tensor],
     ):
     signatures = input_tensor
     for i in range(len(matrix_list) - 1):
@@ -189,7 +195,7 @@ def hat_get_signatures_4d(
         )
         # (B,H,s,d_out) + (H,d_out) -> (B,H,s,d_out)
         signatures = signatures + bias_vector.unsqueeze(0).unsqueeze(2)
-        signatures = hat_mlp_activation_fn(signatures)
+        signatures = torch.nn.functional.silu(signatures)
     if len(matrix_list) > 0:
         weight_matrix = matrix_list[-1]
         bias_vector = bias_list[-1]
@@ -207,12 +213,12 @@ def hat_get_signatures_4d(
     packed_signatures = (binary_signatures * packer).sum(dim=-1)
     return packed_signatures
 
+@torch.jit.script
 def hat_get_signatures_3d(
-        input_tensor,
-        hat_bits,
-        hat_mlp_activation_fn,
-        matrix_list,
-        bias_list,
+        input_tensor: torch.Tensor,
+        hat_bits: int,
+        matrix_list: List[torch.Tensor],
+        bias_list: List[torch.Tensor],
     ):
     signatures = input_tensor
     for i in range(len(matrix_list) - 1):
@@ -223,7 +229,7 @@ def hat_get_signatures_3d(
         )
         # (B,H,s,d_out) + (H,d_out) -> (B,H,s,d_out)
         signatures = signatures + bias_vector.unsqueeze(0)
-        signatures = hat_mlp_activation_fn(signatures)
+        signatures = torch.nn.functional.silu(signatures)
     if len(matrix_list) > 0:
         weight_matrix = matrix_list[-1]
         bias_vector = bias_list[-1]
@@ -242,8 +248,8 @@ def hat_get_signatures_3d(
     return packed_signatures
 
 def hat_get_scores(
-    query_signatures,
-    key_signatures,
+    query_signatures: torch.Tensor,
+    key_signatures: torch.Tensor,
 ):
     '''
         query_signatures: [B, H]  int64 torch tensor
@@ -257,23 +263,22 @@ def hat_get_scores(
     gpu_bit_count_long(bit_matches, scores)
     return scores
     
-
+@torch.jit.script
 def add_hashattention_tokens(
         queries: torch.Tensor,
         keys: torch.Tensor,
-        sink_token_length,
-        local_token_length,
-        heavy_token_length,
-        hat_bits,
-        hat_mlp_layers,
-        hat_mlp_hidden_size, 
-        hat_mlp_activation_fn,
-        hat_weights_query_matrix,
-        hat_weights_query_bias,
-        hat_weights_key_matrix,
-        hat_weights_key_bias,
-        cached_key_signatures,
-        sparse_list,
+        sink_token_length: int,
+        local_token_length: int,
+        heavy_token_length: int,
+        hat_bits: int,
+        hat_mlp_layers: int,
+        hat_mlp_hidden_size: int, 
+        hat_weights_query_matrix: List[torch.Tensor],
+        hat_weights_query_bias: List[torch.Tensor],
+        hat_weights_key_matrix: List[torch.Tensor],
+        hat_weights_key_bias: List[torch.Tensor],
+        cached_key_signatures: Optional[torch.Tensor],
+        sparse_list: torch.Tensor,
 ):
     # get hash attention bit signatures for new keys.
     if cached_key_signatures is not None:
@@ -285,7 +290,6 @@ def add_hashattention_tokens(
     new_key_signatures = hat_get_signatures_4d(
         keys[:,:,old_key_num:, :],
         hat_bits,
-        hat_mlp_activation_fn,
         hat_weights_key_matrix,
         hat_weights_key_bias,
     )
@@ -298,7 +302,6 @@ def add_hashattention_tokens(
     query_signatures = hat_get_signatures_3d(
         queries,
         hat_bits,
-        hat_mlp_activation_fn,
         hat_weights_query_matrix,
         hat_weights_query_bias,
     )
@@ -487,7 +490,7 @@ def adaptive_get_denominator_statics_vectorized(
     
     return total_denominator, dynamic_denominator_std
 
-
+@torch.jit.script
 def adaptive_get_adaptive_budget(
     estimated_residual_denominator_terms_std: torch.Tensor,
     estimated_total_denominator: torch.Tensor,
@@ -510,10 +513,11 @@ def adaptive_get_adaptive_budget(
 
     return budget
 
+@torch.jit.script
 def hash_function(b: int, h: int, q: int) -> int:
     return (b * 4819219 + h * 12345713 + q * 13123211 + 123456789) % 1000000007
 
-
+@torch.jit.script
 def hash_function_vectorized(b: torch.Tensor, h: torch.Tensor, q: int) -> torch.Tensor:
     """Vectorized version of hash_function that operates on tensors."""
     return (b * 4819219 + h * 12345713 + q * 13123211 + 123456789) % 1000000007
@@ -553,7 +557,7 @@ def adaptive_update_sparse_list_with_extra_budget(
                 sparse_list_weights[b, h, sparse_len[b, h]] = float(sampling_range) / float(budget)
                 sparse_len[b, h] += 1
 
-
+@torch.jit.script
 def adaptive_update_sparse_list_with_extra_budget_vectorized(
     sparse_list: torch.Tensor, # [B, H, kv_len]
     sparse_list_weights: torch.Tensor, # [B, H, kv_len]
@@ -651,7 +655,7 @@ def adaptive_update_sparse_list_with_extra_budget_vectorized(
     actual_writes = torch.sum(final_mask, dim=-1)  # [B, H] - count of writes per (b, h)
     sparse_len += actual_writes
 
-
+@torch.jit.script
 def add_adaptive_sampling_tokens(
     queries: torch.Tensor,
     keys: torch.Tensor,
@@ -675,9 +679,7 @@ def add_adaptive_sampling_tokens(
 
     static_count = sink_token_length + local_token_length + heavy_token_length
     # get base sampling indices
-    generator = torch.Generator(device=queries.device)
-    generator.manual_seed(42)
-    sampling_indices = torch.randint(start_idx, end_idx, (queries.shape[0], queries.shape[1], base_num_tokens,), device=queries.device, generator=generator)
+    sampling_indices = get_sampling_indices(queries.shape[0], queries.shape[1], base_num_tokens, start_idx, end_idx, queries.device, 42)
 
     estimated_total_denominator, estimated_residual_denominator_terms_std = adaptive_get_denominator_statics_vectorized(
         queries,
@@ -784,7 +786,6 @@ def ref_vAttention_fwd(
         hat_bits,
         hat_mlp_layers,
         hat_mlp_hidden_size, # this can be removed if we use standard silu
-        ACTIVATION_FNS[hat_mlp_activation], # this can be removed if we use standard silu
         hat_weights_query_matrix,
         hat_weights_query_bias,
         hat_weights_key_matrix,
