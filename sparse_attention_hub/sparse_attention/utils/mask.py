@@ -63,7 +63,7 @@ class Mask:
             self.indices = None
             self.ptr = None
             self.data = None
-            # Check if this is actually a full mask
+            # # Check if this is actually a full mask
             if self._detect_full_mask():
                 self.is_full = True
                 self.mask = None  # Free memory
@@ -92,6 +92,7 @@ class Mask:
         """
         if self.is_full:
             return True
+        return False
 
         if self.from_dense_mask and self.mask is not None:
             return bool(torch.all(self.mask == 1.0).item())
@@ -204,22 +205,30 @@ class Mask:
         data: torch.Tensor,
         type: str = "index",
         dtype: torch.dtype = torch.float32,
+        use_padding: bool = False,
     ) -> "Mask":
         """
         Create a Mask from row-wise indices.
 
         Args:
             shape: Shape of the mask (*, n)
-            row_wise_idx: Row-wise indices tensor of shape (*, k) -ve values are padding
+            row_wise_idx: Row-wise indices tensor of shape (*, k). If use_padding=True,
+                         -1 values are treated as padding and filtered out.
             data: Data tensor of shape (*, k) corresponding to the indices
             type: Type of representation ("index" or "dense")
             dtype: Data type for the mask values
+            use_padding: If True, handles -1 padding (causes GPU-CPU sync). If False (default),
+                        assumes all indices are valid and uses zero-sync fast path.
 
         Returns:
             Mask object with the specified representation
         """
         if len(shape) < 1:
             raise ValueError("shape must have at least one dimension")
+
+        # if empty row-wise idx, return empty mask
+        if row_wise_idx.shape[-1] <= 0:
+            return cls.create_empty_mask(shape, dtype, mask_type=type)
 
         # Validate input shapes
         expected_row_wise_shape: Tuple[int, ...] = shape[:-1] + (
@@ -235,15 +244,7 @@ class Mask:
                 f"data.shape must match row_wise_idx.shape {row_wise_idx.shape}, got {data.shape}"
             )
 
-        # Validate indices are within bounds (allow -1 as padding)
         n: int = shape[-1]
-        valid_indices_mask: torch.Tensor = row_wise_idx >= 0
-        if torch.any((row_wise_idx >= n) & valid_indices_mask):
-            raise ValueError(
-                f"All valid indices in row_wise_idx must be in range [0, {n-1}]"
-            )
-
-        # Always compute sparse representation first
         batch_dims: Tuple[int, ...] = shape[:-1]
         batch_size: int = int(np.prod(batch_dims))
         k: int = row_wise_idx.shape[-1]
@@ -254,20 +255,39 @@ class Mask:
         row_offsets: torch.Tensor = (
             torch.arange(batch_size, device=flat_row_wise_idx.device).unsqueeze(1) * n
         )
-        flat_indices_with_offset: torch.Tensor = flat_row_wise_idx + row_offsets
 
-        # Filter out invalid indices (e.g., -1 padding)
-        valid_mask: torch.Tensor = flat_row_wise_idx >= 0
-        valid_flat_indices: torch.Tensor = flat_indices_with_offset[valid_mask]
-        valid_values: torch.Tensor = flat_data[valid_mask]
+        if use_padding:
+            # Slow path: Handle -1 padding (causes GPU-CPU sync via boolean indexing)
+            flat_indices_with_offset: torch.Tensor = flat_row_wise_idx + row_offsets
 
-        valid_counts_per_row: torch.Tensor = valid_mask.sum(dim=1)
-        ptr: torch.Tensor = torch.cat(
-            [
-                torch.zeros(1, dtype=torch.long, device=flat_row_wise_idx.device),
-                torch.cumsum(valid_counts_per_row, dim=0),
-            ]
-        )
+            # Filter out invalid indices (e.g., -1 padding)
+            valid_mask: torch.Tensor = flat_row_wise_idx >= 0
+            valid_flat_indices: torch.Tensor = flat_indices_with_offset[valid_mask]
+            valid_values: torch.Tensor = flat_data[valid_mask]
+
+            valid_counts_per_row: torch.Tensor = valid_mask.sum(dim=1)
+            ptr: torch.Tensor = torch.cat(
+                [
+                    torch.zeros(1, dtype=torch.long, device=flat_row_wise_idx.device),
+                    torch.cumsum(valid_counts_per_row, dim=0),
+                ]
+            )
+        else:
+            # Fast path: No padding handling (zero-sync, assumes all indices are valid)
+            flat_indices_with_offset: torch.Tensor = flat_row_wise_idx + row_offsets
+
+            # Flatten directly without filtering
+            valid_flat_indices: torch.Tensor = flat_indices_with_offset.reshape(-1)
+            valid_values: torch.Tensor = flat_data.reshape(-1)
+
+            # Create uniform ptr array (each row has exactly k elements)
+            ptr: torch.Tensor = torch.arange(
+                0,
+                batch_size * k + 1,
+                k,
+                dtype=torch.long,
+                device=flat_row_wise_idx.device,
+            )
 
         # Create sparse mask
         sparse_mask: Mask = cls.create_mask_from_indices(
@@ -601,7 +621,14 @@ class Mask:
             num_rows = int(np.prod(self.shape[:-1]))
             n_cols = self.shape[-1]
             row_indices: torch.Tensor = final_indices // n_cols
-            row_counts: torch.Tensor = torch.bincount(row_indices, minlength=num_rows)
+
+            # Use scatter_add instead of bincount to avoid GPU-CPU synchronization
+            row_counts: torch.Tensor = torch.zeros(
+                num_rows, dtype=torch.long, device=device
+            )
+            ones = torch.ones_like(row_indices, dtype=torch.long)
+            row_counts.scatter_add_(0, row_indices, ones)
+
             final_ptr = torch.cat(
                 [
                     torch.zeros(1, dtype=torch.long, device=device),

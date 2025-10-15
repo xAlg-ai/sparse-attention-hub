@@ -634,6 +634,10 @@ class TestAdapterManual:
 
         registered_attention_name = adapter._registered_attention_name
         del adapter
+        # delete function is called by garbage collector . so force it
+        import gc
+
+        gc.collect()
         assert registered_attention_name not in ALL_ATTENTION_FUNCTIONS.valid_keys()
         assert (
             registered_attention_name not in ALL_MASK_ATTENTION_FUNCTIONS.valid_keys()

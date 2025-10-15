@@ -191,9 +191,8 @@ def create_sampling_mask_with_per_head_budget(
     )  # (total_elements,)
 
     # Create row indices by repeating each row index according to its budget
-    row_id = torch.repeat_interleave(
-        torch.arange(num_rows, device=budgets.device), budgets_flat
-    )  # (total_elements,)
+    positions = torch.arange(total_elements, device=budgets.device) + 1
+    row_id = torch.searchsorted(ptr, positions, right=False) - 1  # (total_elements,)
 
     # Calculate global indices
     idx_global = idx_in_row + row_id * seq_len_keys  # (total_elements,)
