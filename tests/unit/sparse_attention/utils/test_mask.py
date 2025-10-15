@@ -308,16 +308,20 @@ class TestMask:
         ):
             Mask.create_from_row_wise_idx(shape, row_wise_idx, data)
 
-    def test_create_from_row_wise_idx_error_out_of_bounds(self):
-        """Test error handling for out-of-bounds indices."""
-        shape = (2, 5)
-        row_wise_idx = torch.tensor([[0, 2, 5], [1, 3, 4]])  # 5 is out of bounds
-        data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
+    # why comment this test?
+    # The original check is removed since it unnecessarily causes GPU-CPU sync when running on GPU
+    # in most cases, the indices are valid, so this check is unnecessary and causes unnecessary sync.
 
-        with pytest.raises(
-            ValueError, match="All valid indices in row_wise_idx must be in range"
-        ):
-            Mask.create_from_row_wise_idx(shape, row_wise_idx, data)
+    # def test_create_from_row_wise_idx_error_out_of_bounds(self):
+    #     """Test error handling for out-of-bounds indices."""
+    #     shape = (2, 5)
+    #     row_wise_idx = torch.tensor([[0, 2, 5], [1, 3, 4]])  # 5 is out of bounds
+    #     data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
+
+    #     with pytest.raises(
+    #         ValueError, match="All valid indices in row_wise_idx must be in range"
+    #     ):
+    #         Mask.create_from_row_wise_idx(shape, row_wise_idx, data)
 
     def test_create_from_row_wise_idx_error_invalid_type(self):
         """Test error handling for invalid type parameter."""
@@ -665,6 +669,9 @@ class TestMask:
             dense = full_mask.get_dense_mask()
             assert dense.dtype == dtype
 
+    @pytest.mark.skip(
+        reason="Auto detection is removed since it causes unnecessary sync when running on GPU"
+    )
     def test_is_full_mask_various_cases(self):
         """Test is_full_mask() method with various mask types."""
         shape = (2, 3)
@@ -687,6 +694,9 @@ class TestMask:
         ones_mask = Mask.create_mask_from_dense_mask(shape, torch.ones(shape))
         assert ones_mask.is_full_mask()
 
+    @pytest.mark.skip(
+        reason="Auto detection is removed since it causes unnecessary sync when running on GPU"
+    )
     def test_full_mask_auto_detection_dense(self):
         """Test auto-detection of full masks from dense representation."""
         shape = (2, 3)
@@ -711,6 +721,9 @@ class TestMask:
         assert not mask.is_full
         assert mask.mask is not None
 
+    @pytest.mark.skip(
+        reason="Auto detection is removed since it causes unnecessary sync when running on GPU"
+    )
     def test_full_mask_auto_detection_sparse(self):
         """Test auto-detection of full masks from sparse representation."""
         shape = (2, 3)
@@ -938,6 +951,9 @@ class TestMask:
         result = full_mask.apply_mask(input_tensor)
         assert torch.equal(result, input_tensor)
 
+    @pytest.mark.skip(
+        reason="Auto detection is removed since it causes unnecessary sync when running on GPU"
+    )
     def test_full_mask_auto_detection_edge_cases(self):
         """Test auto-detection edge cases."""
         # Empty shape should not crash

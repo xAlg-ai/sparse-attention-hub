@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 import torch
+from tqdm import tqdm
 from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
@@ -397,7 +398,7 @@ class ModelAdapterHF(ModelAdapter):
         if not isinstance(should_stop_token_ids, list):
             should_stop_token_ids = [should_stop_token_ids]
 
-        for i in range(max_new_tokens - 1):
+        for i in tqdm(range(max_new_tokens - 1)):
             with torch.no_grad():
                 outputs = self.model(
                     input_ids=generated_ids[-1].unsqueeze(0).unsqueeze(0),
