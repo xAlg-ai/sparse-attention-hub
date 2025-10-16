@@ -73,7 +73,7 @@ class PQCache(TopKMasker):
         #assign codes and store results
 
         #check if index built
-        if "pq_centroids" in sparse_meta_data and "pq_codes" in sparse_meta_data and pq_s == keys.shape[2]:
+        if "pq_centroids" in sparse_meta_data and "pq_codes" in sparse_meta_data and sparse_meta_data["pq_sequence_length"] == keys.shape[2]:
             pass #skip to search
 
         else:
@@ -105,21 +105,22 @@ class PQCache(TopKMasker):
 
                 #iterate for fixed number of epochs
                 for _ in range(self.kmeans_iters):
-
-                    #L2 distance betwen each vector to all centroids
-                    distances = torch.cdist(sub_vectors_to_cluster, centroids_i, p=2)
-                    codes_i = torch.argmin(distances, dim=1)
-
-                    #closest centroid for each vector
-                    new_centroids = torch.zeros_like(centroids_i, device=keys.device, dtype=dtype)
-                    counts = torch.zeros(num_centroids, device=keys.device, dtype=torch.long)
-                    codes_i_expanded = codes_i.unsqueeze(1).expand(-1, dm)
+    # Compute similarities (inner product)
+                    distances = torch.matmul(sub_vectors_to_cluster, centroids_i.T)
+                    codes_i = torch.argmax(distances, dim=1)
+    
+                    # Update centroids
+                    new_centroids = torch.zeros_like(centroids_i)
                     
-                    new_centroids.scatter_add_(0, codes_i_expanded, sub_vectors_to_cluster)
-                    counts.scatter_add_(0, codes_i, torch.ones_like(codes_i))
-
-                    counts[counts == 0] = 1
-                    centroids_i = new_centroids / counts.unsqueeze(1)
+                    for c in range(num_centroids):
+                        mask = (codes_i == c)
+                        count = mask.sum()
+                        if count > 0:
+                            new_centroids[c] = sub_vectors_to_cluster[mask].mean(dim=0)
+                        else:
+                            new_centroids[c] = centroids_i[c]
+                    
+                    centroids_i = new_centroids
 
                 all_centroids[i, :, :] = centroids_i
                 all_codes[:, :, :, i] = codes_i.reshape(n, h_kv, s)
@@ -183,6 +184,9 @@ class PQCache(TopKMasker):
             #add scroes to tottal
             total_scores += gathered_scores
 
+        
+        total_scores = total_scores * scaling
+
 
         
         #total scores now has shape n, h, lq, s 
@@ -202,6 +206,7 @@ class PQCache(TopKMasker):
         #mask_shape = (n, h_q, lq, s)
         #dense_mask = final_mask
         return previous_mask.merge_mask(new_mask, inplace=False)
+        #return new_mask
 
         #return Mask.create_mask_from_dense_mask(mask_shape, dense_mask.to(torch.float32), dtype=previous_mask.dtype)
         # return Mask(mask_qk = final_mask, heavy_size = self.heavy_size)
@@ -213,4 +218,3 @@ class PQCache(TopKMasker):
         if not isinstance(config, PQCacheConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
-
