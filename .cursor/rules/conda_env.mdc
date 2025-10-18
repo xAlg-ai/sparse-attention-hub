@@ -4,9 +4,5 @@ alwaysApply: true
 ---
 Every project is associated with a conda environment. before starting to run any commands, run the following
 ```
-source /workspace/anaconda3/activate
-```
-followed by
-```
 conda activate sparse_attention_hub
 ```
