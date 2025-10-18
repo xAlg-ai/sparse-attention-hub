@@ -398,7 +398,7 @@ class ModelAdapterHF(ModelAdapter):
         if not isinstance(should_stop_token_ids, list):
             should_stop_token_ids = [should_stop_token_ids]
 
-        for i in tqdm(range(max_new_tokens - 1)):
+        for i in tqdm(range(max_new_tokens - 1), disable=(max_new_tokens < 1000)):
             with torch.no_grad():
                 outputs = self.model(
                     input_ids=generated_ids[-1].unsqueeze(0).unsqueeze(0),
