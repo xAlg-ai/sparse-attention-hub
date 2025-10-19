@@ -1,1 +1,1 @@
-"""Performance and stress tests for sparse attention hub."""
+"""Performance tests for sparse attention operations."""
