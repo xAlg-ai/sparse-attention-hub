@@ -21,6 +21,15 @@ class LocalMaskerConfig(FixedMaskerConfig):
 
     window_size: Union[float, int]
     search_space: Dict[str, Any] = field(default_factory=dict)
+    # add validation that window_size > 0
+    def __post_init__(self) -> None:
+        """Validate post-initialization constraints for LocalMaskerConfig.
+
+        Raises:
+            ValueError: If window_size is not greater than 0.
+        """
+        if not self.window_size > 0:
+            raise ValueError(f"window_size must be > 0, got {self.window_size}")
 
 
 @MaskerRegistry.register(LocalMaskerConfig)
@@ -59,7 +68,7 @@ class LocalMasker(FixedMasker):
 
         # If sequence is small enough, use full attention
         if self._should_use_full_attention(tensor_dims, effective_window_size):
-            return self._create_full_mask(tensor_dims, previous_mask.dtype)
+            return self._create_full_mask(tensor_dims, previous_mask.dtype, previous_mask.device)
 
         # Create local attention mask
         local_mask: Mask = self._create_local_mask(
@@ -170,6 +179,14 @@ class SinkMaskerConfig(FixedMaskerConfig):
     sink_size: Union[float, int]
     search_space: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        """Validate post-initialization constraints for SinkMaskerConfig.
+
+        Raises:
+            ValueError: If sink_size is not greater than 0.
+        """
+        if not self.sink_size > 0:
+            raise ValueError(f"sink_size must be > 0, got {self.sink_size}")
 
 @MaskerRegistry.register(SinkMaskerConfig)
 class SinkMasker(FixedMasker):
@@ -207,7 +224,7 @@ class SinkMasker(FixedMasker):
 
         # If sequence is small enough, use full attention
         if self._should_use_full_attention(tensor_dims, effective_sink_size):
-            return self._create_full_mask(tensor_dims, previous_mask.dtype)
+            return self._create_full_mask(tensor_dims, previous_mask.dtype, previous_mask.device)
 
         # Create sink attention mask
         sink_mask: Mask = self._create_sink_mask(

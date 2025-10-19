@@ -88,7 +88,7 @@ class TestLocalMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape)
+        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -124,7 +124,7 @@ class TestLocalMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -160,7 +160,7 @@ class TestLocalMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -215,7 +215,7 @@ class TestLocalMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -269,7 +269,7 @@ class TestLocalMaskerImplementation:
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, :2] = 1.0  # First 2 positions
-        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data)
+        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data, dtype=torch.float32)
 
         result = masker.add_mask(
             keys=keys,
@@ -302,40 +302,13 @@ class TestLocalMaskerImplementation:
         assert torch.allclose(result_dense[0, 0], expected_pattern[0])
 
     def test_local_masker_add_mask_edge_case_window_size_zero(self):
-        """Test LocalMasker with window_size=0."""
+        """Test LocalMasker with window_size=0 should raise ValueError."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-            LocalMasker,
             LocalMaskerConfig,
         )
-        from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
-        config = LocalMaskerConfig(window_size=0)
-        masker = LocalMasker(config)
-
-        batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 2, 5
-
-        # Create mock inputs
-        keys = torch.randn(batch_size, num_heads, seq_len_keys, 8)
-        queries = torch.randn(batch_size, num_heads, seq_len_queries, 8)
-        values = torch.randn(batch_size, num_heads, seq_len_keys, 8)
-
-        # Create empty mask as previous mask
-        mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-
-        result = masker.add_mask(
-            keys=keys,
-            queries=queries,
-            values=values,
-            attention_mask=None,
-            scaling=1.0,
-            dropout=0.0,
-            sparse_meta_data=None,
-            previous_mask=empty_previous_mask,
-        )
-
-        # Should return empty mask (window_size=0 means no local attention)
-        assert result.is_empty()
+        with pytest.raises(ValueError, match="window_size must be > 0, got 0"):
+            config = LocalMaskerConfig(window_size=0)
 
 
 @pytest.mark.unit
@@ -468,7 +441,7 @@ class TestSinkMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape)
+        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -490,7 +463,7 @@ class TestSinkMaskerImplementation:
 
         # Create empty mask as previous mask (to test seq_len_keys <= sink_size condition)
         empty_previous_mask = Mask.create_mask_from_dense_mask(
-            mask_shape, torch.zeros(mask_shape)
+            mask_shape, torch.zeros(mask_shape), dtype=torch.float32
         )
 
         result = masker.add_mask(
@@ -515,7 +488,7 @@ class TestSinkMaskerImplementation:
         partial_mask_data = torch.zeros(mask_shape)
         partial_mask_data[:, :, :, -2:] = 1.0  # Last 2 positions have attention
         partial_previous_mask = Mask.create_mask_from_dense_mask(
-            mask_shape, partial_mask_data
+            mask_shape, partial_mask_data, dtype=torch.float32
         )
 
         result = masker.add_mask(
@@ -545,24 +518,6 @@ class TestSinkMaskerImplementation:
         ):  # Only check if there are positions between sink and last 2
             assert torch.all(result_dense[:, :, :, 4:-2] == 0.0)
 
-        # Test case 4: Edge case with sink_size = 0
-        config = SinkMaskerConfig(sink_size=0)
-        masker = SinkMasker(config)
-
-        result = masker.add_mask(
-            keys=keys,
-            queries=queries,
-            values=values,
-            attention_mask=None,
-            scaling=1.0,
-            dropout=0.0,
-            sparse_meta_data=None,
-            previous_mask=partial_previous_mask,
-        )
-
-        result_dense = result.get_dense_mask()
-
-        # Only position 0 should be attended to from sink
-        assert torch.all(result_dense[:, :, :, 0] == 0.0)
-        # Last 2 positions should still be attended to from merge
-        assert torch.all(result_dense[:, :, :, -2:] == 1.0)
+        # Test case 4: Edge case with sink_size = 0 should raise error
+        with pytest.raises(ValueError, match="sink_size must be > 0, got 0"):
+            config = SinkMaskerConfig(sink_size=0)

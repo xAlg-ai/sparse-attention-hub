@@ -69,7 +69,7 @@ class OracleTopK(TopKMasker):
 
         # If sequence is small enough, use full attention
         if self._should_use_full_attention(tensor_dims, effective_heavy_size):
-            return self._create_full_mask(tensor_dims, previous_mask.dtype)
+            return self._create_full_mask(tensor_dims, previous_mask.dtype, previous_mask.device)
 
         # Create oracle top-K mask
         oracle_mask: Mask = self._create_oracle_topk_mask(

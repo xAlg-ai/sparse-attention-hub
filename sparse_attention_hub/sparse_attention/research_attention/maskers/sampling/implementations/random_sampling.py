@@ -42,9 +42,9 @@ class RandomSamplingMaskerConfig(SamplingMaskerConfig):
 
     def __post_init__(self) -> None:
         """Validate sampling_rate after initialization."""
-        if not (0.0 <= self.sampling_rate <= 1.0):
+        if not (0.0 < self.sampling_rate <= 1.0):
             raise ValueError(
-                f"sampling_rate must be in range [0, 1], got {self.sampling_rate}"
+                f"sampling_rate must be in range (0, 1], got {self.sampling_rate}"
             )
 
 
@@ -185,7 +185,7 @@ class RandomSamplingMasker(SamplingMasker):
             shape=mask_shape,
             row_wise_idx=row_wise_idx,
             data=data,
-            type="index",
+            mask_type="index",
             dtype=previous_mask.dtype,
         )
 

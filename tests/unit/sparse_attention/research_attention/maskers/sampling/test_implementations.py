@@ -48,8 +48,8 @@ class TestRandomSamplingMaskerImplementation:
             RandomSamplingMaskerConfig,
         )
 
-        # Test valid sampling rates
-        valid_rates = [0.0, 0.1, 0.5, 0.9, 1.0]
+        # Test valid sampling rates - must be in range (0, 1] (exclusive of 0)
+        valid_rates = [0.1, 0.5, 0.9, 1.0]
         for rate in valid_rates:
             config = RandomSamplingMaskerConfig(sampling_rate=rate)
             assert config.sampling_rate == rate
@@ -60,12 +60,12 @@ class TestRandomSamplingMaskerImplementation:
             RandomSamplingMaskerConfig,
         )
 
-        # Test invalid sampling rates
-        invalid_rates = [-0.1, 1.1, 2.0, -1.0]
+        # Test invalid sampling rates - 0.0 is also invalid (must be > 0)
+        invalid_rates = [0.0, -0.1, 1.1, 2.0, -1.0]
         for rate in invalid_rates:
             with pytest.raises(
                 ValueError,
-                match=f"sampling_rate must be in range \\[0, 1\\], got {rate}",
+                match=f"sampling_rate must be in range \\(0, 1\\], got {rate}",
             ):
                 RandomSamplingMaskerConfig(sampling_rate=rate)
 
@@ -151,7 +151,7 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape)
+        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -190,7 +190,7 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -206,7 +206,7 @@ class TestRandomSamplingMaskerImplementation:
         # Check basic properties
         assert result.shape == mask_shape
         assert not result.is_full_mask()
-        assert not result.is_empty()
+        assert not result.is_empty
 
         # Convert to dense to check sampling rate
         result_dense = result.get_dense_mask()
@@ -217,45 +217,21 @@ class TestRandomSamplingMaskerImplementation:
         assert 0.2 <= non_zero_fraction <= 0.3  # Allow 20% tolerance
 
     def test_random_sampling_masker_add_mask_sampling_rate_zero(self):
-        """Test RandomSamplingMasker with sampling_rate=0.0."""
+        """Test RandomSamplingMasker with sampling_rate=0.0 should raise ValueError."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-            RandomSamplingMasker,
             RandomSamplingMaskerConfig,
         )
-        from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
-        config = RandomSamplingMaskerConfig(sampling_rate=0.0)
-        masker = RandomSamplingMasker(config)
-
-        batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 2, 5
-
-        # Create mock inputs
-        keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        queries = torch.randn(batch_size, num_heads, seq_len_queries, 16)
-        values = torch.randn(batch_size, num_heads, seq_len_keys, 16)
-        attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
-        sparse_meta_data = {}
-
-        # Create empty mask as previous mask
-        mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-
-        result = masker.add_mask(
-            keys=keys,
-            queries=queries,
-            values=values,
-            attention_mask=attention_mask,
-            scaling=1.0,
-            dropout=0.0,
-            sparse_meta_data=sparse_meta_data,
-            previous_mask=empty_previous_mask,
-        )
-
-        # With sampling_rate=0.0, no indices should be sampled
-        assert result.is_empty()
+        # sampling_rate=0.0 is not valid (must be > 0)
+        with pytest.raises(ValueError, match="sampling_rate must be in range \\(0, 1\\], got 0.0"):
+            config = RandomSamplingMaskerConfig(sampling_rate=0.0)
 
     def test_random_sampling_masker_add_mask_sampling_rate_one(self):
-        """Test RandomSamplingMasker with sampling_rate=1.0."""
+        """Test RandomSamplingMasker with sampling_rate=1.0.
+        
+        Note: Sampling is performed with replacement, so not all positions
+        are guaranteed to be covered even with sampling_rate=1.0.
+        """
         from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
             RandomSamplingMasker,
             RandomSamplingMaskerConfig,
@@ -265,7 +241,7 @@ class TestRandomSamplingMaskerImplementation:
         config = RandomSamplingMaskerConfig(sampling_rate=1.0)
         masker = RandomSamplingMasker(config)
 
-        batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 2, 5
+        batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 2, 100
 
         # Create mock inputs
         keys = torch.randn(batch_size, num_heads, seq_len_keys, 16)
@@ -276,7 +252,7 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -289,9 +265,13 @@ class TestRandomSamplingMaskerImplementation:
             previous_mask=empty_previous_mask,
         )
 
-        # With sampling_rate=1.0, all indices should be sampled
+        # With sampling_rate=1.0 and large seq_len, most positions should be covered
+        # Sampling is with replacement, so coverage should be ~63% (1 - 1/e)
         result_dense = result.get_dense_mask()
-        assert torch.allclose(result_dense, torch.ones_like(result_dense) * 1.0)
+        assert not result.is_empty
+        # Check that a high fraction of positions are covered (relaxed check)
+        non_zero_fraction = (result_dense > 0).float().mean().item()
+        assert non_zero_fraction > 0.5  # Should have good coverage with sampling_rate=1.0
 
     def test_random_sampling_masker_add_mask_merge_with_previous(self):
         """Test that RandomSamplingMasker correctly merges with previous mask."""
@@ -318,7 +298,7 @@ class TestRandomSamplingMaskerImplementation:
         previous_mask_dense = torch.zeros(mask_shape)
         previous_mask_dense[0, 0, 0, 0] = 1.0  # Set one position to active
         previous_mask = Mask.create_mask_from_dense_mask(
-            mask_shape, previous_mask_dense
+            mask_shape, previous_mask_dense, dtype=torch.float32
         )
 
         result = masker.add_mask(
@@ -334,7 +314,7 @@ class TestRandomSamplingMaskerImplementation:
 
         # Check that the result is not empty and has the correct shape
         assert result.shape == mask_shape
-        assert not result.is_empty()
+        assert not result.is_empty
 
         # Convert to dense and check that the previous position is still active
         result_dense = result.get_dense_mask()
@@ -363,7 +343,7 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -406,7 +386,7 @@ class TestRandomSamplingMaskerImplementation:
         sparse_meta_data = {}
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -420,7 +400,7 @@ class TestRandomSamplingMaskerImplementation:
         )
 
         assert result.shape == mask_shape
-        assert not result.is_empty()
+        assert not result.is_empty
 
         # Test on CUDA if available
         if torch.cuda.is_available():
@@ -445,7 +425,7 @@ class TestRandomSamplingMaskerImplementation:
             )
 
             assert result.shape == mask_shape
-            assert not result.is_empty()
+            assert not result.is_empty
 
 
 @pytest.mark.unit
@@ -750,6 +730,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
 
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
@@ -779,7 +760,7 @@ class TestMagicPigImplementation:
         )
 
         # Check that result is not empty (should have some LSH matches)
-        assert not result_mask.is_empty()
+        assert not result_mask.is_empty
 
     def test_magic_pig_add_mask_full_previous(self):
         """Test add_mask with full previous mask."""
@@ -801,6 +782,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_full_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
 
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
@@ -842,6 +824,7 @@ class TestMagicPigImplementation:
         existing_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
 
         # Add some existing entries manually
@@ -896,6 +879,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
 
@@ -933,7 +917,7 @@ class TestMagicPigImplementation:
                 seq_len_queries,
                 seq_len_keys,
             )
-            assert not result.is_empty()
+            assert not result.is_empty
 
     def test_magic_pig_device_consistency(self):
         """Test that masker works with different devices."""
@@ -955,6 +939,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
         sparse_meta_data = {}
@@ -979,6 +964,7 @@ class TestMagicPigImplementation:
             previous_mask_gpu = Mask.create_empty_mask(
                 shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
                 dtype=torch.float32,
+                device=torch.device("cuda"),
             )
             attention_mask_gpu = attention_mask.cuda()
             sparse_meta_data_gpu = (
@@ -1022,6 +1008,7 @@ class TestMagicPigImplementation:
         previous_mask_f32 = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
         sparse_meta_data = {}
@@ -1043,6 +1030,7 @@ class TestMagicPigImplementation:
             previous_mask_f16 = Mask.create_empty_mask(
                 shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
                 dtype=torch.float16,
+                device=torch.device("cpu"),
             )
 
             result_f16 = masker.add_mask(
@@ -1208,6 +1196,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
 
@@ -1252,8 +1241,8 @@ class TestMagicPigImplementation:
 
         # Results may be different due to centering affecting LSH
         # But both should be valid sparse masks
-        assert not result_centered.is_empty()
-        assert not result_not_centered.is_empty()
+        assert not result_centered.is_empty
+        assert not result_not_centered.is_empty
 
     # Tests for packing feature
     def test_packing_config_creation(self):
@@ -1535,6 +1524,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
 
@@ -1571,8 +1561,8 @@ class TestMagicPigImplementation:
         assert result_int64.shape == result_float32.shape
 
         # Both should produce sparse masks
-        assert not result_int64.is_empty()
-        assert not result_float32.is_empty()
+        assert not result_int64.is_empty
+        assert not result_float32.is_empty
 
     def test_packing_integration_with_add_mask(self):
         """Test that different packing modes work correctly when integrated with add_mask."""
@@ -1590,6 +1580,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
 
@@ -1631,8 +1622,8 @@ class TestMagicPigImplementation:
         assert isinstance(result_int64, Mask)
         assert isinstance(result_float32, Mask)
         assert result_int64.shape == result_float32.shape
-        assert not result_int64.is_empty()
-        assert not result_float32.is_empty()
+        assert not result_int64.is_empty
+        assert not result_float32.is_empty
 
     def test_packing_deterministic_with_seed(self):
         """Test that int64 and float32 packing produce exactly the same results with the same seed."""
@@ -1654,6 +1645,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
 
@@ -1731,6 +1723,7 @@ class TestMagicPigImplementation:
         previous_mask = Mask.create_empty_mask(
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             dtype=torch.float32,
+            device=torch.device("cpu"),
         )
         attention_mask = torch.ones(batch_size, seq_len_keys, dtype=torch.bool)
 

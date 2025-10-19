@@ -270,7 +270,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             row_wise_idx=base_row_wise_idx,
             data=base_data,
-            type="index",
+            mask_type="index",
             dtype=dtype,
         )
 
@@ -351,6 +351,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             return Mask.create_full_mask(
                 shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
                 dtype=previous_mask.dtype,
+                device=previous_mask.device,
             )
 
         # Compute attention scores after removing attention_mask
