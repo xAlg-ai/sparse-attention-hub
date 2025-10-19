@@ -509,7 +509,7 @@ class Mask:
 
 
     ################## APPLY MASK ##################
-    def apply_mask(self, input_tensor: torch.Tensor, mode: Literal["sparse", "dense"] = "sparse") -> torch.Tensor:
+    def apply_mask(self, input_tensor: torch.Tensor, mode: Literal["sparse", "dense"] = "dense") -> torch.Tensor:
         """
         Apply the mask to an input tensor.
 
@@ -591,7 +591,7 @@ class Mask:
 
     ################## APPLY INVERSE MASK ##################
 
-    def apply_inv_mask(self, input_tensor: torch.Tensor, mode: Literal["sparse", "dense"] = "sparse") -> torch.Tensor:
+    def apply_inv_mask(self, input_tensor: torch.Tensor, mode: Literal["sparse", "dense"] = "dense") -> torch.Tensor:
         """
         Apply the inverse mask to an input tensor.
 
@@ -680,7 +680,7 @@ class Mask:
         self, 
         other_mask: "Mask",
         inplace: bool,
-        mode: Literal["sparse", "dense"] = "sparse",
+        mode: Literal["sparse", "dense"] = "dense",
     ) -> "Mask":
         """
         Merge this mask with another mask.
@@ -688,7 +688,7 @@ class Mask:
         Args:
             other_mask: The other mask to merge with
             inplace: Whether to modify this mask in place
-            mode: Merge mode - "sparse" (default) or "dense"
+            mode: Merge mode - "dense" (default) or "sparse"
         
         Returns:
             Merged mask
