@@ -106,7 +106,7 @@ class HashAttentionTopKMasker(TopKMasker):
         )
 
         if self._should_use_full_attention(tensor_dims, effective_heavy_size):
-            return self._create_full_mask(tensor_dims, previous_mask.dtype)
+            return self._create_full_mask(tensor_dims, previous_mask.dtype, previous_mask.device)
 
         remaining_kwargs: Dict[str, Any] = {
             k: v for k, v in kwargs.items() if k != "layer_idx"

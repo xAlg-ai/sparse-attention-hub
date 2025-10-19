@@ -88,7 +88,7 @@ class TestOracleTopKMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape)
+        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -124,7 +124,7 @@ class TestOracleTopKMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -160,7 +160,7 @@ class TestOracleTopKMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -204,7 +204,7 @@ class TestOracleTopKMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,
@@ -261,7 +261,7 @@ class TestOracleTopKMaskerImplementation:
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, :2] = 1.0  # First 2 positions active
-        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data)
+        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data, dtype=torch.float32)
 
         result = masker.add_mask(
             keys=keys,
@@ -316,7 +316,7 @@ class TestOracleTopKMaskerImplementation:
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, -2:] = 1.0  # Last 2 positions
-        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data)
+        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data, dtype=torch.float32)
 
         result = masker.add_mask(
             keys=keys,
@@ -350,40 +350,13 @@ class TestOracleTopKMaskerImplementation:
             ), f"Query {q} should have 2 additional active positions, got {additional_active}"
 
     def test_oracle_top_k_masker_add_mask_edge_case_heavy_size_zero(self):
-        """Test OracleTopKMasker with heavy_size=0."""
+        """Test OracleTopKMasker with heavy_size=0 should raise ValueError."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-            OracleTopK,
             OracleTopKConfig,
         )
-        from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
-        config = OracleTopKConfig(heavy_size=0)
-        masker = OracleTopK(config)
-
-        batch_size, num_heads, seq_len_queries, seq_len_keys = 1, 1, 2, 5
-
-        # Create inputs
-        keys = torch.randn(batch_size, num_heads, seq_len_keys, 8)
-        queries = torch.randn(batch_size, num_heads, seq_len_queries, 8)
-        values = torch.randn(batch_size, num_heads, seq_len_keys, 8)
-
-        # Create empty mask as previous mask
-        mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
-
-        result = masker.add_mask(
-            keys=keys,
-            queries=queries,
-            values=values,
-            attention_mask=None,
-            scaling=1.0,
-            dropout=0.0,
-            sparse_meta_data=None,
-            previous_mask=empty_previous_mask,
-        )
-
-        # Should return empty mask (heavy_size=0 means no new attention)
-        assert result.is_empty()
+        with pytest.raises(ValueError, match="heavy_size must be > 0, got 0"):
+            config = OracleTopKConfig(heavy_size=0)
 
     def test_oracle_top_k_masker_add_mask_edge_case_heavy_size_one(self):
         """Test OracleTopKMasker with heavy_size=1."""
@@ -405,7 +378,7 @@ class TestOracleTopKMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, mask_type="index")
+        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
 
         result = masker.add_mask(
             keys=keys,

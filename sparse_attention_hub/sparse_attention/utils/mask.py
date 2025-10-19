@@ -1,6 +1,6 @@
 """Mask class for representing attention masks in both dense and sparse formats."""
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Literal
 
 import numpy as np
 import torch
@@ -23,7 +23,8 @@ class Mask:
     def __init__(
         self,
         shape: Tuple[int, ...],
-        dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype,
+        device: torch.device,
         mask: Optional[torch.Tensor] = None,
         indices: Optional[torch.Tensor] = None,
         ptr: Optional[torch.Tensor] = None,
@@ -31,6 +32,7 @@ class Mask:
         from_dense_mask: bool = False,
         from_index: bool = False,
         is_full: bool = False,
+        is_empty: bool = False,
     ):
         """
         Initialize a Mask object.
@@ -45,30 +47,53 @@ class Mask:
             from_dense_mask: Whether creating from dense mask
             from_index: Whether creating from sparse indices
             is_full: Whether this is a full mask (all elements are 1.0)
+            is_empty: Whether this is an empty mask (all elements are 0.0)
+            device: Device for tensors (required for is_full=True or is_empty=True, inferred otherwise)
         """
         self.shape = shape
         self.dtype = dtype
         self.from_dense_mask = from_dense_mask
         self.from_index = from_index
         self.is_full = is_full
+        self.is_empty = is_empty
 
         if is_full:
             # Full mask optimization - don't store any actual data
+            # Device must be provided for full masks since we have no tensors to infer from
+            if device is None:
+                raise ValueError("device must be specified for full masks")
+            self.device = device
+            self.mask = None
+            self.indices = None
+            self.ptr = None
+            self.data = None
+        elif is_empty:
+            # Empty mask optimization - don't store any actual data
+            # Device must be provided for empty masks since we have no tensors to infer from
+            if device is None:
+                raise ValueError("device must be specified for empty masks")
+            self.device = device
             self.mask = None
             self.indices = None
             self.ptr = None
             self.data = None
         elif from_dense_mask and mask is not None:
             self.mask = mask.to(dtype)
+            self.device = mask.device
             self.indices = None
             self.ptr = None
             self.data = None
-            # # Check if this is actually a full mask
+            # Check if this is actually a full mask
             if self._detect_full_mask():
                 self.is_full = True
                 self.mask = None  # Free memory
+            # Check if this is actually an empty mask
+            elif self._detect_empty_mask():
+                self.is_empty = True
+                self.mask = None  # Free memory
         elif from_index and indices is not None and ptr is not None:
             self.mask = None
+            self.device = indices.device
             self.indices = indices
             self.ptr = ptr
             self.data = data
@@ -78,21 +103,35 @@ class Mask:
                 self.indices = None
                 self.ptr = None
                 self.data = None
+            # Check if this is actually an empty mask
+            elif self._detect_empty_mask():
+                self.is_empty = True
+                self.indices = None
+                self.ptr = None
+                self.data = None
         else:
             raise ValueError(
-                "Must specify either from_dense_mask with mask, from_index with indices and ptr, or is_full=True"
+                "Must specify either from_dense_mask with mask, from_index with indices and ptr, is_full=True, or is_empty=True"
             )
 
-    def _detect_full_mask(self) -> bool:
+    def _detect_full_mask(self, only_check_flag: bool = True) -> bool:
         """
         Detect if the current mask represents a full mask (all elements are 1.0).
-
+        include only_check_flag = False only if you need it . not for fast path. default is True.
         Returns:
             True if all elements are 1.0, False otherwise
         """
         if self.is_full:
             return True
-        return False
+
+        # A mask cannot be both full and empty
+        if self.is_empty:
+            return False
+
+        if only_check_flag:
+            return False
+
+        ## use only_check_flag = False only if you need it . not for fast path
 
         if self.from_dense_mask and self.mask is not None:
             return bool(torch.all(self.mask == 1.0).item())
@@ -109,11 +148,62 @@ class Mask:
 
         return False
 
+    def _detect_empty_mask(self, only_check_flag: bool = True) -> bool:
+        """
+        Detect if the current mask represents an empty mask (all elements are 0.0).
+        include only_check_flag = False only if you need it . not for fast path. default is True.
+        Returns:
+            True if all elements are 0.0, False otherwise
+        """
+        if self.is_empty:
+            return True
+
+        # A mask cannot be both full and empty
+        if self.is_full:
+            return False
+
+        if only_check_flag:
+            return False
+
+        ## use only_check_flag = False only if you need it . not for fast path
+
+        if self.from_dense_mask and self.mask is not None:
+            return bool(torch.all(self.mask == 0.0).item())
+        elif self.from_index and self.indices is not None:
+            # For sparse representation, empty means no indices
+            return self.indices.numel() == 0
+
+        return False
+
+
+    ##### CREATE METHODS ####
+    @classmethod
+    def create_empty_mask(
+        cls,
+        shape: Tuple[int, ...],
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> "Mask":
+        """
+        Create a mask with is_empty set to True
+
+        Args:
+            shape: Shape of the mask (*, n)
+            dtype: Data type for the mask values
+            device: Device for the mask tensors
+
+        Returns:
+            Mask object with is_empty=True (optimized representation)
+        """
+        # Use optimized empty mask representation regardless of mask_type
+        return cls(shape=shape, dtype=dtype, is_empty=True, device=device)
+
     @classmethod
     def create_full_mask(
         cls,
         shape: Tuple[int, ...],
-        dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype,
+        device: torch.device,
     ) -> "Mask":
         """
         Create a full mask (all elements are 1.0) with optimized representation.
@@ -121,11 +211,12 @@ class Mask:
         Args:
             shape: Shape of the mask (*, n)
             dtype: Data type for the mask values
+            device: Device for the mask tensors
 
         Returns:
             Mask object with is_full=True
         """
-        return cls(shape=shape, dtype=dtype, is_full=True)
+        return cls(shape=shape, dtype=dtype, is_full=True, device=device)
 
     def is_full_mask(self) -> bool:
         """
@@ -136,14 +227,23 @@ class Mask:
         """
         return self.is_full
 
+    def is_empty_mask(self) -> bool:
+        """
+        Check if this is an empty mask (all elements are 0.0).
+
+        Returns:
+            True if all elements are 0.0, False otherwise
+        """
+        return self.is_empty
+
     @classmethod
     def create_mask_from_indices(
         cls,
         shape: Tuple[int, ...],
         indices: torch.Tensor,
         ptr: torch.Tensor,
-        data: Optional[torch.Tensor] = None,
-        dtype: torch.dtype = torch.float32,
+        data: Optional[torch.Tensor],
+        dtype: torch.dtype,
     ) -> "Mask":
         """
         Create a Mask from sparse indices and pointer representation.
@@ -152,7 +252,7 @@ class Mask:
             shape: Shape of the mask (*, n)
             indices: Indices for sparse representation
             ptr: Pointer array for sparse representation
-            data: Data for sparse representation
+            data: Data for sparse representation | if not provided (None), assume 1.0 values
             dtype: Data type for the mask values
 
         Returns:
@@ -172,6 +272,7 @@ class Mask:
             ptr=ptr,
             data=data,
             from_index=True,
+            device=indices.device,
         )
 
     @classmethod
@@ -179,7 +280,7 @@ class Mask:
         cls,
         shape: Tuple[int, ...],
         mask: torch.Tensor,
-        dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype,
     ) -> "Mask":
         """
         Create a Mask from dense mask tensor.
@@ -195,7 +296,7 @@ class Mask:
         if mask.shape != shape:
             raise ValueError(f"mask.shape must be {shape}, got {mask.shape}")
 
-        return cls(shape=shape, dtype=dtype, mask=mask, from_dense_mask=True)
+        return cls(shape=shape, dtype=dtype, mask=mask, from_dense_mask=True, device=mask.device)
 
     @classmethod
     def create_from_row_wise_idx(
@@ -203,8 +304,8 @@ class Mask:
         shape: Tuple[int, ...],
         row_wise_idx: torch.Tensor,
         data: torch.Tensor,
-        type: str = "index",
-        dtype: torch.dtype = torch.float32,
+        mask_type: Literal["index", "dense"],
+        dtype: torch.dtype,
         use_padding: bool = False,
     ) -> "Mask":
         """
@@ -215,20 +316,24 @@ class Mask:
             row_wise_idx: Row-wise indices tensor of shape (*, k). If use_padding=True,
                          -1 values are treated as padding and filtered out.
             data: Data tensor of shape (*, k) corresponding to the indices
-            type: Type of representation ("index" or "dense")
+            mask_type: Type of representation ("index" or "dense"). The mask that you need to return.
             dtype: Data type for the mask values
             use_padding: If True, handles -1 padding (causes GPU-CPU sync). If False (default),
                         assumes all indices are valid and uses zero-sync fast path.
 
         Returns:
             Mask object with the specified representation
+
+
+        Comments: For this kind of creation, it is easier to create the mask in index representation.
+        So we manipulate it that way. If required mask_type is dense , we convert it to dense representation.    
         """
         if len(shape) < 1:
             raise ValueError("shape must have at least one dimension")
 
         # if empty row-wise idx, return empty mask
         if row_wise_idx.shape[-1] <= 0:
-            return cls.create_empty_mask(shape, dtype, mask_type=type)
+            raise ValueError("row_wise_idx must have at least one column")
 
         # Validate input shapes
         expected_row_wise_shape: Tuple[int, ...] = shape[:-1] + (
@@ -291,14 +396,14 @@ class Mask:
 
         # Create sparse mask
         sparse_mask: Mask = cls.create_mask_from_indices(
-            shape, valid_flat_indices, ptr, valid_values, dtype
+            shape, valid_flat_indices, ptr, valid_values, dtype=dtype
         )
 
-        if type == "dense":
+        if mask_type == "dense":
             # Convert to dense representation
             dense_mask: torch.Tensor = sparse_mask.get_dense_mask()
-            return cls.create_mask_from_dense_mask(shape, dense_mask, dtype)
-        elif type == "index":
+            return cls.create_mask_from_dense_mask(shape, dense_mask, dtype=dtype)
+        elif mask_type == "index":
             return sparse_mask
         else:
             raise ValueError(f"type must be 'index' or 'dense', got {type}")
@@ -309,18 +414,26 @@ class Mask:
 
         Returns:
             Tuple of (indices, ptr, data) for sparse representation
+        Comments: This will return the mask in index representation.
         """
         if self.is_full:
             # For full masks, generate all indices with value 1.0
             total_size: int = int(np.prod(self.shape))
-            indices: torch.Tensor = torch.arange(total_size, dtype=torch.long)
-            data = torch.ones(total_size, dtype=self.dtype)
+            indices: torch.Tensor = torch.arange(total_size, dtype=torch.long, device=self.device)
+            data = torch.ones(total_size, dtype=self.dtype, device=self.device)
 
             # Create ptr array
             n_cols: int = self.shape[-1]
-            ptr = torch.arange(0, total_size + 1, n_cols, dtype=torch.long)
+            ptr = torch.arange(0, total_size + 1, n_cols, dtype=torch.long, device=self.device)
 
             return indices, ptr, data
+        elif self.is_empty:
+            # For empty masks, return empty indices with zero data
+            empty_indices: torch.Tensor = torch.empty(0, dtype=torch.long, device=self.device)
+            ptr_size: int = int(np.prod(self.shape[:-1]) + 1)
+            ptr: torch.Tensor = torch.zeros(ptr_size, dtype=torch.long, device=self.device)
+            data: torch.Tensor = torch.empty(0, dtype=self.dtype, device=self.device)
+            return empty_indices, ptr, data
         elif self.from_index:
             if self.indices is None or self.ptr is None:
                 raise RuntimeError("Sparse mask indices or ptr is None")
@@ -362,10 +475,14 @@ class Mask:
 
         Returns:
             Dense mask tensor
+        Comments: This will return the mask object in dense representation.
         """
         if self.is_full:
             # For full masks, return tensor of ones
-            return torch.ones(self.shape, dtype=self.dtype)
+            return torch.ones(self.shape, dtype=self.dtype, device=self.device)
+        elif self.is_empty:
+            # For empty masks, return tensor of zeros
+            return torch.zeros(self.shape, dtype=self.dtype, device=self.device)
         elif self.from_dense_mask:
             if self.mask is None:
                 raise RuntimeError("Dense mask is None")
@@ -388,7 +505,56 @@ class Mask:
         else:
             raise RuntimeError("Mask object is in an invalid state")
 
-    def apply_mask(self, input_tensor: torch.Tensor) -> torch.Tensor:
+
+
+
+    ################## APPLY MASK ##################
+    def apply_mask(self, input_tensor: torch.Tensor, mode: Literal["sparse", "dense"] = "sparse") -> torch.Tensor:
+        """
+        Apply the mask to an input tensor.
+
+        Args:
+            input_tensor: Input tensor with shape same as the mask
+            mode: Mode of application ("sparse" or "dense"), defaults to "sparse"
+
+        Returns:
+            Output tensor after applying the mask.
+            if full mask, return input tensor directly.
+            if empty mask, return input tensor directly.
+            otherwise, return the masked output tensor.
+            
+        """
+        if mode == "sparse":
+            return self.apply_mask_sparse(input_tensor)
+        elif mode == "dense":
+            return self.apply_mask_dense(input_tensor)
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+    
+    def apply_mask_dense(self, input_tensor: torch.Tensor) -> torch.Tensor:
+        """
+        Apply the mask to an input tensor in dense format.
+
+        Args:
+            input_tensor: Input tensor with shape same as the mask
+
+        Returns:
+            Output tensor after applying the mask
+        """
+        if input_tensor.shape != self.shape:
+            raise ValueError(
+                f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}"
+            )
+
+        if self.is_full or self.is_empty:
+            # Full mask optimization - return input tensor directly (no-op)
+            return input_tensor
+
+        dense_mask = self.get_dense_mask()
+        output = input_tensor * dense_mask
+        return output
+
+    def apply_mask_sparse(self, input_tensor: torch.Tensor) -> torch.Tensor:
         """
         Apply the mask to an input tensor.
 
@@ -406,10 +572,8 @@ class Mask:
                 f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}"
             )
 
-        if self.is_full:
+        if self.is_full or self.is_empty:
             # Full mask optimization - return input tensor directly (no-op)
-            return input_tensor
-        elif self.is_empty():
             return input_tensor
 
         # Always work with index representation for efficiency
@@ -425,7 +589,51 @@ class Mask:
 
         return output
 
-    def apply_inv_mask(self, input_tensor: torch.Tensor) -> torch.Tensor:
+    ################## APPLY INVERSE MASK ##################
+
+    def apply_inv_mask(self, input_tensor: torch.Tensor, mode: Literal["sparse", "dense"] = "sparse") -> torch.Tensor:
+        """
+        Apply the inverse mask to an input tensor.
+
+        Args:
+            input_tensor: Input tensor with shape same as the mask
+            mode: Mode of application ("sparse" or "dense"), defaults to "sparse"
+
+        Returns:
+            Output tensor after applying the inverse mask
+        """
+        if mode == "sparse":
+            return self.apply_inv_mask_sparse(input_tensor)
+        elif mode == "dense":
+            return self.apply_inv_mask_dense(input_tensor)
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+
+    def apply_inv_mask_dense(self, input_tensor: torch.Tensor) -> torch.Tensor:
+        """
+        Apply the inverse mask to an input tensor in dense format.
+
+        Args:
+            input_tensor: Input tensor with shape same as the mask
+
+        Returns:
+            Output tensor after applying the inverse mask
+        """
+        if input_tensor.shape != self.shape:
+            raise ValueError(
+                f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}"
+            )
+
+        if self.is_full or self.is_empty:
+            # Full mask optimization - return input tensor directly (1.0 / 1.0 = 1.0)
+            return input_tensor
+
+        mask_dense = self.get_dense_mask()
+        valid_mask = mask_dense != 0
+        result = input_tensor * (1.0 / (mask_dense + 1e-6) * valid_mask)
+        return result
+
+    def apply_inv_mask_sparse(self, input_tensor: torch.Tensor) -> torch.Tensor:
         """
         Apply the inverse mask to an input tensor.
 
@@ -444,10 +652,8 @@ class Mask:
                 f"input_tensor.shape must be {self.shape}, got {input_tensor.shape}"
             )
 
-        if self.is_full:
+        if self.is_full or self.is_empty:
             # Full mask optimization - return input tensor directly (1.0 / 1.0 = 1.0)
-            return input_tensor
-        elif self.is_empty():
             return input_tensor
 
         # Always work with index representation for efficiency
@@ -460,74 +666,124 @@ class Mask:
         output: torch.Tensor = torch.zeros_like(input_tensor)
         if indices.numel() > 0:
             # For inverse mask: output[indices] = input[indices] * (1.0 / data)
-            output.view(-1)[indices] = input_tensor.view(-1)[indices] * (1.0 / data)
+            output.view(-1)[indices] = input_tensor.view(-1)[indices] * (1.0 / (data + 1e-6))
 
         return output
 
-    @classmethod
-    def create_empty_mask(
-        cls,
-        shape: Tuple[int, ...],
-        dtype: torch.dtype = torch.float32,
-        mask_type: str = "dense",
-    ) -> "Mask":
-        """
-        Create a mask object with all values set to zero.
-
-        Args:
-            shape: Shape of the mask (*, n)
-            dtype: Data type for the mask values
-            mask_type: Type of representation ("dense" or "index")
-
-        Returns:
-            Mask object with all zeros in the specified representation
-        """
-
-        if mask_type == "dense":
-            empty_mask: torch.Tensor = torch.zeros(shape, dtype=dtype)
-            return cls.create_mask_from_dense_mask(shape, empty_mask, dtype)
-        elif mask_type == "index":
-            # For an empty mask, we have no non-zero indices
-            empty_indices: torch.Tensor = torch.empty(0, dtype=torch.long)
-
-            # Create ptr array with size equal to product of all dimensions except the last one, plus 1
-            # All rows have 0 non-zero elements, so ptr is just zeros
-            ptr_size: int = int(np.prod(shape[:-1]) + 1)
-            ptr: torch.Tensor = torch.zeros(ptr_size, dtype=torch.long)
-
-            # No data since all values are zero
-            data: torch.Tensor = torch.empty(0, dtype=dtype)
-
-            return cls.create_mask_from_indices(shape, empty_indices, ptr, data, dtype)
-        else:
-            raise ValueError(f"mask_type must be 'dense' or 'index', got {mask_type}")
-
-    def is_empty(self) -> bool:
-        """
-        Check if the mask is empty.
-        """
-        if self.is_full:
-            # Full masks are never empty
-            return False
-        elif self.from_dense_mask:
-            if self.mask is None:
-                raise RuntimeError("Dense mask is None")
-            return bool(torch.all(self.mask == 0).item())
-        elif self.from_index:
-            if self.indices is None:
-                raise RuntimeError("Sparse mask indices is None")
-            return self.indices.numel() == 0
-        else:
-            raise RuntimeError("Mask object is in an invalid state")
-
+    
     def __repr__(self) -> str:
         """String representation of the Mask object."""
-        return f"Mask(shape={self.shape}, dtype={self.dtype}, from_dense_mask={self.from_dense_mask}, from_index={self.from_index}, is_full={self.is_full})"
+        return f"Mask(shape={self.shape}, dtype={self.dtype}, from_dense_mask={self.from_dense_mask}, from_index={self.from_index}, is_full={self.is_full}, is_empty={self.is_empty})"
+
 
     def merge_mask(
+        self, 
+        other_mask: "Mask",
+        inplace: bool,
+        mode: Literal["sparse", "dense"] = "sparse",
+    ) -> "Mask":
+        """
+        Merge this mask with another mask.
+        
+        Args:
+            other_mask: The other mask to merge with
+            inplace: Whether to modify this mask in place
+            mode: Merge mode - "sparse" (default) or "dense"
+        
+        Returns:
+            Merged mask
+        """
+        if mode == "dense":
+            return self.merge_mask_dense(other_mask, inplace)
+        elif mode == "sparse":
+            return self.merge_mask_sparse(other_mask, inplace)
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+
+    def merge_mask_dense(
+        self, 
+        other_mask: "Mask",
+        inplace: bool,
+    ) -> "Mask":
+        """
+        Merge this mask with another mask in dense format.
+        """
+        if self.shape != other_mask.shape:
+            raise ValueError(
+                f"Cannot merge masks with different shapes: {self.shape} vs {other_mask.shape}"
+            )
+
+        # Full mask optimizations
+        if self.is_full or other_mask.is_full:
+            # If either mask is full, the result is full
+            if inplace:
+                self.is_full = True
+                self.is_empty = False
+                self.from_dense_mask = False
+                self.from_index = False
+                self.mask = None
+                self.indices = None
+                self.ptr = None
+                self.data = None
+                return self
+            else:
+                return Mask.create_full_mask(self.shape, self.dtype, self.device)
+
+
+        if self.is_empty and other_mask.is_empty:
+            # If both masks are empty, result is empty
+            if inplace:
+                return self
+            else:
+                return Mask.create_empty_mask(self.shape, self.dtype, self.device)
+
+        # Empty mask optimizations
+        if self.is_empty:
+            # If this mask is empty, result is the other mask
+            if inplace:
+                # Copy other mask's state to self
+                self.is_full = other_mask.is_full
+                self.is_empty = other_mask.is_empty
+                self.from_dense_mask = other_mask.from_dense_mask
+                self.from_index = other_mask.from_index
+                self.mask = other_mask.mask
+                self.indices = other_mask.indices
+                self.ptr = other_mask.ptr
+                self.data = other_mask.data
+                self.device = other_mask.device
+                return self
+            else:
+                # Return a copy of the other mask (can use get_dense_mask and create new)
+                return Mask.create_mask_from_dense_mask(self.shape, other_mask.get_dense_mask(), dtype=self.dtype)
+        
+        if other_mask.is_empty:
+            # If other mask is empty, result is this mask
+            if inplace:
+                return self
+            else:
+                return Mask.create_mask_from_dense_mask(self.shape, self.get_dense_mask(), dtype=self.dtype)
+
+        mask1 = self.get_dense_mask()
+        mask2 = other_mask.get_dense_mask()
+        merged_mask = torch.clamp(mask1 + mask2, 0.0, 1.0)
+        if inplace:
+            self.mask = merged_mask
+            self.from_dense_mask = True
+            self.from_index = False
+            self.is_full = False
+            self.is_empty = False
+            self.indices = None
+            self.ptr = None
+            self.data = None
+            return self
+        else:
+            return Mask.create_mask_from_dense_mask(self.shape, merged_mask, dtype=self.dtype)
+        
+
+    def merge_mask_sparse(
         self,
         other_mask: "Mask",
-        inplace: bool = False,
+        inplace: bool,
     ) -> "Mask":
         """
         Merge this mask with another mask in sparse format.
@@ -550,6 +806,7 @@ class Mask:
             # If either mask is full, the result is full
             if inplace:
                 self.is_full = True
+                self.is_empty = False
                 self.from_dense_mask = False
                 self.from_index = False
                 self.mask = None
@@ -558,7 +815,43 @@ class Mask:
                 self.data = None
                 return self
             else:
-                return Mask.create_full_mask(self.shape, self.dtype)
+                return Mask.create_full_mask(self.shape, self.dtype, self.device)
+
+        if self.is_empty and other_mask.is_empty:
+            # If both masks are empty, result is empty
+            if inplace:
+                return self
+            else:
+                return Mask.create_empty_mask(self.shape, self.dtype, self.device)
+
+
+        # Empty mask optimizations
+        if self.is_empty:
+            # If this mask is empty, result is the other mask
+            if inplace:
+                # Copy other mask's state to self
+                self.is_full = other_mask.is_full
+                self.is_empty = other_mask.is_empty
+                self.from_dense_mask = other_mask.from_dense_mask
+                self.from_index = other_mask.from_index
+                self.mask = other_mask.mask
+                self.indices = other_mask.indices
+                self.ptr = other_mask.ptr
+                self.data = other_mask.data
+                self.device = other_mask.device
+                return self
+            else:
+                # Return a copy by getting index representation and creating new
+                indices, ptr, data = other_mask.get_index_mask()
+                return Mask.create_mask_from_indices(self.shape, indices, ptr, data, dtype=self.dtype)
+        
+        if other_mask.is_empty:
+            # If other mask is empty, result is this mask
+            if inplace:
+                return self
+            else:
+                indices, ptr, data = self.get_index_mask()
+                return Mask.create_mask_from_indices(self.shape, indices, ptr, data, dtype=self.dtype)
 
         self_indices: torch.Tensor
         self_ptr: torch.Tensor
@@ -636,22 +929,6 @@ class Mask:
                 ]
             )
 
-        # Check if the result is a full mask
-        expected_size: int = int(np.prod(self.shape))
-        if final_indices.numel() == expected_size and torch.all(final_data == 1.0):
-            # Result is a full mask, use optimization
-            if inplace:
-                self.is_full = True
-                self.from_dense_mask = False
-                self.from_index = False
-                self.mask = None
-                self.indices = None
-                self.ptr = None
-                self.data = None
-                return self
-            else:
-                return Mask.create_full_mask(self.shape, self.dtype)
-
         if inplace:
             self.indices = final_indices
             self.ptr = final_ptr
@@ -659,6 +936,7 @@ class Mask:
             self.from_index = True
             self.from_dense_mask = False
             self.is_full = False
+            self.is_empty = False
             self.mask = None
             return self
         else:
@@ -676,7 +954,7 @@ class Mask:
         """
         if self.is_full:
             return 1.0
-        elif self.is_empty():
+        elif self.is_empty:
             return 0.0
         elif self.from_dense_mask:
             return float(torch.sum(self.mask > 0) / self.mask.numel())

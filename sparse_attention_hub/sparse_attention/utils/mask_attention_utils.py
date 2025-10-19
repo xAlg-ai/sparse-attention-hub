@@ -1,6 +1,6 @@
 """Utility functions for masked attention computation."""
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, Literal
 
 import torch
 from torch import nn
@@ -72,7 +72,7 @@ def apply_inv_mask_sum(input_tensor: torch.Tensor, mask: Mask) -> torch.Tensor:
 
     Note:
         - For full masks: returns sum of all input values
-        - For empty masks: returns zero tensor
+        - For empty masks: returns sum of all input values since empty mask means default case when no mask is built.
         - For sparse masks: efficiently computes sum using sparse operations
     """
     if input_tensor.shape != mask.shape:
@@ -81,56 +81,13 @@ def apply_inv_mask_sum(input_tensor: torch.Tensor, mask: Mask) -> torch.Tensor:
         )
 
     # Handle special cases
-    if mask.is_full_mask():
+    if mask.is_full or mask.is_empty:
         # Full mask: sum all input values
         return input_tensor.sum(dim=-1, keepdim=True)
-    elif mask.is_empty():
-        # Empty mask: return zero tensor
-        return torch.zeros(
-            input_tensor.shape[:-1] + (1,),
-            device=input_tensor.device,
-            dtype=input_tensor.dtype,
-        )
+    result = mask.apply_inv_mask(input_tensor)
+    return result.sum(dim=-1, keepdim=True)
 
-    # Get sparse representation
-    indices, ptr, data = mask.get_index_mask()
-
-    if indices.numel() == 0:
-        # No active indices: return zero tensor
-        return torch.zeros(
-            input_tensor.shape[:-1] + (1,),
-            device=input_tensor.device,
-            dtype=input_tensor.dtype,
-        )
-
-    # Reshape input tensor to 1D for indexing
-    input_flat = input_tensor.view(-1)  # (total_elements,)
-
-    # Extract values at sparse indices and apply inverse mask
-    input_at_indices = input_flat[indices]  # (num_active_indices,)
-    inverse_data = 1.0 / data  # (num_active_indices,)
-    weighted_input = input_at_indices * inverse_data  # (num_active_indices,)
-
-    # Use scatter_add_ for vectorized row-wise summation
-    num_rows = int(torch.prod(torch.tensor(input_tensor.shape[:-1])))
-
-    # Create row indices for each sparse element
-    # indices are flattened, so row_idx = indices // input_tensor.shape[-1]
-    seq_len_last = input_tensor.shape[-1]
-    row_indices = indices // seq_len_last  # (num_active_indices,)
-
-    # Create output tensor for scatter operation
-    result = torch.zeros(num_rows, device=input_tensor.device, dtype=input_tensor.dtype)
-
-    # Use scatter_add_ to sum weighted values per row
-    result.scatter_add_(0, row_indices, weighted_input)
-
-    # Reshape back to original dimensions (except last dimension becomes 1)
-    result = result.view(input_tensor.shape[:-1] + (1,))
-
-    return result
-
-
+# TODO(is there a better dense version of this function?)
 def create_sampling_mask_with_per_head_budget(
     budgets: torch.Tensor,
     sampling_probability: torch.Tensor,
@@ -257,10 +214,9 @@ def _compute_masked_exp_attention_weights(
     raw_attention_weights = raw_attention_weights - row_wise_max
     exp_attention_weights: torch.Tensor = torch.exp(raw_attention_weights)
 
-    if not sparse_attention_mask.is_empty():
-        exp_attention_weights = sparse_attention_mask.apply_inv_mask(
-            exp_attention_weights
-        )
+    exp_attention_weights = sparse_attention_mask.apply_inv_mask(
+        exp_attention_weights
+    )
 
     # Apply dropout to attention weights if specified
     if dropout > 0.0 and training:
@@ -382,6 +338,9 @@ def get_attention_numerator(
 
     return _get_attention_numerator(exp_attention_weights, value_states)
 
+
+
+#################### GET MASKED ATTENTION OUTPUT ####################
 
 def get_masked_attention_output(
     module: nn.Module,
