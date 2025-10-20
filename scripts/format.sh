@@ -77,7 +77,7 @@ ISORT_FLAGS=(
 
 FLAKE8_FLAGS=(
     '--max-line-length=88'
-    '--extend-ignore=E203,W503,E501'
+    '--extend-ignore=E203,W503,E501,E231'
     '--exclude=build,dist,.git,__pycache__,.pytest_cache,.venv'
 )
 
