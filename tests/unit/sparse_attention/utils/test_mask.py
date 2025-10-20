@@ -34,7 +34,9 @@ class TestMask:
         ptr = torch.tensor([0, 5, 7, 9])
         indices = torch.tensor([0, 1, 2, 3, 4, 0, 1, 2, 3])
         data = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-        index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data, dtype=torch.float32)
+        index_mask_object = Mask.create_mask_from_indices(
+            shape, indices, ptr, data, dtype=torch.float32
+        )
         index_mask, index_ptr, index_data = index_mask_object.get_index_mask()
         assert torch.allclose(index_mask, indices)
         assert torch.allclose(index_ptr, ptr)
@@ -50,10 +52,14 @@ class TestMask:
                 [1.0, 0.0, 1.0, 0.0, 1.0],
             ]
         )
-        dense_mask_object = Mask.create_mask_from_dense_mask(shape, mask, dtype=torch.float32)
+        dense_mask_object = Mask.create_mask_from_dense_mask(
+            shape, mask, dtype=torch.float32
+        )
         indices, ptr, data = dense_mask_object.get_index_mask()
 
-        index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data, dtype=torch.float32)
+        index_mask_object = Mask.create_mask_from_indices(
+            shape, indices, ptr, data, dtype=torch.float32
+        )
         dense_mask = index_mask_object.get_dense_mask()
         assert torch.allclose(dense_mask, mask)
 
@@ -62,10 +68,14 @@ class TestMask:
         ptr = torch.tensor([0, 5, 7, 9])
         indices = torch.tensor([0, 1, 2, 3, 4, 5, 6, 12, 13])
         data = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-        index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data, dtype=torch.float32)
+        index_mask_object = Mask.create_mask_from_indices(
+            shape, indices, ptr, data, dtype=torch.float32
+        )
 
         dense_mask = index_mask_object.get_dense_mask()
-        dense_mask_object = Mask.create_mask_from_dense_mask(shape, dense_mask, dtype=torch.float32)
+        dense_mask_object = Mask.create_mask_from_dense_mask(
+            shape, dense_mask, dtype=torch.float32
+        )
         _indices, _ptr, _data = dense_mask_object.get_index_mask()
         assert _indices.shape == indices.shape
         assert _ptr.shape == ptr.shape
@@ -78,7 +88,9 @@ class TestMask:
         n_dims = 3
         shape = tuple([5] * n_dims)
         mask = (torch.rand(shape) > 0.5) * torch.rand(shape)
-        dense_mask_object = Mask.create_mask_from_dense_mask(shape, mask, dtype=torch.float32)
+        dense_mask_object = Mask.create_mask_from_dense_mask(
+            shape, mask, dtype=torch.float32
+        )
         indices, ptr, data = dense_mask_object.get_index_mask()
 
         for i in range(np.prod(shape[:-1])):
@@ -90,7 +102,9 @@ class TestMask:
 
     def test_create_empty_mask_dense(self):
         shape = (3, 5, 7)
-        mask_object = Mask.create_empty_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        mask_object = Mask.create_empty_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         assert mask_object.shape == shape
         assert mask_object.is_empty
         # Empty mask optimization - no actual data is stored
@@ -100,7 +114,9 @@ class TestMask:
 
     def test_create_empty_mask_index(self):
         shape = (3, 5, 7)
-        mask_object = Mask.create_empty_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        mask_object = Mask.create_empty_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         mask = mask_object.get_dense_mask()
         assert mask.shape == shape
         assert mask.sum() == 0
@@ -117,9 +133,13 @@ class TestMask:
 
         true_answer = input * dense_mask
 
-        dense_mask_object = Mask.create_mask_from_dense_mask(shape, dense_mask, dtype=torch.float32)
+        dense_mask_object = Mask.create_mask_from_dense_mask(
+            shape, dense_mask, dtype=torch.float32
+        )
         indices, ptr, data = dense_mask_object.get_index_mask()
-        index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data, dtype=torch.float32)
+        index_mask_object = Mask.create_mask_from_indices(
+            shape, indices, ptr, data, dtype=torch.float32
+        )
 
         dense_masked_data = dense_mask_object.apply_mask(input, mode="dense")
         index_masked_data = index_mask_object.apply_mask(input, mode="dense")
@@ -144,9 +164,13 @@ class TestMask:
             1.0 / dense_mask[non_zero_mask]
         )
 
-        dense_mask_object = Mask.create_mask_from_dense_mask(shape, dense_mask, dtype=torch.float32)
+        dense_mask_object = Mask.create_mask_from_dense_mask(
+            shape, dense_mask, dtype=torch.float32
+        )
         indices, ptr, data = dense_mask_object.get_index_mask()
-        index_mask_object = Mask.create_mask_from_indices(shape, indices, ptr, data, dtype=torch.float32)
+        index_mask_object = Mask.create_mask_from_indices(
+            shape, indices, ptr, data, dtype=torch.float32
+        )
 
         dense_inv_masked_data = dense_mask_object.apply_inv_mask(input, mode="dense")
         index_inv_masked_data = index_mask_object.apply_inv_mask(input, mode="dense")
@@ -158,7 +182,9 @@ class TestMask:
         shape = (2, 3)
         input = torch.rand(shape)
 
-        empty_mask = Mask.create_empty_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_mask = Mask.create_empty_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         result = empty_mask.apply_inv_mask(input, mode="dense")
 
         # Empty mask now returns input tensor directly (no masking applied)
@@ -169,7 +195,9 @@ class TestMask:
         input = torch.rand(shape)
 
         ones_mask = torch.ones(shape)
-        mask_object = Mask.create_mask_from_dense_mask(shape, ones_mask, dtype=torch.float32)
+        mask_object = Mask.create_mask_from_dense_mask(
+            shape, ones_mask, dtype=torch.float32
+        )
         result = mask_object.apply_inv_mask(input, mode="dense")
 
         # When mask is all ones, inverse should be the same as input
@@ -181,7 +209,9 @@ class TestMask:
         row_wise_idx = torch.tensor([[0, 2, 4], [1, 3, 4]])
         data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+        mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+        )
 
         assert mask.shape == shape
         assert mask.from_dense_mask
@@ -198,7 +228,14 @@ class TestMask:
         row_wise_idx = torch.tensor([[0, 2, 4], [1, 3, 4]])
         data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="sparse")
+        mask = Mask.create_from_row_wise_idx(
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="index",
+            dtype=torch.float32,
+            mode="sparse",
+        )
 
         assert mask.shape == shape
         assert not mask.from_dense_mask
@@ -220,7 +257,9 @@ class TestMask:
         row_wise_idx = torch.tensor([[1], [0], [3]])
         data = torch.tensor([[0.5], [0.8], [0.2]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+        mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+        )
 
         dense_mask = mask.get_dense_mask()
         expected = torch.tensor(
@@ -234,7 +273,15 @@ class TestMask:
         row_wise_idx = torch.tensor([[0, 2, -1], [1, -1, -1]])  # -1 as padding
         data = torch.tensor([[1.0, 0.5, 0.0], [0.6, 0.0, 0.0]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, use_padding=True, mode="sparse")
+        mask = Mask.create_from_row_wise_idx(
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            use_padding=True,
+            mode="sparse",
+        )
 
         dense_mask = mask.get_dense_mask()
         expected = torch.tensor([[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.6, 0.0, 0.0, 0.0]])
@@ -250,7 +297,9 @@ class TestMask:
             [[[1.0, 0.5], [0.8, 0.3], [0.2, 0.7]], [[0.4, 0.9], [0.6, 0.1], [0.8, 0.4]]]
         )
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+        mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+        )
 
         dense_mask = mask.get_dense_mask()
 
@@ -290,7 +339,9 @@ class TestMask:
         data = torch.tensor([[1.0, 0.5]])
 
         with pytest.raises(ValueError, match="shape must have at least one dimension"):
-            Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+            Mask.create_from_row_wise_idx(
+                shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+            )
 
     def test_create_from_row_wise_idx_error_mismatched_shapes(self):
         """Test error handling for mismatched input shapes."""
@@ -299,7 +350,9 @@ class TestMask:
         data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
 
         with pytest.raises(ValueError, match="row_wise_idx.shape must be"):
-            Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+            Mask.create_from_row_wise_idx(
+                shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+            )
 
     def test_create_from_row_wise_idx_error_data_shape_mismatch(self):
         """Test error handling when data shape doesn't match row_wise_idx shape."""
@@ -310,7 +363,9 @@ class TestMask:
         with pytest.raises(
             ValueError, match="data.shape must match row_wise_idx.shape"
         ):
-            Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+            Mask.create_from_row_wise_idx(
+                shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+            )
 
     # why comment this test?
     # The original check is removed since it unnecessarily causes GPU-CPU sync when running on GPU
@@ -334,7 +389,9 @@ class TestMask:
         data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
 
         with pytest.raises(ValueError, match="type must be 'index' or 'dense'"):
-            Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="invalid", dtype=torch.float32)
+            Mask.create_from_row_wise_idx(
+                shape, row_wise_idx, data, mask_type="invalid", dtype=torch.float32
+            )
 
     def test_create_from_row_wise_idx_empty_mask(self):
         """Test creating empty mask with all -1 indices."""
@@ -342,10 +399,18 @@ class TestMask:
         row_wise_idx = torch.tensor([[-1, -1, -1], [-1, -1, -1]])
         data = torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, use_padding=True, mode="sparse")
+        mask = Mask.create_from_row_wise_idx(
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            use_padding=True,
+            mode="sparse",
+        )
 
         # is_empty is set only when creating the mask empty
-        #assert mask.is_empty 
+        # assert mask.is_empty
         dense_mask = mask.get_dense_mask()
         assert torch.allclose(dense_mask, torch.zeros(shape))
 
@@ -360,7 +425,9 @@ class TestMask:
         row_wise_idx = torch.tensor([[0, 2, 4], [1, 3, 4]], device=device)
         data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]], device=device)
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+        mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32
+        )
         assert mask.get_dense_mask().device == row_wise_idx.device
 
     def test_merge_mask_basic(self):
@@ -369,13 +436,23 @@ class TestMask:
 
         # Create first mask
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.8, 0.0, 0.0, 0.3]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.8, 0.0, 0.0, 0.3]],
+                dtype=torch.float32,
+            ),
+            dtype=torch.float32,
+        )
 
         # Create second mask
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.0, 0.2, 0.5, 0.0, 0.4], [0.1, 0.0, 0.0, 0.6, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[0.0, 0.2, 0.5, 0.0, 0.4], [0.1, 0.0, 0.0, 0.6, 0.0]],
+                dtype=torch.float32,
+            ),
+            dtype=torch.float32,
+        )
 
         # Merge masks
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -389,7 +466,6 @@ class TestMask:
         assert merged.from_dense_mask
         assert not merged.from_index
 
-
         merged = mask1.merge_mask(mask2, inplace=False, mode="sparse")
 
         # Expected result: union of indices with data addition
@@ -401,20 +477,29 @@ class TestMask:
         assert merged.from_index
         assert not merged.from_dense_mask
 
-
     def test_merge_mask_with_capping(self):
         """Test merge with capping (always [0.0, 1.0])."""
         shape = (2, 5)
 
         # Create first mask
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.8, 0.0, 0.0, 0.3]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.8, 0.0, 0.0, 0.3]],
+                dtype=torch.float32,
+            ),
+            dtype=torch.float32,
+        )
 
         # Create second mask
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.0, 0.2, 0.8, 0.0, 0.4], [0.1, 0.0, 0.0, 0.6, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[0.0, 0.2, 0.8, 0.0, 0.4], [0.1, 0.0, 0.0, 0.6, 0.0]],
+                dtype=torch.float32,
+            ),
+            dtype=torch.float32,
+        )
 
         # Merge masks with capping
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -435,13 +520,23 @@ class TestMask:
 
         # Create first mask
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.8, 0.0, 0.0, 0.3]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.8, 0.0, 0.0, 0.3]],
+                dtype=torch.float32,
+            ),
+            dtype=torch.float32,
+        )
 
         # Create second mask
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.0, 0.2, 0.5, 0.0, 0.4], [0.1, 0.0, 0.0, 0.6, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[0.0, 0.2, 0.5, 0.0, 0.4], [0.1, 0.0, 0.0, 0.6, 0.0]],
+                dtype=torch.float32,
+            ),
+            dtype=torch.float32,
+        )
 
         # Merge masks in-place
         original_id = id(mask1)
@@ -467,12 +562,16 @@ class TestMask:
         shape = (2, 3)
 
         # Create empty mask
-        empty_mask = Mask.create_empty_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_mask = Mask.create_empty_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Create non-empty mask
         non_empty_mask = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         # Merge empty with non-empty
         merged1 = empty_mask.merge_mask(non_empty_mask, inplace=False, mode="dense")
@@ -484,7 +583,11 @@ class TestMask:
 
         # Merge two empty masks
         merged_empty = empty_mask.merge_mask(
-            Mask.create_empty_mask(shape, dtype=torch.float32, device=torch.device("cpu")), inplace=False, mode="dense"
+            Mask.create_empty_mask(
+                shape, dtype=torch.float32, device=torch.device("cpu")
+            ),
+            inplace=False,
+            mode="dense",
         )
         assert merged_empty.is_empty
 
@@ -507,8 +610,12 @@ class TestMask:
             ]
         )
 
-        mask1 = Mask.create_mask_from_dense_mask(shape, mask1_dense, dtype=torch.float32)
-        mask2 = Mask.create_mask_from_dense_mask(shape, mask2_dense, dtype=torch.float32)
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape, mask1_dense, dtype=torch.float32
+        )
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape, mask2_dense, dtype=torch.float32
+        )
 
         # Merge
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -526,13 +633,17 @@ class TestMask:
         indices1 = torch.tensor([0, 2, 6, 8])
         ptr1 = torch.tensor([0, 2, 4])
         data1 = torch.tensor([1.0, 0.5, 0.8, 0.3])
-        mask1 = Mask.create_mask_from_indices(shape, indices1, ptr1, data1, dtype=torch.float32)
+        mask1 = Mask.create_mask_from_indices(
+            shape, indices1, ptr1, data1, dtype=torch.float32
+        )
 
         # Create sparse mask 2
         indices2 = torch.tensor([1, 2, 5, 7])
         ptr2 = torch.tensor([0, 2, 4])
         data2 = torch.tensor([0.2, 0.5, 0.1, 0.6])
-        mask2 = Mask.create_mask_from_indices(shape, indices2, ptr2, data2, dtype=torch.float32)
+        mask2 = Mask.create_mask_from_indices(
+            shape, indices2, ptr2, data2, dtype=torch.float32
+        )
 
         # Merge
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -548,8 +659,12 @@ class TestMask:
         shape1 = (2, 5)
         shape2 = (3, 5)
 
-        mask1 = Mask.create_empty_mask(shape1, dtype=torch.float32, device=torch.device("cpu"))
-        mask2 = Mask.create_empty_mask(shape2, dtype=torch.float32, device=torch.device("cpu"))
+        mask1 = Mask.create_empty_mask(
+            shape1, dtype=torch.float32, device=torch.device("cpu")
+        )
+        mask2 = Mask.create_empty_mask(
+            shape2, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         with pytest.raises(
             ValueError, match="Cannot merge masks with different shapes"
@@ -562,12 +677,16 @@ class TestMask:
 
         # Create masks with negative values
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, -0.5, 0.0], [0.0, 0.8, -0.3]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, -0.5, 0.0], [0.0, 0.8, -0.3]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.0, 0.2, -0.4], [-0.1, 0.0, 0.6]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[0.0, 0.2, -0.4], [-0.1, 0.0, 0.6]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         # Merge with capping (now always [0.0, 1.0])
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -584,12 +703,16 @@ class TestMask:
         shape = (2, 3)
 
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.5, 1.5, 2.5], [3.5, 4.5, 5.5]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[0.5, 1.5, 2.5], [3.5, 4.5, 5.5]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         # Test with capping (now always [0.0, 1.0])
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -605,8 +728,12 @@ class TestMask:
         """Test merge with single element masks."""
         shape = (1, 1)
 
-        mask1 = Mask.create_mask_from_dense_mask(shape, torch.tensor([[0.5]], dtype=torch.float32), dtype=torch.float32)
-        mask2 = Mask.create_mask_from_dense_mask(shape, torch.tensor([[0.3]], dtype=torch.float32), dtype=torch.float32)
+        mask1 = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[0.5]], dtype=torch.float32), dtype=torch.float32
+        )
+        mask2 = Mask.create_mask_from_dense_mask(
+            shape, torch.tensor([[0.3]], dtype=torch.float32), dtype=torch.float32
+        )
 
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
 
@@ -623,12 +750,20 @@ class TestMask:
         shape = (2, 3)
 
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], device=device, dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], device=device, dtype=torch.float32
+            ),
+            dtype=torch.float32,
+        )
         true_device = mask1.get_dense_mask().device
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.0, 0.2, 0.5], [0.1, 0.0, 0.6]], device=device, dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor(
+                [[0.0, 0.2, 0.5], [0.1, 0.0, 0.6]], device=device, dtype=torch.float32
+            ),
+            dtype=torch.float32,
+        )
 
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
 
@@ -643,7 +778,9 @@ class TestMask:
     def test_create_full_mask_basic(self):
         """Test basic full mask creation."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         assert full_mask.shape == shape
         assert full_mask.dtype == torch.float32
@@ -664,7 +801,9 @@ class TestMask:
         shapes = [(5,), (2, 4), (3, 2, 5), (2, 3, 4, 5)]
 
         for shape in shapes:
-            full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+            full_mask = Mask.create_full_mask(
+                shape, dtype=torch.float32, device=torch.device("cpu")
+            )
             assert full_mask.shape == shape
             assert full_mask.is_full_mask()
 
@@ -679,7 +818,9 @@ class TestMask:
         dtypes = [torch.float32, torch.float64, torch.float16]
 
         for dtype in dtypes:
-            full_mask = Mask.create_full_mask(shape, dtype=dtype, device=torch.device("cpu"))
+            full_mask = Mask.create_full_mask(
+                shape, dtype=dtype, device=torch.device("cpu")
+            )
             assert full_mask.dtype == dtype
             assert full_mask.is_full_mask()
 
@@ -695,7 +836,9 @@ class TestMask:
         shape = (2, 3)
 
         # Test with full mask
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         assert full_mask.is_full_mask()
 
         # Test with empty mask
@@ -704,12 +847,16 @@ class TestMask:
 
         # Test with partial mask
         partial_mask = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
         assert not partial_mask.is_full_mask()
 
         # Test with all-ones mask (should be detected as full)
-        ones_mask = Mask.create_mask_from_dense_mask(shape, torch.ones(shape, dtype=torch.float32))
+        ones_mask = Mask.create_mask_from_dense_mask(
+            shape, torch.ones(shape, dtype=torch.float32)
+        )
         assert ones_mask.is_full_mask()
 
     @pytest.mark.skip(
@@ -732,7 +879,9 @@ class TestMask:
 
         # Create dense mask with some non-1.0 values
         partial_tensor = torch.tensor([[1.0, 0.5, 1.0], [1.0, 1.0, 1.0]])
-        mask = Mask.create_mask_from_dense_mask(shape, partial_tensor, dtype=torch.float32)
+        mask = Mask.create_mask_from_dense_mask(
+            shape, partial_tensor, dtype=torch.float32
+        )
 
         # Should NOT be detected as full
         assert not mask.is_full_mask()
@@ -752,7 +901,9 @@ class TestMask:
         ptr = torch.tensor([0, 3, 6], dtype=torch.long)
         data = torch.ones(total_size, dtype=torch.float32)
 
-        mask = Mask.create_mask_from_indices(shape, indices, ptr, data, dtype=torch.float32)
+        mask = Mask.create_mask_from_indices(
+            shape, indices, ptr, data, dtype=torch.float32
+        )
 
         # Should be auto-detected as full
         assert mask.is_full_mask()
@@ -769,8 +920,8 @@ class TestMask:
         partial_data = torch.ones(3, dtype=torch.float32)
 
         mask = Mask.create_mask_from_indices(
-            shape, partial_indices, partial_ptr, partial_data
-        , dtype=torch.float32)
+            shape, partial_indices, partial_ptr, partial_data, dtype=torch.float32
+        )
 
         # Should NOT be detected as full
         assert not mask.is_full_mask()
@@ -780,7 +931,9 @@ class TestMask:
     def test_full_mask_get_dense_mask(self):
         """Test get_dense_mask() optimization for full masks."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         dense = full_mask.get_dense_mask()
 
@@ -794,7 +947,9 @@ class TestMask:
     def test_full_mask_get_index_mask(self):
         """Test get_index_mask() optimization for full masks."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         indices, ptr, data = full_mask.get_index_mask()
 
@@ -813,7 +968,9 @@ class TestMask:
     def test_full_mask_apply_mask_no_op(self):
         """Test that apply_mask() is a no-op for full masks."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         input_tensor = torch.randn(shape)
         result = full_mask.apply_mask(input_tensor, mode="dense")
@@ -825,7 +982,9 @@ class TestMask:
     def test_full_mask_apply_inv_mask_no_op(self):
         """Test that apply_inv_mask() is a no-op for full masks."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         input_tensor = torch.randn(shape)
         result = full_mask.apply_inv_mask(input_tensor, mode="dense")
@@ -837,19 +996,25 @@ class TestMask:
     def test_full_mask_is_empty_false(self):
         """Test that is_empty() returns False for full masks."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         assert not full_mask.is_empty
 
     def test_full_mask_merge_optimization(self):
         """Test merge_mask() optimization when one mask is full."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Create a partial mask
         partial_mask = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         # Merge full with partial - result should be full
         merged1 = full_mask.merge_mask(partial_mask, inplace=False, mode="dense")
@@ -866,12 +1031,16 @@ class TestMask:
     def test_full_mask_merge_inplace_optimization(self):
         """Test in-place merge optimization with full masks."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Create a partial mask
         partial_mask = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, 0.0, 0.5], [0.0, 0.8, 0.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         # In-place merge with full mask
         original_id = id(partial_mask)
@@ -891,11 +1060,15 @@ class TestMask:
 
         # Create two masks that together cover all positions with 1.0
         mask1 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[1.0, 0.0, 1.0], [1.0, 0.0, 1.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[1.0, 0.0, 1.0], [1.0, 0.0, 1.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
         mask2 = Mask.create_mask_from_dense_mask(
-            shape, torch.tensor([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32)
-        , dtype=torch.float32)
+            shape,
+            torch.tensor([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32),
+            dtype=torch.float32,
+        )
 
         # Merge should detect the result is full
         merged = mask1.merge_mask(mask2, inplace=False, mode="dense")
@@ -904,7 +1077,9 @@ class TestMask:
     def test_full_mask_repr(self):
         """Test string representation includes is_full flag."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         repr_str = repr(full_mask)
         assert "is_full=True" in repr_str
@@ -913,7 +1088,9 @@ class TestMask:
     def test_full_mask_multidimensional(self):
         """Test full mask functionality with multi-dimensional tensors."""
         shape = (2, 3, 4)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Test basic properties
         assert full_mask.shape == shape
@@ -938,7 +1115,9 @@ class TestMask:
     def test_full_mask_device_consistency(self):
         """Test full mask device consistency."""
         shape = (2, 3)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Test get_dense_mask device
         dense = full_mask.get_dense_mask()
@@ -955,7 +1134,9 @@ class TestMask:
         """Test full mask edge cases."""
         # Single element mask
         shape = (1, 1)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         assert full_mask.is_full_mask()
 
         dense = full_mask.get_dense_mask()
@@ -964,7 +1145,9 @@ class TestMask:
 
         # Large shape
         shape = (10, 20)
-        full_mask = Mask.create_full_mask(shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         assert full_mask.is_full_mask()
 
         # Apply mask should still be no-op
@@ -981,7 +1164,9 @@ class TestMask:
         shape = (0, 5)
         try:
             empty_tensor = torch.ones(shape)
-            mask = Mask.create_mask_from_dense_mask(shape, empty_tensor, dtype=torch.float32)
+            mask = Mask.create_mask_from_dense_mask(
+                shape, empty_tensor, dtype=torch.float32
+            )
             # Should handle gracefully
         except Exception:
             # If it fails, that's also acceptable for edge cases
@@ -1001,13 +1186,15 @@ class TestMask:
 
     def test_create_from_row_wise_idx_sparse_dense_equivalence(self):
         """Stress test to ensure sparse and dense modes produce identical results."""
-        print("\n" + "="*80)
-        print("Stress Testing: create_from_row_wise_idx - Sparse vs Dense Mode Equivalence")
-        print("="*80)
-        
+        print("\n" + "=" * 80)
+        print(
+            "Stress Testing: create_from_row_wise_idx - Sparse vs Dense Mode Equivalence"
+        )
+        print("=" * 80)
+
         test_cases_passed: int = 0
         test_cases_total: int = 0
-        
+
         # Test configuration matrix
         test_configs: list = [
             # (shape, k, description)
@@ -1019,164 +1206,237 @@ class TestMask:
             ((4, 8, 16, 32), 6, "Small 4D"),
             ((2, 4, 8, 64), 16, "Medium 4D"),
         ]
-        
+
         # Test different mask types
         mask_types: list = ["dense", "index"]
-        
+
         # Test different dtypes
         dtypes: list = [torch.float32, torch.float64]
-        
+
         for shape, k, desc in test_configs:
             n: int = shape[-1]
             batch_dims: tuple = shape[:-1]
-            
+
             for mask_type in mask_types:
                 for dtype in dtypes:
                     test_cases_total += 1
-                    
+
                     # Generate random row-wise indices
                     row_wise_idx: torch.Tensor = torch.randint(
                         0, n, size=batch_dims + (k,), dtype=torch.long
                     )
-                    
+
                     # Generate random data values
                     data: torch.Tensor = torch.rand(batch_dims + (k,), dtype=dtype)
-                    
+
                     # Create mask using sparse mode
                     mask_sparse: Mask = Mask.create_from_row_wise_idx(
-                        shape, row_wise_idx, data, 
-                        mask_type=mask_type, 
-                        dtype=dtype, 
-                        mode="sparse"
+                        shape,
+                        row_wise_idx,
+                        data,
+                        mask_type=mask_type,
+                        dtype=dtype,
+                        mode="sparse",
                     )
-                    
+
                     # Create mask using dense mode
                     mask_dense: Mask = Mask.create_from_row_wise_idx(
-                        shape, row_wise_idx, data, 
-                        mask_type=mask_type, 
-                        dtype=dtype, 
-                        mode="dense"
+                        shape,
+                        row_wise_idx,
+                        data,
+                        mask_type=mask_type,
+                        dtype=dtype,
+                        mode="dense",
                     )
-                    
+
                     # Compare dense representations (most reliable comparison)
                     dense_mask_sparse: torch.Tensor = mask_sparse.get_dense_mask()
                     dense_mask_dense: torch.Tensor = mask_dense.get_dense_mask()
-                    
+
                     # Verify they are identical
-                    if not torch.allclose(dense_mask_sparse, dense_mask_dense, rtol=1e-5, atol=1e-7):
+                    if not torch.allclose(
+                        dense_mask_sparse, dense_mask_dense, rtol=1e-5, atol=1e-7
+                    ):
                         print(f"❌ FAILED: {desc}, mask_type={mask_type}, dtype={dtype}")
-                        print(f"   Max diff: {(dense_mask_sparse - dense_mask_dense).abs().max().item()}")
-                        assert False, f"Sparse and dense modes produce different results for {desc}"
-                    
+                        print(
+                            f"   Max diff: {(dense_mask_sparse - dense_mask_dense).abs().max().item()}"
+                        )
+                        assert (
+                            False
+                        ), f"Sparse and dense modes produce different results for {desc}"
+
                     # Note: We don't compare index representations directly because:
                     # - Sparse mode creates index representation directly from row_wise_idx
                     # - Dense mode creates dense mask first (which handles duplicates via scatter_),
                     #   then converts to index (extracting non-zero elements)
                     # - With random indices, duplicates can occur, leading to different index counts
                     # - The important thing is that the dense representations match (which they do!)
-                    
+
                     test_cases_passed += 1
-        
+
         print(f"\n✅ All {test_cases_passed}/{test_cases_total} test cases passed!")
-        print(f"   Tested configurations: {len(test_configs)} shapes × {len(mask_types)} mask types × {len(dtypes)} dtypes")
-        print("="*80 + "\n")
+        print(
+            f"   Tested configurations: {len(test_configs)} shapes × {len(mask_types)} mask types × {len(dtypes)} dtypes"
+        )
+        print("=" * 80 + "\n")
 
     def test_create_from_row_wise_idx_sparse_dense_edge_cases(self):
         """Test edge cases for sparse vs dense mode equivalence."""
         # Set seed for reproducibility
         torch.manual_seed(42)
-        
-        print("\n" + "="*80)
+
+        print("\n" + "=" * 80)
         print("Edge Case Testing: create_from_row_wise_idx - Sparse vs Dense Mode")
-        print("="*80)
-        
+        print("=" * 80)
+
         # Edge Case 1: Single element per row
         print("\nTest 1: Single element per row")
         shape: tuple = (10, 50)
-        row_wise_idx: torch.Tensor = torch.randint(0, 50, size=(10, 1), dtype=torch.long)
+        row_wise_idx: torch.Tensor = torch.randint(
+            0, 50, size=(10, 1), dtype=torch.long
+        )
         data: torch.Tensor = torch.rand(10, 1, dtype=torch.float32)
-        
+
         mask_sparse: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="sparse"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            mode="sparse",
         )
         mask_dense: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="dense"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            mode="dense",
         )
-        
+
         assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask())
         print("   ✅ Passed")
-        
+
         # Edge Case 2: Many elements per row (high density)
         print("\nTest 2: High density (90% of elements)")
         shape: tuple = (5, 100)
         k: int = 90
-        row_wise_idx: torch.Tensor = torch.stack([
-            torch.randperm(100)[:k] for _ in range(5)
-        ])
+        row_wise_idx: torch.Tensor = torch.stack(
+            [torch.randperm(100)[:k] for _ in range(5)]
+        )
         data: torch.Tensor = torch.rand(5, k, dtype=torch.float32)
-        
+
         mask_sparse: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="sparse"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="index",
+            dtype=torch.float32,
+            mode="sparse",
         )
         mask_dense: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="dense"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="index",
+            dtype=torch.float32,
+            mode="dense",
         )
-        
+
         assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask())
         print("   ✅ Passed")
-        
+
         # Edge Case 3: Duplicate indices (last value should win)
         print("\nTest 3: Duplicate indices (scatter_ behavior)")
         shape: tuple = (2, 10)
         row_wise_idx: torch.Tensor = torch.tensor([[0, 0, 0], [5, 5, 5]])
         data: torch.Tensor = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-        
+
         mask_sparse: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="sparse"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            mode="sparse",
         )
         mask_dense: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="dense"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            mode="dense",
         )
-        
+
         # Both should have the last value at the duplicate index
         dense_sparse: torch.Tensor = mask_sparse.get_dense_mask()
         dense_dense: torch.Tensor = mask_dense.get_dense_mask()
-        
+
         assert torch.allclose(dense_sparse, dense_dense)
         print("   ✅ Passed")
-        
+
         # Edge Case 4: Very large batch dimensions
         print("\nTest 4: Large batch dimensions")
         shape: tuple = (32, 32, 32, 128)
         k: int = 64
-        row_wise_idx: torch.Tensor = torch.randint(0, shape[-1], size=shape[:-1] + (k,), dtype=torch.long)
+        row_wise_idx: torch.Tensor = torch.randint(
+            0, shape[-1], size=shape[:-1] + (k,), dtype=torch.long
+        )
         data: torch.Tensor = torch.rand(shape[:-1] + (k,), dtype=torch.float32)
-        
+
         mask_sparse: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="sparse"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="index",
+            dtype=torch.float32,
+            mode="sparse",
         )
         mask_dense: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="dense"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float32,
+            mode="dense",
         )
-        
+
         assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask())
         print("   ✅ Passed")
-        
+
         # Edge Case 5: Small values near zero
         print("\nTest 5: Small values near zero")
         shape: tuple = (5, 20)
         row_wise_idx: torch.Tensor = torch.randint(0, 20, size=(5, 3), dtype=torch.long)
-        data: torch.Tensor = torch.randn(5, 3, dtype=torch.float64) * 1e-8  # Very small values
-        
+        data: torch.Tensor = (
+            torch.randn(5, 3, dtype=torch.float64) * 1e-8
+        )  # Very small values
+
         mask_sparse: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float64, mode="sparse"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float64,
+            mode="sparse",
         )
         mask_dense: Mask = Mask.create_from_row_wise_idx(
-            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float64, mode="dense"
+            shape,
+            row_wise_idx,
+            data,
+            mask_type="dense",
+            dtype=torch.float64,
+            mode="dense",
         )
-        
-        assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask(), rtol=1e-10, atol=1e-15)
+
+        assert torch.allclose(
+            mask_sparse.get_dense_mask(),
+            mask_dense.get_dense_mask(),
+            rtol=1e-10,
+            atol=1e-15,
+        )
         print("   ✅ Passed")
-        
+
         print("\n✅ All edge case tests passed!")
-        print("="*80 + "\n")
+        print("=" * 80 + "\n")

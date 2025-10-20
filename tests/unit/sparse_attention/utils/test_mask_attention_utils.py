@@ -39,7 +39,9 @@ class TestApplyInvMaskSum:
 
     def test_full_mask(self, sample_tensor):
         """Test with full mask."""
-        full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = apply_inv_mask_sum(sample_tensor, full_mask)
 
@@ -49,7 +51,9 @@ class TestApplyInvMaskSum:
 
     def test_empty_mask(self, sample_tensor):
         """Test with empty mask."""
-        empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu"))
+        empty_mask = Mask.create_empty_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = apply_inv_mask_sum(sample_tensor, empty_mask)
         # empty and full have to behavethe same
@@ -97,7 +101,9 @@ class TestApplyInvMaskSum:
 
     def test_shape_mismatch(self, sample_tensor):
         """Test with shape mismatch."""
-        wrong_shape_mask = Mask.create_full_mask((2, 4, 8, 8), dtype=torch.float32, device=torch.device("cpu"))
+        wrong_shape_mask = Mask.create_full_mask(
+            (2, 4, 8, 8), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         with pytest.raises(ValueError, match="input_tensor.shape must be"):
             apply_inv_mask_sum(sample_tensor, wrong_shape_mask)
@@ -107,7 +113,9 @@ class TestApplyInvMaskSum:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         sample_tensor = sample_tensor.to(device)
 
-        full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32, device=device)
+        full_mask = Mask.create_full_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=device
+        )
 
         result = apply_inv_mask_sum(sample_tensor, full_mask)
 
@@ -116,7 +124,9 @@ class TestApplyInvMaskSum:
     def test_dtype_consistency(self, sample_tensor):
         """Test dtype consistency."""
         sample_tensor = sample_tensor.to(torch.float64)
-        full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float64, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            (2, 4, 8, 16), dtype=torch.float64, device=torch.device("cpu")
+        )
 
         result = apply_inv_mask_sum(sample_tensor, full_mask)
 
@@ -368,7 +378,11 @@ class TestMaskExpWts:
         keys = torch.randn(batch_size, num_heads, seq_len, d_model)
 
         # Test case 1: No attention mask, empty sparse mask
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         result = _compute_masked_exp_attention_weights(
             queries=queries,
@@ -408,7 +422,11 @@ class TestMaskExpWts:
             .expand(batch_size, num_heads, -1, -1)
         )
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         result = _compute_masked_exp_attention_weights(
             queries=queries,
@@ -447,8 +465,8 @@ class TestMaskExpWts:
         )  # assign weights
         dense_mask = dense_mask.float()
         sparse_attention_mask = Mask.create_mask_from_dense_mask(
-            (batch_size, num_heads, seq_len, seq_len), dense_mask
-        , dtype=torch.float32)
+            (batch_size, num_heads, seq_len, seq_len), dense_mask, dtype=torch.float32
+        )
 
         result = _compute_masked_exp_attention_weights(
             queries=queries,
@@ -505,8 +523,8 @@ class TestMaskExpWts:
         )  # assign weights
         dense_mask = dense_mask.float()
         sparse_attention_mask = Mask.create_mask_from_dense_mask(
-            (batch_size, num_heads, seq_len, seq_len), dense_mask
-        , dtype=torch.float32)
+            (batch_size, num_heads, seq_len, seq_len), dense_mask, dtype=torch.float32
+        )
 
         result = _compute_masked_exp_attention_weights(
             queries=queries,
@@ -550,7 +568,11 @@ class TestMaskExpWts:
         queries = torch.randn(batch_size, num_heads, seq_len, d_model)
         keys = torch.randn(batch_size, num_heads, seq_len, d_model)
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         # Test with different scaling factors
         scaling_factors = [0.1, 0.2, 0.3]
@@ -599,7 +621,11 @@ class TestGetAttentionDenominator:
         attention_mask = torch.randn(batch_size, num_heads, seq_len, seq_len)
 
         # Create a sparse attention mask (random pattern)
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         module = torch.nn.Module()
         module.eval()
@@ -660,8 +686,8 @@ class TestGetAttentionNumerator:
         )  # assign weights
         dense_mask = dense_mask.float()
         sparse_attention_mask = Mask.create_mask_from_dense_mask(
-            (batch_size, num_heads, seq_len, seq_len), dense_mask
-        , dtype=torch.float32)
+            (batch_size, num_heads, seq_len, seq_len), dense_mask, dtype=torch.float32
+        )
 
         with mock.patch(
             "sparse_attention_hub.sparse_attention.utils.mask_attention_utils._compute_masked_exp_attention_weights"
@@ -708,7 +734,11 @@ class TestGetMaskedAttentionOutputExternal:
         keys = torch.randn(batch_size, num_kv_heads, seq_len_kv, d_model)
         values = torch.randn(batch_size, num_kv_heads, seq_len_kv, d_model)
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_q_heads, seq_len_q, seq_len_kv), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_q_heads, seq_len_q, seq_len_kv),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         # Create attention mask (lower triangular for causal attention)
         attention_mask = torch.triu(
@@ -764,7 +794,11 @@ class TestGetMaskedAttentionOutputExternal:
         keys = torch.randn(batch_size, num_kv_heads, seq_len, d_model)
         values = torch.randn(batch_size, num_kv_heads, seq_len, d_model)
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_q_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_q_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         # Create attention mask (lower triangular for causal attention)
         attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
@@ -815,7 +849,11 @@ class TestGetMaskedAttentionOutputExternal:
         keys = torch.randn(batch_size, num_heads, seq_len, d_model)
         values = torch.randn(batch_size, num_heads, seq_len, d_model)
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         # Create attention mask (lower triangular for causal attention)
         attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
@@ -867,7 +905,11 @@ class TestGetMaskedAttentionOutputExternal:
         keys = torch.randn(batch_size, num_heads, seq_len, d_model)
         values = torch.randn(batch_size, num_heads, seq_len, d_model)
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         # Create attention mask (lower triangular for causal attention)
         attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
@@ -918,7 +960,11 @@ class TestGetMaskedAttentionOutputExternal:
         keys = torch.randn(batch_size, num_heads, seq_len, d_model)
         values = torch.randn(batch_size, num_heads, seq_len, d_model)
 
-        sparse_attention_mask = Mask.create_empty_mask((batch_size, num_heads, seq_len, seq_len), dtype=torch.float32, device=torch.device("cpu"))
+        sparse_attention_mask = Mask.create_empty_mask(
+            (batch_size, num_heads, seq_len, seq_len),
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
 
         # Create attention mask (lower triangular for causal attention)
         attention_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)

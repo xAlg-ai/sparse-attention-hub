@@ -46,7 +46,10 @@ class TestLongContextTiming:
 
     @pytest.fixture
     def sparse_mask_10_percent(
-        self, long_context_shape: Tuple[int, int, int, int], device: torch.device, dtype: torch.dtype
+        self,
+        long_context_shape: Tuple[int, int, int, int],
+        device: torch.device,
+        dtype: torch.dtype,
     ) -> Mask:
         """Create a mask with 10% sparsity (90% of values are non-zero)."""
         torch.manual_seed(42)
@@ -57,7 +60,10 @@ class TestLongContextTiming:
 
     @pytest.fixture
     def sparse_mask_50_percent(
-        self, long_context_shape: Tuple[int, int, int, int], device: torch.device, dtype: torch.dtype
+        self,
+        long_context_shape: Tuple[int, int, int, int],
+        device: torch.device,
+        dtype: torch.dtype,
     ) -> Mask:
         """Create a mask with 50% sparsity (50% of values are non-zero)."""
         torch.manual_seed(43)
@@ -68,7 +74,10 @@ class TestLongContextTiming:
 
     @pytest.fixture
     def sparse_mask_90_percent(
-        self, long_context_shape: Tuple[int, int, int, int], device: torch.device, dtype: torch.dtype
+        self,
+        long_context_shape: Tuple[int, int, int, int],
+        device: torch.device,
+        dtype: torch.dtype,
     ) -> Mask:
         """Create a mask with 90% sparsity (10% of values are non-zero)."""
         torch.manual_seed(44)
@@ -79,11 +88,11 @@ class TestLongContextTiming:
 
     def _prepare_mask_for_mode(self, mask: Mask, mode: str) -> Mask:
         """Prepare mask in the appropriate internal representation for the given mode.
-        
+
         Args:
             mask: The mask to prepare
             mode: "sparse" or "dense"
-            
+
         Returns:
             Mask in the appropriate representation
         """
@@ -116,7 +125,7 @@ class TestLongContextTiming:
         benchmark_iterations: int = 100,
     ) -> Dict[str, float]:
         """Benchmark an operation in both sparse and dense modes.
-        
+
         Args:
             operation_name: Name of the operation being benchmarked
             mask: The mask to use (will be prepared in appropriate representation)
@@ -124,18 +133,18 @@ class TestLongContextTiming:
             dense_fn: Function to execute dense operation (receives dense-prepared mask)
             warmup_iterations: Number of warmup iterations
             benchmark_iterations: Number of benchmark iterations
-            
+
         Returns:
             Dictionary with timing results and speedup information
         """
         # Prepare masks in appropriate representations
         sparse_mask: Mask = self._prepare_mask_for_mode(mask, "sparse")
         dense_mask: Mask = self._prepare_mask_for_mode(mask, "dense")
-        
+
         # Warmup for sparse
         for _ in range(warmup_iterations):
             sparse_fn(sparse_mask)
-        
+
         # Benchmark sparse
         if torch.cuda.is_available():
             torch.cuda.synchronize()
@@ -149,7 +158,7 @@ class TestLongContextTiming:
         # Warmup for dense
         for _ in range(warmup_iterations):
             dense_fn(dense_mask)
-        
+
         # Benchmark dense
         if torch.cuda.is_available():
             torch.cuda.synchronize()
@@ -193,7 +202,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_apply_mask_timing_50_percent_sparsity(
@@ -219,7 +230,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_apply_mask_timing_90_percent_sparsity(
@@ -245,7 +258,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_apply_inv_mask_timing_10_percent_sparsity(
@@ -271,7 +286,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_apply_inv_mask_timing_50_percent_sparsity(
@@ -297,7 +314,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_apply_inv_mask_timing_90_percent_sparsity(
@@ -323,7 +342,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_merge_mask_timing_10_percent_sparsity(
@@ -337,8 +358,10 @@ class TestLongContextTiming:
         torch.manual_seed(45)
         shape: Tuple[int, ...] = long_context_shape
         mask_tensor: torch.Tensor = (torch.rand(shape, device=device) > 0.15).to(dtype)
-        other_mask_base: Mask = Mask.create_mask_from_dense_mask(shape, mask_tensor, dtype=dtype)
-        
+        other_mask_base: Mask = Mask.create_mask_from_dense_mask(
+            shape, mask_tensor, dtype=dtype
+        )
+
         # Prepare other_mask in both representations
         other_mask_sparse: Mask = self._prepare_mask_for_mode(other_mask_base, "sparse")
         other_mask_dense: Mask = self._prepare_mask_for_mode(other_mask_base, "dense")
@@ -346,7 +369,9 @@ class TestLongContextTiming:
         results: Dict[str, float] = self._benchmark_operation(
             "merge_mask (10% sparsity)",
             sparse_mask_10_percent,
-            lambda mask: mask.merge_mask(other_mask_sparse, inplace=False, mode="sparse"),
+            lambda mask: mask.merge_mask(
+                other_mask_sparse, inplace=False, mode="sparse"
+            ),
             lambda mask: mask.merge_mask(other_mask_dense, inplace=False, mode="dense"),
         )
 
@@ -354,7 +379,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_merge_mask_timing_50_percent_sparsity(
@@ -368,8 +395,10 @@ class TestLongContextTiming:
         torch.manual_seed(46)
         shape: Tuple[int, ...] = long_context_shape
         mask_tensor: torch.Tensor = (torch.rand(shape, device=device) > 0.5).to(dtype)
-        other_mask_base: Mask = Mask.create_mask_from_dense_mask(shape, mask_tensor, dtype=dtype)
-        
+        other_mask_base: Mask = Mask.create_mask_from_dense_mask(
+            shape, mask_tensor, dtype=dtype
+        )
+
         # Prepare other_mask in both representations
         other_mask_sparse: Mask = self._prepare_mask_for_mode(other_mask_base, "sparse")
         other_mask_dense: Mask = self._prepare_mask_for_mode(other_mask_base, "dense")
@@ -377,7 +406,9 @@ class TestLongContextTiming:
         results: Dict[str, float] = self._benchmark_operation(
             "merge_mask (50% sparsity)",
             sparse_mask_50_percent,
-            lambda mask: mask.merge_mask(other_mask_sparse, inplace=False, mode="sparse"),
+            lambda mask: mask.merge_mask(
+                other_mask_sparse, inplace=False, mode="sparse"
+            ),
             lambda mask: mask.merge_mask(other_mask_dense, inplace=False, mode="dense"),
         )
 
@@ -385,7 +416,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_merge_mask_timing_90_percent_sparsity(
@@ -399,8 +432,10 @@ class TestLongContextTiming:
         torch.manual_seed(47)
         shape: Tuple[int, ...] = long_context_shape
         mask_tensor: torch.Tensor = (torch.rand(shape, device=device) > 0.9).to(dtype)
-        other_mask_base: Mask = Mask.create_mask_from_dense_mask(shape, mask_tensor, dtype=dtype)
-        
+        other_mask_base: Mask = Mask.create_mask_from_dense_mask(
+            shape, mask_tensor, dtype=dtype
+        )
+
         # Prepare other_mask in both representations
         other_mask_sparse: Mask = self._prepare_mask_for_mode(other_mask_base, "sparse")
         other_mask_dense: Mask = self._prepare_mask_for_mode(other_mask_base, "dense")
@@ -408,7 +443,9 @@ class TestLongContextTiming:
         results: Dict[str, float] = self._benchmark_operation(
             "merge_mask (90% sparsity)",
             sparse_mask_90_percent,
-            lambda mask: mask.merge_mask(other_mask_sparse, inplace=False, mode="sparse"),
+            lambda mask: mask.merge_mask(
+                other_mask_sparse, inplace=False, mode="sparse"
+            ),
             lambda mask: mask.merge_mask(other_mask_dense, inplace=False, mode="dense"),
         )
 
@@ -416,7 +453,9 @@ class TestLongContextTiming:
         print(f"Operation: {results['operation']}")
         print(f"Sparse time: {results['sparse_time_ms']:.4f} ms")
         print(f"Dense time:  {results['dense_time_ms']:.4f} ms")
-        print(f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)")
+        print(
+            f"Speedup:     {results['speedup']:.2f}x ({results['faster_mode']} is faster)"
+        )
         print(f"{'='*70}")
 
     def test_comprehensive_timing_summary(
@@ -465,7 +504,9 @@ class TestLongContextTiming:
         print("\n" + "=" * 100)
         print("COMPREHENSIVE TIMING SUMMARY - LONG CONTEXT (B=1, H=32, Q=1, K=32768)")
         print("=" * 100)
-        print(f"{'Operation':<40} {'Sparse (ms)':<15} {'Dense (ms)':<15} {'Speedup':<10} {'Winner':<10}")
+        print(
+            f"{'Operation':<40} {'Sparse (ms)':<15} {'Dense (ms)':<15} {'Speedup':<10} {'Winner':<10}"
+        )
         print("-" * 100)
 
         for result in all_results:
@@ -493,7 +534,6 @@ class TestLongContextTiming:
         for op, counts in operation_winners.items():
             winner: str = "sparse" if counts["sparse"] > counts["dense"] else "dense"
             print(f"{op:<30} -> Default mode should be: {winner.upper()}")
-            print(f"{'':>30}    (wins {counts[winner]}/3 sparsity levels)")
+            print(f"{' ' * 30}    (wins {counts[winner]}/3 sparsity levels)")
 
         print("=" * 100 + "\n")
-

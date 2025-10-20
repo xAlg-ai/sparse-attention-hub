@@ -61,6 +61,7 @@ class TopKMaskerConfig(FixedMaskerConfig):
         if not self.heavy_size > 0:
             raise ValueError(f"heavy_size must be > 0, got {self.heavy_size}")
 
+
 class TopKMasker(FixedMasker):
     """Abstract base class for top-K maskers."""
 

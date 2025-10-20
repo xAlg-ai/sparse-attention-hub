@@ -270,7 +270,9 @@ class TestOracleTopPMaskerAddMask:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_previous_mask = Mask.create_full_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -301,7 +303,9 @@ class TestOracleTopPMaskerAddMask:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -334,7 +338,9 @@ class TestOracleTopPMaskerAddMask:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
         scores = torch.rand(batch_size, num_heads, seq_len_queries, seq_len_keys)
         with mock.patch.object(
             masker, "_compute_exp_attention_scores", return_value=scores
@@ -376,7 +382,9 @@ class TestOracleTopPMaskerAddMask:
         attention_mask = None
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -407,7 +415,9 @@ class TestOracleTopPMaskerAddMask:
         attention_mask = torch.ones(batch_size, seq_len_keys)
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -462,7 +472,9 @@ class TestOracleTopPMaskerIntegration:
             attention_mask = None
 
             mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-            empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+            empty_previous_mask = Mask.create_empty_mask(
+                mask_shape, dtype=torch.float32, device=torch.device("cpu")
+            )
 
             result = masker.add_mask(
                 keys=keys,
@@ -497,7 +509,9 @@ class TestOracleTopPMaskerIntegration:
         attention_mask_cpu = None
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask_cpu = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask_cpu = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result_cpu = masker.add_mask(
             keys=keys_cpu,
@@ -515,7 +529,9 @@ class TestOracleTopPMaskerIntegration:
         queries_gpu = queries_cpu.cuda()
         values_gpu = values_cpu.cuda()
         attention_mask_gpu = None
-        empty_previous_mask_gpu = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cuda"))
+        empty_previous_mask_gpu = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cuda")
+        )
 
         result_gpu = masker.add_mask(
             keys=keys_gpu,
