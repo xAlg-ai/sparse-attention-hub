@@ -361,7 +361,9 @@ class TestAdaptiveSamplingMasker:
         keys, queries, values, attention_mask = sample_tensors
 
         # Create a full mask
-        full_mask = Mask.create_full_mask((2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu"))
+        full_mask = Mask.create_full_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys,
@@ -381,7 +383,9 @@ class TestAdaptiveSamplingMasker:
         keys, queries, values, attention_mask = sample_tensors
 
         # Create an empty mask
-        empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu"))
+        empty_mask = Mask.create_empty_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys,
@@ -426,7 +430,9 @@ class TestAdaptiveSamplingMasker:
         values = values.to(device)
         attention_mask = attention_mask.to(device)
 
-        empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu"))
+        empty_mask = Mask.create_empty_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys,
@@ -450,7 +456,9 @@ class TestAdaptiveSamplingMasker:
         keys = keys * 1000
         queries = queries * 1000
 
-        empty_mask = Mask.create_empty_mask((2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu"))
+        empty_mask = Mask.create_empty_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys,

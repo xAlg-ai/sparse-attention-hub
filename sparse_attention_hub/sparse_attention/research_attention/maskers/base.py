@@ -142,7 +142,11 @@ class ResearchMasker(ABC):
         data: torch.Tensor = torch.ones_like(indices, dtype=dtype, device=device)
 
         return Mask.create_from_row_wise_idx(
-            shape=mask_shape, row_wise_idx=indices, data=data, mask_type="index", dtype=dtype
+            shape=mask_shape,
+            row_wise_idx=indices,
+            data=data,
+            mask_type="index",
+            dtype=dtype,
         )
 
     def _calculate_effective_size(

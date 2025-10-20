@@ -1,6 +1,6 @@
 """Utility functions for masked attention computation."""
 
-from typing import Any, Dict, Optional, Tuple, Union, Literal
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 from torch import nn
@@ -86,6 +86,7 @@ def apply_inv_mask_sum(input_tensor: torch.Tensor, mask: Mask) -> torch.Tensor:
         return input_tensor.sum(dim=-1, keepdim=True)
     result = mask.apply_inv_mask(input_tensor)
     return result.sum(dim=-1, keepdim=True)
+
 
 # TODO(is there a better dense version of this function?)
 def create_sampling_mask_with_per_head_budget(
@@ -214,9 +215,7 @@ def _compute_masked_exp_attention_weights(
     raw_attention_weights = raw_attention_weights - row_wise_max
     exp_attention_weights: torch.Tensor = torch.exp(raw_attention_weights)
 
-    exp_attention_weights = sparse_attention_mask.apply_inv_mask(
-        exp_attention_weights
-    )
+    exp_attention_weights = sparse_attention_mask.apply_inv_mask(exp_attention_weights)
 
     # Apply dropout to attention weights if specified
     if dropout > 0.0 and training:
@@ -339,8 +338,8 @@ def get_attention_numerator(
     return _get_attention_numerator(exp_attention_weights, value_states)
 
 
+# GET MASKED ATTENTION OUTPUT
 
-#################### GET MASKED ATTENTION OUTPUT ####################
 
 def get_masked_attention_output(
     module: nn.Module,

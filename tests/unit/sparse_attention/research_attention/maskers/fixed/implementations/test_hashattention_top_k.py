@@ -338,7 +338,9 @@ class TestHashAttentionTopKMaskerImplementation:
             test_tensors["seq_len_queries"],
             test_tensors["seq_len_keys"],
         )
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Test sparse_meta_data None
         with pytest.raises(ValueError, match="sparse_meta_data cannot be None"):
@@ -383,7 +385,9 @@ class TestHashAttentionTopKMaskerImplementation:
             test_tensors["seq_len_queries"],
             test_tensors["seq_len_keys"],
         )
-        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_previous_mask = Mask.create_full_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=test_tensors["keys"],
@@ -418,7 +422,9 @@ class TestHashAttentionTopKMaskerImplementation:
             large_test_tensors["seq_len_queries"],
             large_test_tensors["seq_len_keys"],
         )
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=large_test_tensors["keys"],
@@ -452,7 +458,9 @@ class TestHashAttentionTopKMaskerImplementation:
             test_tensors["seq_len_queries"],
             test_tensors["seq_len_keys"],
         )
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=test_tensors["keys"],
@@ -495,7 +503,9 @@ class TestHashAttentionTopKMaskerImplementation:
             test_tensors["seq_len_queries"],
             test_tensors["seq_len_keys"],
         )
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=test_tensors["keys"],
@@ -541,7 +551,9 @@ class TestHashAttentionTopKMaskerImplementation:
         )
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, -2:] = 1.0  # Last 2 positions
-        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data, dtype=torch.float32)
+        previous_mask = Mask.create_mask_from_dense_mask(
+            mask_shape, previous_mask_data, dtype=torch.float32
+        )
 
         result = masker.add_mask(
             keys=large_test_tensors["keys"],
@@ -593,7 +605,9 @@ class TestHashAttentionTopKMaskerImplementation:
             test_tensors["seq_len_queries"],
             test_tensors["seq_len_keys"],
         )
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # First call - should initialize cache
         sparse_meta_data = {}
@@ -661,7 +675,9 @@ class TestHashAttentionTopKMaskerImplementation:
             test_tensors["seq_len_queries"],
             test_tensors["seq_len_keys"],
         )
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         # Should work without errors for all activation functions
         result = masker.add_mask(

@@ -88,7 +88,9 @@ class TestLocalMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_previous_mask = Mask.create_full_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -124,7 +126,9 @@ class TestLocalMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -160,7 +164,9 @@ class TestLocalMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -215,7 +221,9 @@ class TestLocalMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -269,7 +277,9 @@ class TestLocalMaskerImplementation:
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
         previous_mask_data = torch.zeros(mask_shape)
         previous_mask_data[:, :, :, :2] = 1.0  # First 2 positions
-        previous_mask = Mask.create_mask_from_dense_mask(mask_shape, previous_mask_data, dtype=torch.float32)
+        previous_mask = Mask.create_mask_from_dense_mask(
+            mask_shape, previous_mask_data, dtype=torch.float32
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -308,7 +318,7 @@ class TestLocalMaskerImplementation:
         )
 
         with pytest.raises(ValueError, match="window_size must be > 0, got 0"):
-            config = LocalMaskerConfig(window_size=0)
+            LocalMaskerConfig(window_size=0)
 
 
 @pytest.mark.unit
@@ -441,7 +451,9 @@ class TestSinkMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_previous_mask = Mask.create_full_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -546,8 +558,12 @@ class TestBasicOldNew:
 
         # Create mock inputs
         keys: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
-        queries: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
-        values: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
+        queries: torch.Tensor = torch.randn(
+            batch_size, num_heads, seq_len_queries, head_dim
+        )
+        values: torch.Tensor = torch.randn(
+            batch_size, num_heads, seq_len_keys, head_dim
+        )
 
         # Test LocalMasker - 3 implementations
         local_config: LocalMaskerConfig = LocalMaskerConfig(window_size=4)
@@ -576,21 +592,31 @@ class TestBasicOldNew:
         empty_previous_mask_2: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
-        
+
         tensor_dims = local_masker_dense1._extract_tensor_dimensions(keys, queries)
-        effective_window_size: int = local_masker_dense1._calculate_effective_window_size(
-            tensor_dims.seq_len_keys
+        effective_window_size: int = (
+            local_masker_dense1._calculate_effective_window_size(
+                tensor_dims.seq_len_keys
+            )
         )
-        
+
         local_result_2: Mask = local_masker_dense1.get_updated_mask(
-            tensor_dims, effective_window_size, keys, empty_previous_mask_2, mode="dense1"
+            tensor_dims,
+            effective_window_size,
+            keys,
+            empty_previous_mask_2,
+            mode="dense1",
         )
-        
+
         empty_previous_mask_3: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
         local_result_3: Mask = local_masker_dense1.get_updated_mask(
-            tensor_dims, effective_window_size, keys, empty_previous_mask_3, mode="dense2"
+            tensor_dims,
+            effective_window_size,
+            keys,
+            empty_previous_mask_3,
+            mode="dense2",
         )
 
         # Convert all to dense for comparison
@@ -602,11 +628,11 @@ class TestBasicOldNew:
         assert torch.allclose(
             local_dense_1, local_dense_2, rtol=1e-5, atol=1e-5
         ), "Local implementations 1 and 2 do not match"
-        
+
         assert torch.allclose(
             local_dense_1, local_dense_3, rtol=1e-5, atol=1e-5
         ), "Local implementations 1 and 3 do not match"
-        
+
         assert torch.allclose(
             local_dense_2, local_dense_3, rtol=1e-5, atol=1e-5
         ), "Local implementations 2 and 3 do not match"
@@ -636,14 +662,18 @@ class TestBasicOldNew:
         empty_previous_mask_sink_2: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
-        
+
         tensor_dims_sink = sink_masker._extract_tensor_dimensions(keys, queries)
         effective_sink_size: int = sink_masker._calculate_effective_sink_size(
             tensor_dims_sink.seq_len_keys
         )
-        
+
         sink_result_2: Mask = sink_masker.get_updated_mask(
-            tensor_dims_sink, effective_sink_size, keys, empty_previous_mask_sink_2, mode="dense"
+            tensor_dims_sink,
+            effective_sink_size,
+            keys,
+            empty_previous_mask_sink_2,
+            mode="dense",
         )
 
         # Convert all to dense for comparison
@@ -659,7 +689,7 @@ class TestBasicOldNew:
         # Test with float window size
         local_config_float: LocalMaskerConfig = LocalMaskerConfig(window_size=0.3)
         local_masker_float: LocalMasker = LocalMasker(local_config_float)
-        
+
         empty_mask_float_1: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
@@ -669,58 +699,88 @@ class TestBasicOldNew:
         empty_mask_float_3: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
-        
+
         tensor_dims_float = local_masker_float._extract_tensor_dimensions(keys, queries)
-        effective_window_size_float: int = local_masker_float._calculate_effective_window_size(
-            tensor_dims_float.seq_len_keys
+        effective_window_size_float: int = (
+            local_masker_float._calculate_effective_window_size(
+                tensor_dims_float.seq_len_keys
+            )
         )
-        
+
         float_result_1: Mask = local_masker_float.get_updated_mask(
-            tensor_dims_float, effective_window_size_float, keys, empty_mask_float_1, mode="sparse"
+            tensor_dims_float,
+            effective_window_size_float,
+            keys,
+            empty_mask_float_1,
+            mode="sparse",
         )
         float_result_2: Mask = local_masker_float.get_updated_mask(
-            tensor_dims_float, effective_window_size_float, keys, empty_mask_float_2, mode="dense1"
+            tensor_dims_float,
+            effective_window_size_float,
+            keys,
+            empty_mask_float_2,
+            mode="dense1",
         )
         float_result_3: Mask = local_masker_float.get_updated_mask(
-            tensor_dims_float, effective_window_size_float, keys, empty_mask_float_3, mode="dense2"
+            tensor_dims_float,
+            effective_window_size_float,
+            keys,
+            empty_mask_float_3,
+            mode="dense2",
         )
-        
+
         assert torch.allclose(
-            float_result_1.get_dense_mask(), float_result_2.get_dense_mask(), rtol=1e-5, atol=1e-5
+            float_result_1.get_dense_mask(),
+            float_result_2.get_dense_mask(),
+            rtol=1e-5,
+            atol=1e-5,
         ), "Float window size: implementations 1 and 2 do not match"
-        
+
         assert torch.allclose(
-            float_result_1.get_dense_mask(), float_result_3.get_dense_mask(), rtol=1e-5, atol=1e-5
+            float_result_1.get_dense_mask(),
+            float_result_3.get_dense_mask(),
+            rtol=1e-5,
+            atol=1e-5,
         ), "Float window size: implementations 1 and 3 do not match"
 
         # Test with float sink size
         sink_config_float: SinkMaskerConfig = SinkMaskerConfig(sink_size=0.25)
         sink_masker_float: SinkMasker = SinkMasker(sink_config_float)
-        
+
         empty_mask_sink_float_1: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
         empty_mask_sink_float_2: Mask = Mask.create_empty_mask(
             mask_shape, dtype=torch.float32, device=torch.device("cpu")
         )
-        
-        tensor_dims_sink_float = sink_masker_float._extract_tensor_dimensions(keys, queries)
-        effective_sink_size_float: int = sink_masker_float._calculate_effective_sink_size(
-            tensor_dims_sink_float.seq_len_keys
+
+        tensor_dims_sink_float = sink_masker_float._extract_tensor_dimensions(
+            keys, queries
         )
-        
+        effective_sink_size_float: int = (
+            sink_masker_float._calculate_effective_sink_size(
+                tensor_dims_sink_float.seq_len_keys
+            )
+        )
+
         sink_float_result_1: Mask = sink_masker_float.get_updated_mask(
-            tensor_dims_sink_float, effective_sink_size_float, keys, 
-            empty_mask_sink_float_1, mode="sparse"
+            tensor_dims_sink_float,
+            effective_sink_size_float,
+            keys,
+            empty_mask_sink_float_1,
+            mode="sparse",
         )
         sink_float_result_2: Mask = sink_masker_float.get_updated_mask(
-            tensor_dims_sink_float, effective_sink_size_float, keys, 
-            empty_mask_sink_float_2, mode="dense"
+            tensor_dims_sink_float,
+            effective_sink_size_float,
+            keys,
+            empty_mask_sink_float_2,
+            mode="dense",
         )
-        
-        assert torch.allclose(
-            sink_float_result_1.get_dense_mask(), 
-            sink_float_result_2.get_dense_mask(), 
-            rtol=1e-5, atol=1e-5
-        ), "Float sink size: implementations do not match"
 
+        assert torch.allclose(
+            sink_float_result_1.get_dense_mask(),
+            sink_float_result_2.get_dense_mask(),
+            rtol=1e-5,
+            atol=1e-5,
+        ), "Float sink size: implementations do not match"

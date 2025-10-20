@@ -151,7 +151,9 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create full mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        full_previous_mask = Mask.create_full_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        full_previous_mask = Mask.create_full_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -190,7 +192,9 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -223,12 +227,14 @@ class TestRandomSamplingMaskerImplementation:
         )
 
         # sampling_rate=0.0 is not valid (must be > 0)
-        with pytest.raises(ValueError, match="sampling_rate must be in range \\(0, 1\\], got 0.0"):
-            config = RandomSamplingMaskerConfig(sampling_rate=0.0)
+        with pytest.raises(
+            ValueError, match="sampling_rate must be in range \\(0, 1\\], got 0.0"
+        ):
+            RandomSamplingMaskerConfig(sampling_rate=0.0)
 
     def test_random_sampling_masker_add_mask_sampling_rate_one(self):
         """Test RandomSamplingMasker with sampling_rate=1.0.
-        
+
         Note: Sampling is performed with replacement, so not all positions
         are guaranteed to be covered even with sampling_rate=1.0.
         """
@@ -252,7 +258,9 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -271,7 +279,9 @@ class TestRandomSamplingMaskerImplementation:
         assert not result.is_empty
         # Check that a high fraction of positions are covered (relaxed check)
         non_zero_fraction = (result_dense > 0).float().mean().item()
-        assert non_zero_fraction > 0.5  # Should have good coverage with sampling_rate=1.0
+        assert (
+            non_zero_fraction > 0.5
+        )  # Should have good coverage with sampling_rate=1.0
 
     def test_random_sampling_masker_add_mask_merge_with_previous(self):
         """Test that RandomSamplingMasker correctly merges with previous mask."""
@@ -343,7 +353,9 @@ class TestRandomSamplingMaskerImplementation:
 
         # Create empty mask as previous mask
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
@@ -386,7 +398,9 @@ class TestRandomSamplingMaskerImplementation:
         sparse_meta_data = {}
 
         mask_shape = (batch_size, num_heads, seq_len_queries, seq_len_keys)
-        empty_previous_mask = Mask.create_empty_mask(mask_shape, dtype=torch.float32, device=torch.device("cpu"))
+        empty_previous_mask = Mask.create_empty_mask(
+            mask_shape, dtype=torch.float32, device=torch.device("cpu")
+        )
 
         result = masker.add_mask(
             keys=keys,
