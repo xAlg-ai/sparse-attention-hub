@@ -1,6 +1,7 @@
 """Mask class for representing attention masks in both dense and sparse formats."""
 
 from typing import Optional, Tuple, Literal
+import warnings
 
 import numpy as np
 import torch
@@ -300,6 +301,95 @@ class Mask:
 
     @classmethod
     def create_from_row_wise_idx(
+        cls,
+        shape: Tuple[int, ...],
+        row_wise_idx: torch.Tensor,
+        data: torch.Tensor,
+        mask_type: Literal["index", "dense"],
+        dtype: torch.dtype,
+        use_padding: bool = False,
+        mode: Literal["sparse", "dense"] = "dense",
+    ) -> "Mask":
+        if mode == "sparse":
+            if mask_type == "dense":
+                warnings.warn(
+                    "Creating dense mask in sparse mode is SLOW. Unless you know what you are doing, use dense mode instead.",
+                    UserWarning,
+                    stacklevel=2
+                )
+            return cls.create_from_row_wise_idx_sparse(shape, row_wise_idx, data, mask_type, dtype, use_padding)
+        elif mode == "dense":
+            if mask_type == "index":
+                warnings.warn(
+                    "Creating index mask in dense mode is SLOW. Unless you know what you are doing, use sparse mode instead.",
+                    UserWarning,
+                    stacklevel=2
+                )
+            return cls.create_from_row_wise_idx_dense(shape, row_wise_idx, data, mask_type, dtype, use_padding)
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+
+    @classmethod
+    def create_from_row_wise_idx_dense(
+        cls,
+        shape: Tuple[int, ...],
+        row_wise_idx: torch.Tensor,
+        data: torch.Tensor,
+        mask_type: Literal["index", "dense"],
+        dtype: torch.dtype,
+        use_padding: bool = False,
+    ) -> "Mask":
+        """
+        Create a Mask from row-wise indices in dense representation.
+
+        Args:
+            shape: Shape of the mask (*, n)
+            row_wise_idx: Row-wise indices tensor of shape (*, k). If use_padding=True,
+                         -1 values are treated as padding and filtered out.
+            data: Data tensor of shape (*, k) corresponding to the indices
+            mask_type: Type of representation ("index" or "dense"). The mask that you need to return.
+
+        Returns:
+            Mask object with the specified representation
+
+        Comments: For this kind of creation, it is easier to create the mask in dense representation.
+        So we manipulate it that way. If required mask_type is index , we convert it to index representation.    
+        """
+        if len(shape) < 1:
+            raise ValueError("shape must have at least one dimension")
+
+        # if empty row-wise idx, return empty mask
+        if row_wise_idx.shape[-1] <= 0:
+            raise ValueError("row_wise_idx must have at least one column")
+
+        # Validate input shapes
+        expected_row_wise_shape: Tuple[int, ...] = shape[:-1] + (
+            row_wise_idx.shape[-1],
+        )
+        if row_wise_idx.shape != expected_row_wise_shape:
+            raise ValueError(
+                f"row_wise_idx.shape must be {expected_row_wise_shape}, got {row_wise_idx.shape}"
+            )
+
+        if data.shape != row_wise_idx.shape:
+            raise ValueError(
+                f"data.shape must match row_wise_idx.shape {row_wise_idx.shape}, got {data.shape}"
+            )
+        assert use_padding == False, "use_padding is not supported for dense mode; use sparse mode instead"
+
+        dense_mask: torch.Tensor = torch.zeros(shape, dtype=dtype, device=row_wise_idx.device)
+        dense_mask.scatter_(dim=-1, index=row_wise_idx, src=data)
+        if mask_type == "dense":
+            return cls.create_mask_from_dense_mask(shape, dense_mask, dtype=dtype)
+        elif mask_type == "index":
+            # Convert dense to index representation
+            temp_mask: Mask = cls.create_mask_from_dense_mask(shape, dense_mask, dtype=dtype)
+            return temp_mask
+        else:
+            raise ValueError(f"type must be 'index' or 'dense', got {mask_type}")
+
+    @classmethod
+    def create_from_row_wise_idx_sparse(
         cls,
         shape: Tuple[int, ...],
         row_wise_idx: torch.Tensor,

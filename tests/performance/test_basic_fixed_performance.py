@@ -16,29 +16,39 @@ class TestLocalMaskerPerformance:
     """Performance tests for LocalMasker implementations."""
 
     def test_local_masker_performance(self):
-        """Compare performance of 3 LocalMasker implementations."""
+        """Compare performance of 3 LocalMasker implementations: B=1, Q=1, H=32, CTX=32768."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             LocalMasker,
             LocalMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
-        # Test configurations: (batch_size, num_heads, seq_len_queries, seq_len_keys, description)
+        # Setup device
+        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"\nUsing device: {device}")
+
+        # Long context attention configuration
+        batch_size: int = 1
+        num_heads: int = 32
+        seq_len_queries: int = 1
+        seq_len_keys: int = 32768
+        
+        # Test configurations: (window_size, description)
         test_configs: list = [
-            (2, 8, 128, 512, "Small"),
-            (4, 16, 256, 1024, "Medium"),
-            (8, 32, 512, 2048, "Large"),
+            (128, "Window 128"),
+            (256, "Window 256"),
+            (512, "Window 512"),
         ]
 
-        window_size: int = 64
         num_warmup: int = 5
         num_iterations: int = 20
 
         print("\n" + "="*80)
         print("LocalMasker Performance Comparison")
+        print(f"Long Context: B={batch_size}, H={num_heads}, Q={seq_len_queries}, CTX={seq_len_keys}")
         print("="*80)
 
-        for batch_size, num_heads, seq_len_queries, seq_len_keys, desc in test_configs:
+        for window_size, desc in test_configs:
             print(f"\n{desc} Config: batch={batch_size}, heads={num_heads}, "
                   f"queries={seq_len_queries}, keys={seq_len_keys}")
             print("-" * 80)
@@ -73,22 +83,28 @@ class TestLocalMaskerPerformance:
                 # Warmup
                 for _ in range(num_warmup):
                     empty_mask: Mask = Mask.create_empty_mask(
-                        mask_shape, dtype=torch.float32, device=torch.device("cpu")
+                        mask_shape, dtype=torch.float32, device=device
                     )
                     _ = local_masker.get_updated_mask(
                         tensor_dims, effective_window_size, keys, empty_mask, mode=mode
                     )
                 
+                # Synchronize before timing
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                
                 # Actual timing
                 for _ in range(num_iterations):
                     empty_mask = Mask.create_empty_mask(
-                        mask_shape, dtype=torch.float32, device=torch.device("cpu")
+                        mask_shape, dtype=torch.float32, device=device
                     )
                     
                     start_time: float = time.perf_counter()
                     result: Mask = local_masker.get_updated_mask(
                         tensor_dims, effective_window_size, keys, empty_mask, mode=mode
                     )
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()
                     end_time: float = time.perf_counter()
                     
                     times.append(end_time - start_time)
@@ -126,38 +142,48 @@ class TestSinkMaskerPerformance:
     """Performance tests for SinkMasker implementations."""
 
     def test_sink_masker_performance(self):
-        """Compare performance of 2 SinkMasker implementations."""
+        """Compare performance of 2 SinkMasker implementations: B=1, Q=1, H=32, CTX=32768."""
         from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
             SinkMasker,
             SinkMaskerConfig,
         )
         from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
-        # Test configurations: (batch_size, num_heads, seq_len_queries, seq_len_keys, description)
+        # Setup device
+        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"\nUsing device: {device}")
+
+        # Long context attention configuration
+        batch_size: int = 1
+        num_heads: int = 32
+        seq_len_queries: int = 1
+        seq_len_keys: int = 32768
+        
+        # Test configurations: (sink_size, description)
         test_configs: list = [
-            (2, 8, 128, 512, "Small"),
-            (4, 16, 256, 1024, "Medium"),
-            (8, 32, 512, 2048, "Large"),
+            (32, "Sink 32"),
+            (64, "Sink 64"),
+            (128, "Sink 128"),
         ]
 
-        sink_size: int = 32
         num_warmup: int = 5
         num_iterations: int = 20
 
         print("\n" + "="*80)
         print("SinkMasker Performance Comparison")
+        print(f"Long Context: B={batch_size}, H={num_heads}, Q={seq_len_queries}, CTX={seq_len_keys}")
         print("="*80)
 
-        for batch_size, num_heads, seq_len_queries, seq_len_keys, desc in test_configs:
-            print(f"\n{desc} Config: batch={batch_size}, heads={num_heads}, "
-                  f"queries={seq_len_queries}, keys={seq_len_keys}")
+        for sink_size, desc in test_configs:
+            print(f"\n{desc}: batch={batch_size}, heads={num_heads}, "
+                  f"queries={seq_len_queries}, keys={seq_len_keys}, sink={sink_size}")
             print("-" * 80)
 
-            head_dim: int = 64
+            head_dim: int = 128
             
-            # Create mock inputs
-            keys: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_keys, head_dim)
-            queries: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_queries, head_dim)
+            # Create mock inputs on device
+            keys: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_keys, head_dim, device=device)
+            queries: torch.Tensor = torch.randn(batch_size, num_heads, seq_len_queries, head_dim, device=device)
             
             sink_config: SinkMaskerConfig = SinkMaskerConfig(sink_size=sink_size)
             sink_masker: SinkMasker = SinkMasker(sink_config)
@@ -183,22 +209,28 @@ class TestSinkMaskerPerformance:
                 # Warmup
                 for _ in range(num_warmup):
                     empty_mask: Mask = Mask.create_empty_mask(
-                        mask_shape, dtype=torch.float32, device=torch.device("cpu")
+                        mask_shape, dtype=torch.float32, device=device
                     )
                     _ = sink_masker.get_updated_mask(
                         tensor_dims, effective_sink_size, keys, empty_mask, mode=mode
                     )
                 
+                # Synchronize before timing
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                
                 # Actual timing
                 for _ in range(num_iterations):
                     empty_mask = Mask.create_empty_mask(
-                        mask_shape, dtype=torch.float32, device=torch.device("cpu")
+                        mask_shape, dtype=torch.float32, device=device
                     )
                     
                     start_time: float = time.perf_counter()
                     result: Mask = sink_masker.get_updated_mask(
                         tensor_dims, effective_sink_size, keys, empty_mask, mode=mode
                     )
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()
                     end_time: float = time.perf_counter()
                     
                     times.append(end_time - start_time)

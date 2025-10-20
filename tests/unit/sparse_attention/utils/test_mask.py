@@ -198,7 +198,7 @@ class TestMask:
         row_wise_idx = torch.tensor([[0, 2, 4], [1, 3, 4]])
         data = torch.tensor([[1.0, 0.5, 0.8], [0.6, 0.9, 0.3]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="index", dtype=torch.float32)
+        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="sparse")
 
         assert mask.shape == shape
         assert not mask.from_dense_mask
@@ -234,7 +234,7 @@ class TestMask:
         row_wise_idx = torch.tensor([[0, 2, -1], [1, -1, -1]])  # -1 as padding
         data = torch.tensor([[1.0, 0.5, 0.0], [0.6, 0.0, 0.0]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32)
+        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, use_padding=True, mode="sparse")
 
         dense_mask = mask.get_dense_mask()
         expected = torch.tensor([[1.0, 0.0, 0.5, 0.0, 0.0], [0.0, 0.6, 0.0, 0.0, 0.0]])
@@ -342,7 +342,7 @@ class TestMask:
         row_wise_idx = torch.tensor([[-1, -1, -1], [-1, -1, -1]])
         data = torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, use_padding=True)
+        mask = Mask.create_from_row_wise_idx(shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, use_padding=True, mode="sparse")
 
         # is_empty is set only when creating the mask empty
         #assert mask.is_empty 
@@ -998,3 +998,185 @@ class TestMask:
         almost_ones = torch.tensor([[1.0, 0.999999], [1.0, 1.0]])
         mask = Mask.create_mask_from_dense_mask(shape, almost_ones, dtype=torch.float32)
         assert not mask.is_full_mask()  # Should not be detected as full
+
+    def test_create_from_row_wise_idx_sparse_dense_equivalence(self):
+        """Stress test to ensure sparse and dense modes produce identical results."""
+        print("\n" + "="*80)
+        print("Stress Testing: create_from_row_wise_idx - Sparse vs Dense Mode Equivalence")
+        print("="*80)
+        
+        test_cases_passed: int = 0
+        test_cases_total: int = 0
+        
+        # Test configuration matrix
+        test_configs: list = [
+            # (shape, k, description)
+            ((10, 20), 5, "Small 2D"),
+            ((50, 100), 20, "Medium 2D"),
+            ((100, 200), 50, "Large 2D"),
+            ((5, 8, 16), 4, "Small 3D"),
+            ((10, 16, 32), 8, "Medium 3D"),
+            ((4, 8, 16, 32), 6, "Small 4D"),
+            ((2, 4, 8, 64), 16, "Medium 4D"),
+        ]
+        
+        # Test different mask types
+        mask_types: list = ["dense", "index"]
+        
+        # Test different dtypes
+        dtypes: list = [torch.float32, torch.float64]
+        
+        for shape, k, desc in test_configs:
+            n: int = shape[-1]
+            batch_dims: tuple = shape[:-1]
+            
+            for mask_type in mask_types:
+                for dtype in dtypes:
+                    test_cases_total += 1
+                    
+                    # Generate random row-wise indices
+                    row_wise_idx: torch.Tensor = torch.randint(
+                        0, n, size=batch_dims + (k,), dtype=torch.long
+                    )
+                    
+                    # Generate random data values
+                    data: torch.Tensor = torch.rand(batch_dims + (k,), dtype=dtype)
+                    
+                    # Create mask using sparse mode
+                    mask_sparse: Mask = Mask.create_from_row_wise_idx(
+                        shape, row_wise_idx, data, 
+                        mask_type=mask_type, 
+                        dtype=dtype, 
+                        mode="sparse"
+                    )
+                    
+                    # Create mask using dense mode
+                    mask_dense: Mask = Mask.create_from_row_wise_idx(
+                        shape, row_wise_idx, data, 
+                        mask_type=mask_type, 
+                        dtype=dtype, 
+                        mode="dense"
+                    )
+                    
+                    # Compare dense representations (most reliable comparison)
+                    dense_mask_sparse: torch.Tensor = mask_sparse.get_dense_mask()
+                    dense_mask_dense: torch.Tensor = mask_dense.get_dense_mask()
+                    
+                    # Verify they are identical
+                    if not torch.allclose(dense_mask_sparse, dense_mask_dense, rtol=1e-5, atol=1e-7):
+                        print(f"❌ FAILED: {desc}, mask_type={mask_type}, dtype={dtype}")
+                        print(f"   Max diff: {(dense_mask_sparse - dense_mask_dense).abs().max().item()}")
+                        assert False, f"Sparse and dense modes produce different results for {desc}"
+                    
+                    # Note: We don't compare index representations directly because:
+                    # - Sparse mode creates index representation directly from row_wise_idx
+                    # - Dense mode creates dense mask first (which handles duplicates via scatter_),
+                    #   then converts to index (extracting non-zero elements)
+                    # - With random indices, duplicates can occur, leading to different index counts
+                    # - The important thing is that the dense representations match (which they do!)
+                    
+                    test_cases_passed += 1
+        
+        print(f"\n✅ All {test_cases_passed}/{test_cases_total} test cases passed!")
+        print(f"   Tested configurations: {len(test_configs)} shapes × {len(mask_types)} mask types × {len(dtypes)} dtypes")
+        print("="*80 + "\n")
+
+    def test_create_from_row_wise_idx_sparse_dense_edge_cases(self):
+        """Test edge cases for sparse vs dense mode equivalence."""
+        # Set seed for reproducibility
+        torch.manual_seed(42)
+        
+        print("\n" + "="*80)
+        print("Edge Case Testing: create_from_row_wise_idx - Sparse vs Dense Mode")
+        print("="*80)
+        
+        # Edge Case 1: Single element per row
+        print("\nTest 1: Single element per row")
+        shape: tuple = (10, 50)
+        row_wise_idx: torch.Tensor = torch.randint(0, 50, size=(10, 1), dtype=torch.long)
+        data: torch.Tensor = torch.rand(10, 1, dtype=torch.float32)
+        
+        mask_sparse: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="sparse"
+        )
+        mask_dense: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="dense"
+        )
+        
+        assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask())
+        print("   ✅ Passed")
+        
+        # Edge Case 2: Many elements per row (high density)
+        print("\nTest 2: High density (90% of elements)")
+        shape: tuple = (5, 100)
+        k: int = 90
+        row_wise_idx: torch.Tensor = torch.stack([
+            torch.randperm(100)[:k] for _ in range(5)
+        ])
+        data: torch.Tensor = torch.rand(5, k, dtype=torch.float32)
+        
+        mask_sparse: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="sparse"
+        )
+        mask_dense: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="dense"
+        )
+        
+        assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask())
+        print("   ✅ Passed")
+        
+        # Edge Case 3: Duplicate indices (last value should win)
+        print("\nTest 3: Duplicate indices (scatter_ behavior)")
+        shape: tuple = (2, 10)
+        row_wise_idx: torch.Tensor = torch.tensor([[0, 0, 0], [5, 5, 5]])
+        data: torch.Tensor = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        
+        mask_sparse: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="sparse"
+        )
+        mask_dense: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="dense"
+        )
+        
+        # Both should have the last value at the duplicate index
+        dense_sparse: torch.Tensor = mask_sparse.get_dense_mask()
+        dense_dense: torch.Tensor = mask_dense.get_dense_mask()
+        
+        assert torch.allclose(dense_sparse, dense_dense)
+        print("   ✅ Passed")
+        
+        # Edge Case 4: Very large batch dimensions
+        print("\nTest 4: Large batch dimensions")
+        shape: tuple = (32, 32, 32, 128)
+        k: int = 64
+        row_wise_idx: torch.Tensor = torch.randint(0, shape[-1], size=shape[:-1] + (k,), dtype=torch.long)
+        data: torch.Tensor = torch.rand(shape[:-1] + (k,), dtype=torch.float32)
+        
+        mask_sparse: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="index", dtype=torch.float32, mode="sparse"
+        )
+        mask_dense: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float32, mode="dense"
+        )
+        
+        assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask())
+        print("   ✅ Passed")
+        
+        # Edge Case 5: Small values near zero
+        print("\nTest 5: Small values near zero")
+        shape: tuple = (5, 20)
+        row_wise_idx: torch.Tensor = torch.randint(0, 20, size=(5, 3), dtype=torch.long)
+        data: torch.Tensor = torch.randn(5, 3, dtype=torch.float64) * 1e-8  # Very small values
+        
+        mask_sparse: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float64, mode="sparse"
+        )
+        mask_dense: Mask = Mask.create_from_row_wise_idx(
+            shape, row_wise_idx, data, mask_type="dense", dtype=torch.float64, mode="dense"
+        )
+        
+        assert torch.allclose(mask_sparse.get_dense_mask(), mask_dense.get_dense_mask(), rtol=1e-10, atol=1e-15)
+        print("   ✅ Passed")
+        
+        print("\n✅ All edge case tests passed!")
+        print("="*80 + "\n")
