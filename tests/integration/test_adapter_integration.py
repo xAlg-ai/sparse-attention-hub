@@ -39,7 +39,7 @@ def sparse_attention_config_multi():
 @pytest.fixture
 def model_name():
     """Model name for testing."""
-    return "meta-llama/Llama-3.2-1B"
+    return "Qwen/Qwen3-1.7B"
 
 
 class TestAdapterIntegration:
@@ -576,7 +576,7 @@ class TestAdapterManual:
         """Test enable_sparse_mode with real model."""
         from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
         from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
-        from transformers.models.llama.modeling_llama import LlamaAttention
+        from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
 
         adapter = ModelAdapterHF(
             model_name=model_name,
@@ -585,7 +585,7 @@ class TestAdapterManual:
         )
 
         for name, module in adapter.model.named_modules():
-            if isinstance(module, LlamaAttention):
+            if isinstance(module, Qwen3Attention):
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
@@ -594,7 +594,7 @@ class TestAdapterManual:
         with adapter.enable_sparse_mode():
             # Should not raise any errors - sparse mode is working
             for name, module in adapter.model.named_modules():
-                if isinstance(module, LlamaAttention):
+                if isinstance(module, Qwen3Attention):
                     assert (
                         module.config._attn_implementation
                         == adapter._registered_attention_name
@@ -612,14 +612,14 @@ class TestAdapterManual:
         )
 
         for name, module in adapter.model.named_modules():
-            if isinstance(module, LlamaAttention):
+            if isinstance(module, Qwen3Attention):
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
 
         # Test dense mode (default mode after exiting sparse mode)
         for name, module in adapter.model.named_modules():
-            if isinstance(module, LlamaAttention):
+            if isinstance(module, Qwen3Attention):
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
