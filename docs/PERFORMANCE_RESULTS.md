@@ -116,3 +116,158 @@ The benchmark suite (`tests/performance/test_long_context_timing.py`) includes:
 
 This ensures that the benchmarks measure the true performance of the operations themselves, not conversion overhead.
 
+---
+
+# LocalMasker and SinkMasker Implementation Performance
+
+## Test Methodology
+
+- **Warmup runs**: 5 iterations per implementation
+- **Timing runs**: 20 iterations per implementation  
+- **Timing method**: `time.perf_counter()` for high-precision measurements
+- **Test configurations**: Small, Medium, and Large workloads
+- **Hardware**: CPU benchmarks
+
+## LocalMasker Performance Results
+
+Compared 3 implementations:
+1. **Sparse**: Original sparse implementation using `_create_local_mask`
+2. **Dense1 (broadcast)**: Dense implementation using broadcasting operations
+3. **Dense2 (triu)**: Dense implementation using `torch.triu_indices`
+
+### Results Summary
+
+| Config | Batch | Heads | Queries | Keys | Sparse (ms) | Dense1 (ms) | Dense2 (ms) | **Winner** | Speedup |
+|--------|-------|-------|---------|------|-------------|-------------|-------------|------------|---------|
+| Small  | 2     | 8     | 128     | 512  | 0.296       | 0.266       | **0.163**   | Dense2     | 1.81x   |
+| Medium | 4     | 16    | 256     | 1024 | 1.743       | 1.771       | **1.696**   | Dense2     | 1.03x   |
+| Large  | 8     | 32    | 512     | 2048 | 16.845      | 16.434      | **15.740**  | Dense2     | 1.07x   |
+
+### LocalMasker Recommendation
+
+**✅ Active: Dense2 (triu) - `update_core` method (DEFAULT)**
+
+- Consistently fastest across all workload sizes
+- Speedup ranges from 1.03x to 1.81x over sparse implementation
+- Most efficient for small workloads (81% improvement)
+- **Now set as default mode in `LocalMasker.add_mask()`**
+
+**Implementation:**
+```python
+def update_core(self, dense_mask: torch.Tensor, effective_window_size: int) -> torch.Tensor:
+    """Update the core of the masker using torch.triu_indices."""
+    i, j = torch.triu_indices(
+        dense_mask.shape[2], 
+        dense_mask.shape[3], 
+        dense_mask.shape[3] - dense_mask.shape[2] - effective_window_size + 1,
+        device=dense_mask.device, 
+        dtype=torch.long
+    )
+    dense_mask[..., i, j] = 1.0
+    i, j = torch.triu_indices(
+        dense_mask.shape[2], 
+        dense_mask.shape[3], 
+        dense_mask.shape[3] - dense_mask.shape[2] + 1, 
+        device=dense_mask.device
+    )
+    dense_mask[..., i, j] = 0.0
+    return dense_mask
+```
+
+## SinkMasker Performance Results
+
+Compared 2 implementations:
+1. **Sparse**: Original sparse implementation using `_create_sink_mask`
+2. **Dense**: Dense implementation with direct indexing
+
+### Results Summary
+
+| Config | Batch | Heads | Queries | Keys | Sparse (ms) | Dense (ms) | **Winner** | Speedup |
+|--------|-------|-------|---------|------|-------------|------------|------------|---------|
+| Small  | 2     | 8     | 128     | 512  | 0.254       | **0.066**  | Dense      | 3.84x   |
+| Medium | 4     | 16    | 256     | 1024 | 1.676       | **1.429**  | Dense      | 1.17x   |
+| Large  | 8     | 32    | 512     | 2048 | 13.160      | **12.102** | Dense      | 1.09x   |
+
+### SinkMasker Recommendation
+
+**✅ Active: Dense implementation - `get_updated_mask_dense` method (DEFAULT)**
+
+- Consistently fastest across all workload sizes
+- Speedup ranges from 1.09x to 3.84x over sparse implementation  
+- Exceptionally efficient for small workloads (284% improvement)
+- **Now set as default mode in `SinkMasker.add_mask()`**
+
+**Implementation:**
+```python
+def get_updated_mask_dense(
+    self, 
+    tensor_dims: AttentionTensorDimensions, 
+    effective_sink_size: int, 
+    keys: torch.Tensor, 
+    previous_mask: Mask
+) -> Mask:
+    """Dense implementation for sink masking."""
+    mask = previous_mask.get_dense_mask()
+    mask[..., :effective_sink_size] = 1.0
+    return Mask.create_mask_from_dense_mask(mask.shape, mask, previous_mask.dtype)
+```
+
+## Key Insights
+
+1. **Dense implementations outperform sparse** for both LocalMasker and SinkMasker
+2. **Small workloads benefit most** from dense implementations (up to 3.84x speedup)
+3. **torch.triu_indices is more efficient** than broadcasting for LocalMasker
+4. **Direct indexing is highly efficient** for SinkMasker's simple pattern
+
+## Running the Benchmarks
+
+To reproduce these results:
+
+```bash
+pytest tests/performance/test_basic_fixed_performance.py -v -s
+```
+
+For individual tests:
+
+```bash
+# LocalMasker performance
+pytest tests/performance/test_basic_fixed_performance.py::TestLocalMaskerPerformance::test_local_masker_performance -v -s
+
+# SinkMasker performance
+pytest tests/performance/test_basic_fixed_performance.py::TestSinkMaskerPerformance::test_sink_masker_performance -v -s
+```
+
+## Default Mode Changes
+
+Based on the performance benchmarks above, the following changes have been implemented:
+
+### LocalMasker
+- **Old default**: Sparse mode (`get_updated_mask_1`)
+- **New default**: Dense2/triu mode (`get_updated_mask_3` using `update_core`)
+- **Impact**: Up to 1.8x performance improvement
+
+Users can still explicitly use sparse mode by calling:
+```python
+# Override to use sparse mode if needed
+local_masker.get_updated_mask(..., mode="sparse")
+```
+
+### SinkMasker
+- **Old default**: Sparse mode (`get_updated_mask_sparse`)
+- **New default**: Dense mode (`get_updated_mask_dense`)
+- **Impact**: Up to 3.8x performance improvement
+
+Users can still explicitly use sparse mode by calling:
+```python
+# Override to use sparse mode if needed
+sink_masker.get_updated_mask(..., mode="sparse")
+```
+
+### Backward Compatibility
+
+The API remains fully backward compatible. Users who were explicitly specifying modes will see no changes. The performance improvements apply automatically to code using the default behavior.
+
+---
+
+*Last updated: Performance benchmarks for LocalMasker and SinkMasker implementations, with defaults updated to use fastest implementations*
+
