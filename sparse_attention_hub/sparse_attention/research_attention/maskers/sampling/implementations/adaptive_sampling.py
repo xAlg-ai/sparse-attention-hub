@@ -270,7 +270,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             row_wise_idx=base_row_wise_idx,
             data=base_data,
-            mask_type="index",
+            mask_type="dense",
             dtype=dtype,
         )
 
