@@ -183,10 +183,10 @@ class TestModelCreation:
             "use_cache": True,
             "attn_implementation": "flash_attention_2",
         }
-        self.server._create_model("llama-7b", None, kwargs)
+        self.server._create_model("qwen3-1.7b", None, kwargs)
 
         # Verify all kwargs passed through
-        mock_auto_model.from_pretrained.assert_called_once_with("llama-7b", **kwargs)
+        mock_auto_model.from_pretrained.assert_called_once_with("qwen3-1.7b", **kwargs)
 
 
 @pytest.mark.unit
