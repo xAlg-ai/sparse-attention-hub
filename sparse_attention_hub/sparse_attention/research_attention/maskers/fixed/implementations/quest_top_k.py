@@ -1,4 +1,4 @@
-"""Quest page-Top-K masker implementation (inference-time)."""
+"""Quest page-Top-K masker implementation."""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Literal, Tuple
