@@ -24,13 +24,16 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/ubuntu/sparse-attention-hub')
-sys.path.insert(0, '/home/ubuntu/sparse-attention-hub')
+os.chdir('/home/sj157/Experiments/sparse-attention-hub')
+sys.path.insert(0, '/home/sj157/Experiments/sparse-attention-hub')
 
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    DoubleSparsityTopKMaskerConfig
+    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, QuestTopKMaskerConfig
+)
+from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
+    AdaptiveSamplingMaskerConfig
 )
 
 #from benchmark.longbench import LongBench
@@ -45,13 +48,10 @@ def main():
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        DoubleSparsityTopKMaskerConfig(
-            heavy_size=4096,
-            group_factor=2,
-            label_bits=2,
-            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
-            channel_selection="q_proj"
-        )
+        SinkMaskerConfig(sink_size=128),
+        LocalMaskerConfig(window_size=128),
+        OracleTopKConfig(heavy_size=128),
+        QuestTopKMaskerConfig(heavy_size=0.05, page_size=64),
     ])
     
     print("  ✓ Loading model...")
