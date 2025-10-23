@@ -70,7 +70,9 @@ class QuestTopKMasker(TopKMasker):
         effective_heavy_size: int = self._calculate_effective_heavy_size(dims.seq_len_keys)
 
         if self._should_use_full_attention(dims, effective_heavy_size):
-            return self._create_full_mask(dims, previous_mask.dtype, previous_mask.device)
+            return self._create_full_mask(
+                dims, previous_mask.dtype, previous_mask.device
+            )
 
         return self._create_quest_page_topk_mask(
             dims,
