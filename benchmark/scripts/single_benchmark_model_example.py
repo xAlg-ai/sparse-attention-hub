@@ -11,7 +11,7 @@ This example uses the MockBenchmark (5 simple samples) for quick demonstration:
 - Fast execution for testing and learning
 
 Usage:
-    python 04_simple_benchmark_example.py
+    python simple_benchmark_example.py
 """
 
 import os
@@ -33,15 +33,16 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
     LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, QuestTopKMaskerConfig
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-    AdaptiveSamplingMaskerConfig
+    AdaptiveSamplingMaskerConfig, MagicPigConfig
 )
 
 #from benchmark.longbench import LongBench
 from benchmark.ruler32k import Ruler32K
+from benchmark.longbench.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
-    model_name = "meta-llama/Llama-3.1-8B-Instruct"
+    model_name = "lmsys/longchat-7b-v1.5-32k"
     device = 0
 
     # sorted_channel_file is available in the author's repository
@@ -49,9 +50,12 @@ def main():
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=128),
-        QuestTopKMaskerConfig(heavy_size=0.05, page_size=64),
+        LocalMaskerConfig(window_size=128), 
+        QuestTopKMaskerConfig(
+            heavy_size=0.1,
+            page_size=32
+        )
+        # OracleTopKConfig(heavy_size=0.1)
     ])
     
     print("  ✓ Loading model...")
@@ -65,21 +69,12 @@ def main():
         device=device
     )
     
-    #benchmark = LongBench(['passage_retrieval_en'])
-    benchmark = Ruler32K(['vt'])
+    benchmark = LongBench(['gov_report'])
 
     result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
-    metric_logger = MicroMetricLogger()
-    metric_logger.configure_logging(
-            log_path=result_dir,
-            enabled_metrics=[
-                "research_attention_density",
-                "research_attention_output_error",
-            ],
-        )
-    metric_logger.flush()
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 10, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
+
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 50, "max_context_length": 1000000})
     
 if __name__ == "__main__":
     main() 

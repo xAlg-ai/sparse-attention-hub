@@ -14,6 +14,7 @@ from .double_sparsity_top_k import (
 from .hashattention_top_k import HashAttentionTopKMasker, HashAttentionTopKMaskerConfig
 from .oracle_top_k import OracleTopK, OracleTopKConfig
 from .oracle_top_p import OracleTopPMasker, OracleTopPMaskerConfig
+from .quest_top_k import QuestTopKMasker, QuestTopKMaskerConfig
 from .pq_top_k import PQCache, PQCacheConfig
 
 __all__ = [
@@ -21,6 +22,8 @@ __all__ = [
     "CausalMasker",
     "SinkMasker",
     "OracleTopK",
+    "OracleTopKMasker",
+    "QuestTopKMasker",
     "OracleTopPMasker",
     "PQCache",
     "HashAttentionTopKMasker",
@@ -28,6 +31,7 @@ __all__ = [
     "LocalMaskerConfig",
     "SinkMaskerConfig",
     "OracleTopKConfig",
+    "QuestTopKMaskerConfig",
     "OracleTopPMaskerConfig",
     "PQCacheConfig",
     "HashAttentionTopKMaskerConfig",
