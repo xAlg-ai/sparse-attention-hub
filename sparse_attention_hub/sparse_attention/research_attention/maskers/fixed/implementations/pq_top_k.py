@@ -77,6 +77,9 @@ class PQCache(TopKMasker):
 
         if torch.isnan(keys).any():
             print("NaN found in layer" + str(layer_idx))
+        
+        if torch.isnan(queries).any():
+            print("NaN found in queries layer" + str(layer_idx))
 
         queries_partitioned = self._partition_vectors(queries, num_sub_vectors, dm)
         keys_partitioned = self._partition_vectors(keys, num_sub_vectors, dm)
@@ -110,8 +113,13 @@ class PQCache(TopKMasker):
         if layer_idx == 0:
             print(f"Top-k indices shape: {top_k_indices.shape}, Top-k scores shape: {top_k_scores.shape}")
         this_mask = Mask.create_from_row_wise_idx(mask_shape, top_k_indices, top_k_scores, type="index", dtype=previous_mask.dtype)
-        self._update_sparse_meta_data(sparse_meta_data, keys)
+        self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
+        if layer_idx == 0:
+            print(f"After updating meta data - sparse_meta_data['pq_codes'][0] shape: {sparse_meta_data['pq_codes'][0].shape}")
+            print(f"NaN in sparse_meta_data['pq_codes'][0]: {torch.isnan(sparse_meta_data['pq_codes'][0].float()).any()}")
         new_mask =  previous_mask.merge_mask(this_mask, inplace=False)
+        if layer_idx == 0:
+            print(f"New mask has NaN: {torch.isnan(new_mask.data).any()}")
         return new_mask
 
         
