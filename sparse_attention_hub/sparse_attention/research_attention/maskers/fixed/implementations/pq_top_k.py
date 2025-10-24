@@ -2,6 +2,10 @@
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
+from sklearn.cluster import KMeans
+import numpy as np
+
+
 
 import torch
 
@@ -51,6 +55,7 @@ class PQCache(TopKMasker):
         previous_mask: Mask,
         **kwargs: Dict[str, Any],
     ) -> Mask:
+        
 
         #print(f"Keys shape: {keys.shape}")
         pq_s = sparse_meta_data.get("pq_sequence_length")
@@ -66,155 +71,264 @@ class PQCache(TopKMasker):
         #number of sub vectors is dh / dm
         num_sub_vectors = dh // dm
         #ex was dh = 4, dm = 1, num_sub_vectors = 4 in image
-
+        mask_shape = n, h_q, lq, s
         num_centroids = 2 ** self.pq_bits
+        layer_idx = kwargs.get("layer_idx", 0)
+        queries_partitioned = self._partition_vectors(queries, num_sub_vectors, dm)
+        keys_partitioned = self._partition_vectors(keys, num_sub_vectors, dm)
+        #partition the keys, queries using helper
+
+        if "pq_centroids" not in sparse_meta_data or "pq_codes" not in sparse_meta_data:
+            sparse_meta_data["pq_centroids"] = {}
+            sparse_meta_data["pq_codes"] = {}
+            codebook, centroids = self._cluster_keys(keys_partitioned)
+            sparse_meta_data["pq_centroids"][layer_idx] = centroids
+            sparse_meta_data["pq_codes"][layer_idx] = codebook
+
+
+        assert "pq_codes" in sparse_meta_data, "pq_codes must be present if pq_centroids are present"
+        query_centroid_score = self._compute_query_centroid_score(queries, centroids = sparse_meta_data["pq_centroids"][layer_idx])
+        query_key_scores = self._compute_query_key_scores(query_centroid_score, key_codebook = sparse_meta_data["pq_codes"][layer_idx])
+        _, top_k_indices = torch.topk(query_key_scores, self.heavy_size, dim=-1)
+        this_mask = Mask.create_from_row_wise_idx(mask_shape, top_k_indices, dtype=previous_mask.dtype)
+        self._update_sparse_meta_data(sparse_meta_data, keys)
+        return previous_mask.merge_mask(this_mask, inplace=False)
+
         #clustering 
         #iterate over num_sub_vectors, extract each sub_vector, cluster it
         #assign codes and store results
-
-        #check if index built
-        if "pq_centroids" in sparse_meta_data and "pq_codes" in sparse_meta_data and sparse_meta_data["pq_sequence_length"] == keys.shape[2]:
-            pass #skip to search
-
-        else:
-            #clear index
-            sparse_meta_data.clear()
-            #partition the keys
-            
-            keys_partitioned = keys.reshape(n, h_kv, s, num_sub_vectors, dm)
-
-            #cluster separately
-            #tensors stored in shape (num_sub_vectors, num_centroids, dm)
-            #codes in tensor with shape ((batch_size, num_heads, sequence length, num_sub_vectors))
-
-            #cluster separately
-            all_centroids = torch.zeros((num_sub_vectors, num_centroids, dm), dtype=keys.dtype, device=keys.device)
-            all_codes = torch.zeros((n, h_kv, s, num_sub_vectors), dtype=torch.long, device=keys.device)    
-
-            #reshape for clustering operation flatten first three dims
-            keys_flat_for_clustering = keys_partitioned.reshape(-1, num_sub_vectors, dm)
-            #number of vectors to cluster for each sub dim in the flattened size
-            num_vectors_to_cluster = keys_flat_for_clustering.shape[0]
-
-            #loop
-            for i in range(num_sub_vectors):
-                sub_vectors_to_cluster = keys_flat_for_clustering[:, i, :] #shape num_vectors_to_cluster, dm
-                rand_indices = torch.randperm(num_vectors_to_cluster, device=keys.device)[:num_centroids]
-                centroids_i = sub_vectors_to_cluster[rand_indices]
-                #initialize centroids
-
-                #iterate for fixed number of epochs
-                for _ in range(self.kmeans_iters):
-    # Compute similarities (inner product)
-                    distances = torch.matmul(sub_vectors_to_cluster, centroids_i.T)
-                    codes_i = torch.argmax(distances, dim=1)
-    
-                    # Update centroids
-                    new_centroids = torch.zeros_like(centroids_i)
-                    
-                    for c in range(num_centroids):
-                        mask = (codes_i == c)
-                        count = mask.sum()
-                        if count > 0:
-                            new_centroids[c] = sub_vectors_to_cluster[mask].mean(dim=0)
-                        else:
-                            new_centroids[c] = centroids_i[c]
-                    
-                    centroids_i = new_centroids
-
-                all_centroids[i, :, :] = centroids_i
-                all_codes[:, :, :, i] = codes_i.reshape(n, h_kv, s)
-            
-
-            sparse_meta_data["pq_centroids"] = all_centroids
-            sparse_meta_data["pq_codes"] = all_codes
-
-            sparse_meta_data["pq_sequence_length"] = keys.shape[2]
-
-        #pq search phase
-        centroids = sparse_meta_data["pq_centroids"]
-        codes = sparse_meta_data["pq_codes"]
-
-        #partition the query first - work on a copy to avoid modifying the original queries tensor
-        queries_copy = queries.clone()  # Create a copy to avoid modifying the original
-        queries_partitioned = queries_copy.reshape(n, h_q, lq, num_sub_vectors, dm)
-        #lq up in line 57
-
-        ##compute similarity using matmul naive rn
-        scores_per_centroid = torch.zeros(n, h_q, lq, num_sub_vectors, num_centroids, device=keys.device, dtype=dtype)
-        for i in range(num_sub_vectors):
-            q_sub = queries_partitioned[:, :, :, i, :] #shape n, h, lq, dm
-            
-            #get centroids for this dimension
-            c_set = centroids[i, :, :] #shape num_centroids, dm
-            
-            #calcualte dot product
-            #reshape q_sub to (n*h*lq,dm) for batched matmul
-            q_su_flat = q_sub.reshape(-1, dm)
-            
-            #transpose c_set to (dm, num_centroids) for matumul
-            c_set_transposed = c_set.T
-            #matmul result is (n*h*lq, num_centroids)
-            scores = torch.matmul(q_su_flat, c_set_transposed)
-
-            scores_per_centroid[:, :, :, i, :] = scores.reshape(n, h_q, lq, num_centroids)
-
-        #gather and reduce
-        head_ratio = h_q // h_kv
-        codes_repeated = codes.repeat(1, head_ratio, 1, 1)
-        total_scores = torch.zeros(n, h_q, lq, s, device=keys.device, dtype=dtype)
-        #loop over sub-vector dimensions m 
-        for i in range(num_sub_vectors):
-            #get scores for this sub-vector i for all queries
-            #shape n,h,lq, num_centroids
-            scores_for_sub_dim = scores_per_centroid[:, :, :, i, :]
-            #get codes for this sub dim i for all keys #shape n, h, s
-            codes_for_sub_dim = codes_repeated[:, :, :, i]
-
-            #torch.gather to get scores for each for eahc keys code
-            #output shaoe n, h, lq, s
-
-            #input to gather needs to be expanded to match input shape
-            scores_expanded = scores_for_sub_dim.unsqueeze(3).expand(n, h_q, lq, s, num_centroids)
-            #gather expand to match input shape
-            codes_expanded = codes_for_sub_dim.unsqueeze(2).expand(n, h_q, lq, s)
-            #gather scores
-            gathered_scores = torch.gather(scores_expanded, dim=4, index=codes_expanded.unsqueeze(4)).squeeze(4)
-
-            #add scroes to tottal
-            total_scores += gathered_scores
-
         
-        total_scores = total_scores * scaling
-
-
-        
-        #total scores now has shape n, h, lq, s 
-        top_k_scores, top_k_indices = torch.topk(total_scores, self.heavy_size, dim=-1)
-       
-        #topk indices has shape n, h, lq, self.heavy_size
-        #contains indices of topk keys for each query
-        mask = torch.zeros_like(total_scores, dtype=torch.bool, device=keys.device)
-        #set topk indicies to true
-        mask.scatter_(-1, top_k_indices, True)
-        #combine with original mask
-        #final_mask = mask & attention_mask.to(torch.bool)
-        mask_shape = (n, h_q, lq, s)
-        new_mask = Mask.create_mask_from_dense_mask(mask_shape, mask.to(torch.float32), dtype=previous_mask.dtype)
-
-
-        #mask_shape = (n, h_q, lq, s)
-        #dense_mask = final_mask
-        return previous_mask.merge_mask(new_mask, inplace=False)
-        #return new_mask
-
-        #return Mask.create_mask_from_dense_mask(mask_shape, dense_mask.to(torch.float32), dtype=previous_mask.dtype)
-        # return Mask(mask_qk = final_mask, heavy_size = self.heavy_size)
-
-
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "PQCache":
         """Create PQCache instance from configuration."""
         if not isinstance(config, PQCacheConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
+    
+
+    def _partition_vectors(self, vectors: torch.Tensor, num_sub_vectors: int, dm: int) -> torch.Tensor:
+        """Partition vectors into sub-vectors
+
+        Args: 
+        vectors: input tensor of shape (n, h_kv, s, dh)
+            n is batch size, h is # heads, s is sequence length, dh is dimension of each head
+        num_sub_vectors: number of sub vectors to partition into, also = m
+        dm: dimension of each sub vector (dm = dh/m)
+        
+        Returns:
+        Partitioned tensor of shape (n, h, s, num_sub_vectors, dm)
+    """
+        
+        n, h_kv, s, dh = vectors.shape
+        assert dh == num_sub_vectors * dm, "dh must equal num_sub_vectors * dm"
+        return vectors.reshape(n, h_kv, s, num_sub_vectors, dm)
+
+
+    def _cluster_keys(self, keys: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Cluster keys using PQ and return codebook and centroids.
+
+        Args:
+            keys: Input keys tensor of shape (n, h, s, num_sub_vectors, dm)
+        Returns:
+            codebook: Tensor of shape (n, h, s, num_sub_vectors) with assigned codes
+            centroids: Tensor of shape (num_sub_vectors, num_centroids, dm) with learned centroids
+        """
+        #take in keys already partitioned
+        n, h_kv, s, num_sub_vectors, dm = keys.shape
+        #keys_partitioned = keys
+        device = keys.device
+        dtype = keys.dtype
+        num_centroids = 2 ** self.pq_bits
+        keys_flat = keys.reshape(-1, num_sub_vectors, dm)
+        N_flat = keys_flat.shape[0]
+
+        all_centroids = torch.zeros((num_sub_vectors, num_centroids, dm), dtype=dtype, device=device)
+        all_codes = torch.zeros((N_flat, num_sub_vectors), dtype=torch.long, device=device)
+
+        for i in range(num_sub_vectors):
+            sub_vectors = keys_flat[:, i, :]  # shape (N_flat, dm)
+            x = sub_vectors.to(torch.float32).cpu().numpy()
+
+            kmeans = KMeans(n_clusters=num_centroids, init='random', max_iter=self.kmeans_iters, random_state=0)
+            kmeans.fit(x)
+            labels = kmeans.labels_
+            centers = kmeans.cluster_centers_
+
+
+            all_centroids[i] = torch.from_numpy(centers).to(device=device, dtype=dtype)
+            all_codes[:, i] = torch.from_numpy(labels).to(device=device, dtype=torch.long)
+
+        codebook = all_codes.reshape(n, h_kv, s, num_sub_vectors) #reshape codebook back
+
+        return codebook, all_centroids
+    
+    def _compute_query_centroid_score(self, queries_partitioned: torch.Tensor, centroids: torch.Tensor, scaling: float) -> torch.Tensor:
+        """Compute similarity between query sub-vectors and centroids.
+        
+        
+        Args:
+            queries_partitioned: tensor of shape (n, h, lq, num_sub_vectors, dm)
+            centroids: tensor of shape (num_sub_vectors, num_centroids, dm)
+
+            scaling : scaling factor for attention scores
+
+
+        Returns:
+            lookup table/scores: tensor of shape (n, h, lq, num_sub_vectors, num_centroids)
+        """
+
+        # Compute the dot product between queries and centroids
+        scores = torch.einsum(
+            "nhlmd,mcd->nhlmc",
+            queries_partitioned,
+            centroids
+        )
+
+        # Apply scaling
+        scores *= scaling
+
+        return scores
+
+    def _compute_query_key_scores(self, query_centroid_scores: torch.Tensor, key_codebook: torch.Tensor) -> torch.Tensor:
+        """Compute approximate query-key scores using centroid scores and key codes.
+
+        Args:
+            query_centroid_scores: tensor of shape (n, h, lq, num_sub_vectors, num_centroids)
+            key_codebook: tensor of shape (n, h, s, num_sub_vectors)
+        Returns:
+            approximate query-key scores: tensor of shape (n, h, lq, s)
+
+        """
+        device = query_centroid_scores.device
+        n, h_q, lq, num_sub_vectors, num_centroids = query_centroid_scores.shape
+        _, h_kv, s, _ = key_codebook.shape
+
+        # Initialize the final scores tensor
+        final_scores = torch.zeros((n, h_q, lq, s), device=device, dtype=query_centroid_scores.dtype)
+
+        if h_kv != h_q:
+            head_ratio = h_q // h_kv
+            key_codebook_expanded = key_codebook.repeat_interleave
+            key_codebook = key_codebook.repeat(1, head_ratio, 1, 1)
+
+        final_scores = torch.zeros((n, h_q, lq, s), device=query_centroid_scores.device, dtype=query_centroid_scores.dtype)
+
+        # Loop over each sub-vector dimension to accumulate scores
+        #create index tensors for indexing 
+        n_idx = torch.arange(n, device=device)[:, None, None, None, None]
+        h_idx = torch.arange(h_q, device=device)[None, :, None, None, None]
+        q_idx = torch.arange(lq, device=device)[None, None, :, None, None]
+        m_idx = torch.arange(num_sub_vectors, device=device)[None, None, None, None, :]
+
+        #pseudo for
+        #for each (batch, head, query, key, partition):
+            #centroid_id = codebook[batch, head, query, key, partition]
+            #score = query_centroid_scores[batch, head, query, partition, centroid_id]
+
+        gathered_scores = query_centroid_scores[
+            n_idx,
+            h_idx,
+            q_idx,
+            m_idx,
+            key_codebook_expanded
+        ]  # shape (n, h_q, lq, s, num_sub_vectors)
+
+        approx_scores = gathered_scores.sum(dim=-1)  # sum over num_sub_vectors
+        return approx_scores
+
+    def _update_sparse_meta_data(self, sparse_meta_data: Dict[Any, Any], keys: torch.Tensor, layer_idx: int = 0) -> None:   
+        """Update PQ codes when new keys are added to cache."""
+        if "pq_centroids" not in sparse_meta_data or layer_idx not in sparse_meta_data["pq_centroids"]:
+            return
+        
+        n, h_kv, new_s, dh = keys.shape
+        dm = self.pq_sub_dim
+        num_sub_vectors = dh // dm
+        
+        centroids = sparse_meta_data["pq_centroids"][layer_idx]
+        existing_codes = sparse_meta_data["pq_codes"][layer_idx]
+        
+        # Get existing sequence length
+        _, _, existing_s, _ = existing_codes.shape
+        
+        # Only process new keys if cache has grown
+        if new_s <= existing_s:
+            return  # No new keys to process
+        
+        # Extract only the new keys
+        new_keys_only = keys[:, :, existing_s:, :]  # Shape: (n, h_kv, new_s - existing_s, dh)
+        
+        # Partition only the new keys
+        keys_partitioned = self._partition_vectors(
+            new_keys_only, 
+            num_sub_vectors, 
+            dm
+        )  # Shape: (n, h_kv, new_s - existing_s, num_sub_vectors, dm)
+        
+        # Assign codes to new keys
+        new_codes = self._assign_codes_to_keys(keys_partitioned, centroids)
+        
+        # Append new codes to existing codes (concat on sequence length dim)
+        updated_codes = torch.cat([existing_codes, new_codes], dim=2)
+        sparse_meta_data["pq_codes"][layer_idx] = updated_codes
+
+
+    def _assign_codes_to_keys( self, keys_partitioned: torch.Tensor, centroids: torch.Tensor) -> torch.Tensor:
+        """Assign codes to keys based on nearest centroids.
+        
+        Args:
+            keys_partitioned: tensor of shape (n, h, s, num_sub_vectors, dm)
+            centroids: tensor of shape (num_sub_vectors, num_centroids, dm) or
+                    (h, num_sub_vectors, num_centroids, dm) if cluster_per_head
+        
+        Returns:
+            codes: tensor of shape (n, h, s, num_sub_vectors)
+        """
+        n, h_kv, s, num_sub_vectors, dm = keys_partitioned.shape
+        device = keys_partitioned.device
+        
+        # Determine number of centroids and whether we have per-head clustering
+        if centroids.dim() == 4:
+            # Per-head centroids: (h, num_sub_vectors, num_centroids, dm)
+            cluster_per_head = True
+            num_centroids = centroids.shape[2]
+        else:
+            # Shared centroids: (num_sub_vectors, num_centroids, dm)
+            cluster_per_head = False
+            num_centroids = centroids.shape[1]
+        
+        codes = torch.zeros((n, h_kv, s, num_sub_vectors), dtype=torch.long, device=device)
+        
+        if cluster_per_head:
+            # Handle per-head centroids
+            for head_idx in range(h_kv):
+                for i in range(num_sub_vectors):
+                    sub_vectors = keys_partitioned[:, head_idx, :, i, :]  # (n, s, dm)
+                    c_set = centroids[head_idx, i, :, :]  # (num_centroids, dm)
+                    
+                    # Flatten and compute distances
+                    sub_vectors_flat = sub_vectors.reshape(-1, dm)  # (n*s, dm)
+                    
+                    # Use Euclidean distance (consistent with K-Means)
+                    distances = torch.cdist(sub_vectors_flat, c_set)  # (n*s, num_centroids)
+                    
+                    # Assign to nearest centroid (argmin for distance)
+                    assigned_codes = torch.argmin(distances, dim=1)  # (n*s)
+                    codes[:, head_idx, :, i] = assigned_codes.reshape(n, s)
+        else:
+            # Handle shared centroids
+            for i in range(num_sub_vectors):
+                sub_vectors = keys_partitioned[:, :, :, i, :]  # (n, h_kv, s, dm)
+                c_set = centroids[i, :, :]  # (num_centroids, dm)
+                
+                # Flatten and compute distances
+                sub_vectors_flat = sub_vectors.reshape(-1, dm)  # (n*h_kv*s, dm)
+                
+                # Use Euclidean distance (consistent with K-Means)
+                distances = torch.cdist(sub_vectors_flat, c_set)  # (n*h_kv*s, num_centroids)
+                
+                # Assign to nearest centroid (argmin for distance)
+                assigned_codes = torch.argmin(distances, dim=1)  # (n*h_kv*s)
+                codes[:, :, :, i] = assigned_codes.reshape(n, h_kv, s)
+        
+        return codes
