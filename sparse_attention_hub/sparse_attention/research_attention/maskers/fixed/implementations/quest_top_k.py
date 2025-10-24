@@ -24,7 +24,7 @@ from ..base import TopKMasker, TopKMaskerConfig
 @dataclass
 class QuestTopKMaskerConfig(TopKMaskerConfig):
     """Configuration for QuestTopKMasker."""
-    page_size: int = 128
+    page_size: int
     search_space: Dict[str, Any] = field(
         default_factory=lambda: {
             "heavy_size": tune.grid_search(
@@ -43,9 +43,11 @@ class QuestTopKMasker(TopKMasker):
 
     def __init__(self, config: QuestTopKMaskerConfig) -> None:
         super().__init__(config)
+        
         if config.page_size <= 0:
             raise ValueError("page_size must be a positive integer")
         self.page_size = int(config.page_size)
+        self.heavy_size = config.heavy_size
 
     def add_mask(
         self,
