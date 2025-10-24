@@ -45,6 +45,7 @@ class QuestTopKMasker(TopKMasker):
 
     def __init__(self, config: QuestTopKMaskerConfig) -> None:
         super().__init__(config)
+        
         if config.page_size <= 0:
             raise ValueError("page_size must be a positive integer")
         self.page_size = int(config.page_size)
