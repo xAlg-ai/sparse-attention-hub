@@ -74,29 +74,46 @@ class PQCache(TopKMasker):
         mask_shape = n, h_q, lq, s
         num_centroids = 2 ** self.pq_bits
         layer_idx = kwargs.get("layer_idx", 0)
+
+        if torch.isnan(keys).any():
+            print("NaN found in layer" + str(layer_idx))
+
         queries_partitioned = self._partition_vectors(queries, num_sub_vectors, dm)
         keys_partitioned = self._partition_vectors(keys, num_sub_vectors, dm)
         #partition the keys, queries using helper
 
+        if layer_idx == 0:
+            print(f"After partition - keys_partitioned has NaN: {torch.isnan(keys_partitioned).any()}")
+
         if "pq_centroids" not in sparse_meta_data or "pq_codes" not in sparse_meta_data:
-            sparse_meta_data["pq_centroids"] = {}
-            sparse_meta_data["pq_codes"] = {}
+            if "pq_centroids" not in sparse_meta_data:
+                sparse_meta_data["pq_centroids"] = {}
+            if "pq_codes" not in sparse_meta_data:
+                sparse_meta_data["pq_codes"] = {}
+
+        if layer_idx not in sparse_meta_data["pq_centroids"] or layer_idx not in sparse_meta_data["pq_codes"]:
             codebook, centroids = self._cluster_keys(keys_partitioned)
+            if layer_idx == 0:
+                print(f"After clustering - centroids has NaN: {torch.isnan(centroids).any()}")
             sparse_meta_data["pq_centroids"][layer_idx] = centroids
             sparse_meta_data["pq_codes"][layer_idx] = codebook
 
 
         assert "pq_codes" in sparse_meta_data, "pq_codes must be present if pq_centroids are present"
-        query_centroid_score = self._compute_query_centroid_score(queries, centroids = sparse_meta_data["pq_centroids"][layer_idx])
+        query_centroid_score = self._compute_query_centroid_score(queries_partitioned, centroids = sparse_meta_data["pq_centroids"][layer_idx], scaling = scaling)
+        if layer_idx == 0:
+            print(f"After query centroid score - query_centroid_score has NaN: {torch.isnan(query_centroid_score).any()}")
         query_key_scores = self._compute_query_key_scores(query_centroid_score, key_codebook = sparse_meta_data["pq_codes"][layer_idx])
-        _, top_k_indices = torch.topk(query_key_scores, self.heavy_size, dim=-1)
-        this_mask = Mask.create_from_row_wise_idx(mask_shape, top_k_indices, dtype=previous_mask.dtype)
+        if layer_idx == 0:
+            print(f"After query-key score - query_key_scores has NaN: {torch.isnan(query_key_scores).any()}")
+        top_k_scores, top_k_indices = torch.topk(query_key_scores, self.heavy_size, dim=-1)
+        if layer_idx == 0:
+            print(f"Top-k indices shape: {top_k_indices.shape}, Top-k scores shape: {top_k_scores.shape}")
+        this_mask = Mask.create_from_row_wise_idx(mask_shape, top_k_indices, top_k_scores, type="index", dtype=previous_mask.dtype)
         self._update_sparse_meta_data(sparse_meta_data, keys)
-        return previous_mask.merge_mask(this_mask, inplace=False)
+        new_mask =  previous_mask.merge_mask(this_mask, inplace=False)
+        return new_mask
 
-        #clustering 
-        #iterate over num_sub_vectors, extract each sub_vector, cluster it
-        #assign codes and store results
         
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "PQCache":
@@ -148,12 +165,16 @@ class PQCache(TopKMasker):
         for i in range(num_sub_vectors):
             sub_vectors = keys_flat[:, i, :]  # shape (N_flat, dm)
             x = sub_vectors.to(torch.float32).cpu().numpy()
+            sub_vectors = torch.nan_to_num(sub_vectors, nan=0.0, posinf=0.0, neginf=0.0)
+            x = sub_vectors.to(torch.float32).cpu().numpy()
 
             kmeans = KMeans(n_clusters=num_centroids, init='random', max_iter=self.kmeans_iters, random_state=0)
             kmeans.fit(x)
             labels = kmeans.labels_
             centers = kmeans.cluster_centers_
 
+            #sanitize output to prevent nan centroids
+            centers = np.nan_to_num(centers, nan=0.0, posinf=0.0, neginf=0.0)
 
             all_centroids[i] = torch.from_numpy(centers).to(device=device, dtype=dtype)
             all_codes[:, i] = torch.from_numpy(labels).to(device=device, dtype=torch.long)
@@ -178,12 +199,12 @@ class PQCache(TopKMasker):
         """
 
         # Compute the dot product between queries and centroids
+
         scores = torch.einsum(
             "nhlmd,mcd->nhlmc",
             queries_partitioned,
             centroids
         )
-
         # Apply scaling
         scores *= scaling
 
@@ -204,18 +225,16 @@ class PQCache(TopKMasker):
         _, h_kv, s, _ = key_codebook.shape
 
         # Initialize the final scores tensor
-        final_scores = torch.zeros((n, h_q, lq, s), device=device, dtype=query_centroid_scores.dtype)
 
         if h_kv != h_q:
             head_ratio = h_q // h_kv
-            key_codebook_expanded = key_codebook.repeat_interleave
+            #key_codebook_expanded = key_codebook.repeat_interleave
             key_codebook = key_codebook.repeat(1, head_ratio, 1, 1)
 
-        final_scores = torch.zeros((n, h_q, lq, s), device=query_centroid_scores.device, dtype=query_centroid_scores.dtype)
 
         # Loop over each sub-vector dimension to accumulate scores
         #create index tensors for indexing 
-        n_idx = torch.arange(n, device=device)[:, None, None, None, None]
+        n_idx = torch.arange(n, device=device)[:, None, None, None, None] #arange creates 1d tensor of n
         h_idx = torch.arange(h_q, device=device)[None, :, None, None, None]
         q_idx = torch.arange(lq, device=device)[None, None, :, None, None]
         m_idx = torch.arange(num_sub_vectors, device=device)[None, None, None, None, :]
@@ -224,7 +243,7 @@ class PQCache(TopKMasker):
         #for each (batch, head, query, key, partition):
             #centroid_id = codebook[batch, head, query, key, partition]
             #score = query_centroid_scores[batch, head, query, partition, centroid_id]
-
+        key_codebook_expanded = key_codebook.unsqueeze(2)
         gathered_scores = query_centroid_scores[
             n_idx,
             h_idx,
