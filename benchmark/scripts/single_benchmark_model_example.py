@@ -52,8 +52,8 @@ def main():
         SinkMaskerConfig(sink_size=128),
         LocalMaskerConfig(window_size=128), 
         QuestTopKMaskerConfig(
-            heavy_size=0.1,
-            page_size=32
+            heavy_size=0.128,
+            page_size=16
         )
         # OracleTopKConfig(heavy_size=0.1)
     ])
@@ -69,12 +69,12 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['gov_report'])
+    benchmark = LongBench(['multifieldqa_en'])
 
     result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
 
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 50, "max_context_length": 1000000})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 50, "max_context_length": 32000})
     
 if __name__ == "__main__":
     main() 
