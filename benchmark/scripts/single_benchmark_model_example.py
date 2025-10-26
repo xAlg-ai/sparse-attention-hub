@@ -24,18 +24,16 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/sparse-attention-hub')
-sys.path.insert(0, '/workspace/sparse-attention-hub')
+os.chdir('/home/ubuntu/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/sparse-attention-hub')
 
+from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig
-)
-from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-    AdaptiveSamplingMaskerConfig
+    DoubleSparsityTopKMaskerConfig
 )
 
-from benchmark.ruler32k import Ruler32K
+from benchmark.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
@@ -43,27 +41,37 @@ def main():
     device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=128),
-        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128)
+        DoubleSparsityTopKMaskerConfig(
+            heavy_size=4096,
+            group_factor=2,
+            label_bits=2,
+            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            channel_selection="q_proj"
+        )
     ])
     
     print("  ✓ Loading model...")
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16},
-        generate_kwargs={"max_new_tokens": 32},
+        model_kwargs= {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_3"},
         device=device
     )
     
-    benchmark = Ruler32K(['vt'])
+    benchmark = LongBench(['passage_retrieval_en'])
 
-    result_dir = Path("./test_results.5cpt.topk.2/")
+    result_dir = Path("./test_results.passage_retrieval_en.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
-
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 1000000})
+    metric_logger = MicroMetricLogger()
+    metric_logger.configure_logging(
+            log_path=result_dir,
+            enabled_metrics=[
+                "research_attention_density",
+                "research_attention_output_error",
+            ],
+        )
+    metric_logger.flush()
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 10, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
     
 if __name__ == "__main__":
     main() 

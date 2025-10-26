@@ -184,7 +184,8 @@ class Benchmark(ABC):
                 'total_q': f"{questions_processed}/{total_questions}"
             })
             
-            try:
+            # try:
+            if True:
                 # Create request using current adapter interface (simplified)
                 answer_prefix = df_group["answer_prefix"].iloc[0]
                 request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
@@ -208,11 +209,11 @@ class Benchmark(ABC):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     
-            except Exception as e:
-                # Log error but continue processing other contexts
-                print(f"Error processing context (length {len(context)}): {str(e)}")
-                # Fill with empty responses for failed contexts
-                dataset_df.loc[df_group.index, "predicted_answer"] = [""] * len(df_group)
+            # except Exception as e:
+            #     # Log error but continue processing other contexts
+            #     print(f"Error processing context (length {len(context)}): {str(e)}")
+            #     # Fill with empty responses for failed contexts
+            #     dataset_df.loc[df_group.index, "predicted_answer"] = [""] * len(df_group)
         
         return dataset_df
 

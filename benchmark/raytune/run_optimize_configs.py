@@ -48,6 +48,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
     SinkMaskerConfig,
     OracleTopKConfig,
     HashAttentionTopKMaskerConfig,
+    DoubleSparsityTopKMaskerConfig,
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
     AdaptiveSamplingMaskerConfig,
@@ -466,7 +467,7 @@ MODEL_CONFIGS = {
     }
 }
 
-DEFAULT_MODEL = "mistral"
+DEFAULT_MODEL = "llama"
 
 # Task configurations
 DEBUG_TASKS = ["loogle/shortdep_qa"]
@@ -626,6 +627,24 @@ def get_all_sparse_configs(weight_file: str = None, objective: str = "default") 
     #     )
     # ])
     # to_optimize_configs.append((name, config, classes))
+
+
+    # 5. MagicPig config
+    for heavy_size in [256, 1024, 4096]:
+        classes = [SinkMaskerConfig, LocalMaskerConfig, DoubleSparsityTopKMaskerConfig]
+        name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
+
+        config = ResearchAttentionConfig(masker_configs=[
+            SinkMaskerConfig(sink_size=128),
+            LocalMaskerConfig(window_size=128),
+            DoubleSparsityTopKMaskerConfig(
+                heavy_size=heavy_size,
+                group_factor=2,
+                label_bits=2,
+                sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+                channel_selection="q_proj"),
+        ])
+        optimal_configs.append((name, config, classes))
     
     return optimal_configs, to_optimize_configs
 
