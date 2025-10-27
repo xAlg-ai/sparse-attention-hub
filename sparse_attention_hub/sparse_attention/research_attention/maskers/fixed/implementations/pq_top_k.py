@@ -95,8 +95,7 @@ class PQCache(TopKMasker):
 
 
 
-        if layer_idx == 0:
-            print(f"After partition - keys_partitioned has NaN: {torch.isnan(keys_partitioned).any()}")
+        
 
         if "pq_centroids" not in sparse_meta_data or "pq_codes" not in sparse_meta_data:
             if "pq_centroids" not in sparse_meta_data:
@@ -106,15 +105,18 @@ class PQCache(TopKMasker):
 
         if layer_idx not in sparse_meta_data["pq_centroids"] or layer_idx not in sparse_meta_data["pq_codes"]:
             codebook, centroids = self._cluster_keys(keys_partitioned)
-            if layer_idx == 0:
-                print(f"After clustering - centroids has NaN: {torch.isnan(centroids).any()}")
+            #if layer_idx == 0:
+                #print(f"After clustering - centroids has NaN: {torch.isnan(centroids).any()}")
             sparse_meta_data["pq_centroids"][layer_idx] = centroids
             sparse_meta_data["pq_codes"][layer_idx] = codebook
-
+        else:
+            # Update PQ codes if cache has grown
+            if layer_idx in sparse_meta_data["pq_codes"]:
+                existing_s = sparse_meta_data["pq_codes"][layer_idx].shape[2]
+                if s > existing_s:  # Cache has grown
+                    self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
 
         assert "pq_codes" in sparse_meta_data, "pq_codes must be present if pq_centroids are present"
-        current_codebook = sparse_meta_data["pq_codes"][layer_idx][:, :, :s, :]  # Only use first s positions
-
         query_centroid_score = self._compute_query_centroid_score(queries_partitioned, centroids = sparse_meta_data["pq_centroids"][layer_idx], scaling = scaling)
         query_key_scores = self._compute_query_key_scores(query_centroid_score, key_codebook = sparse_meta_data["pq_codes"][layer_idx])
         #_scores, top_k_indices = torch.topk(query_key_scores, self.heavy_size, dim=-1)
@@ -130,20 +132,13 @@ class PQCache(TopKMasker):
                 expected_mask_shape, dtype=dtype
             )
         
+       
+
         this_mask = self._create_mask_from_rowise_indices(tensor_dims, top_k_indices, keys.device, previous_mask.dtype)
-        print("this mask shape after rowwise indices" + str(this_mask.shape))
-        if layer_idx == 0:
-            print(f"[DEBUG MASK] this_mask shape: {this_mask.data.shape if hasattr(this_mask, 'data') else 'no data attr'}, keys s={s}")
-        if layer_idx in sparse_meta_data["pq_codes"]:
-            existing_s = sparse_meta_data["pq_codes"][layer_idx].shape[2]
-            if s > existing_s:  # Only if cache actually grew
-                self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
-                if layer_idx == 0:
-                    print(f"[DEBUG AFTER UPDATE] keys.shape[2]={s}, codebook.shape[2]={sparse_meta_data['pq_codes'][layer_idx].shape[2]}")
-
-
-        #self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
-        print("this mask shape" + str(this_mask.shape))
+        #print("this mask shape after rowwise indices" + str(this_mask.shape))
+        #if layer_idx == 0:
+            #print(f"[DEBUG MASK] this_mask shape: {this_mask.data.shape if hasattr(this_mask, 'data') else 'no data attr'}, keys s={s}")
+        #print("this mask shape" + str(this_mask.shape))
         new_mask =  previous_mask.merge_mask(this_mask, inplace=False)
         return new_mask
 
