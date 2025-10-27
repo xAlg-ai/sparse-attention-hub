@@ -44,13 +44,10 @@ def main():
     device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128), 
         QuestTopKMaskerConfig(
             heavy_size=0.128,
             page_size=16
         )
-        # OracleTopKConfig(heavy_size=0.1)
     ])
     
     print("  ✓ Loading model...")
@@ -62,7 +59,7 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['multifieldqa_en'])
+    benchmark = LongBench(['gov_report'])
 
     result_dir = Path("./test_results.5cpt.topk.2/")
     result_dir.mkdir(exist_ok=True)
