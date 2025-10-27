@@ -106,6 +106,7 @@ class TestBenchmarkAdapterIntegration:
                 "answers": [["Test answer"]],
                 "all_classes": [[]],
                 "answer_prefix": ["Answer: "],
+                "max_new_tokens": [10],
             }
         )
 
@@ -167,6 +168,7 @@ class TestBenchmarkAdapterIntegration:
                 "answers": [["Answer 1"], ["Answer 2"]],
                 "all_classes": [[], []],
                 "answer_prefix": ["Answer: ", "Answer: "],
+                "max_new_tokens": [10, 10],
             }
         )
 
@@ -354,6 +356,7 @@ class TestLongBenchIntegration:
                     3000,
                     5000,
                 ],  # Only extended datasets have length
+                "max_new_tokens": [10, 10, 10, 10],
             }
         )
 
@@ -385,7 +388,7 @@ class TestLongBenchIntegration:
 
 class TestErrorHandlingIntegration:
     """Test error handling in real integration scenarios."""
-
+    @pytest.mark.skip(reason="Skipping since we removed error handling for better error dumps")
     def test_adapter_failure_recovery(self, temp_result_dir):
         """Test benchmark recovery when adapter fails intermittently."""
         # Create adapter that fails on certain contexts

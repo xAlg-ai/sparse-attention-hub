@@ -106,6 +106,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         test_data = {
             "model.layers.0.self_attn.k_proj": [[0, 1, 2, 3, 4, 5, 6, 7]],
             "model.layers.0.self_attn.q_proj": [[8, 9, 10, 11, 12, 13, 14, 15]],
+            "model.layers.0.self_attn.qk_proj": [[8, 9, 10, 11, 12, 13, 14, 15]],
         }
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -116,13 +117,14 @@ class TestDoubleSparsityTopKMaskerImplementation:
         try:
             config = DoubleSparsityTopKMaskerConfig(
                 heavy_size=256,
-                sorted_channel_file=temp_file
+                sorted_channel_file=temp_file,
+                channel_selection="k_proj"
             )
             masker = DoubleSparsityTopKMasker.create_from_config(config)
             assert isinstance(masker, DoubleSparsityTopKMasker)
             # Initialize sorted channels by calling _ensure_sorted_channel_is_loaded
             masker._ensure_sorted_channel_is_loaded(0, torch.device("cpu"))
-            assert len(masker.sorted_channels) == 2
+            assert len(masker.sorted_channels) == 3
         finally:
             Path(temp_file).unlink()
 

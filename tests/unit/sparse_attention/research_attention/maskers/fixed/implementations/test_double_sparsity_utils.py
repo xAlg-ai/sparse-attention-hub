@@ -117,13 +117,13 @@ class TestDoubleSparsityUtils:
         }
         
         result = extract_layer_channels(sorted_channels, 0, "k_proj", torch.device("cpu"))
-        assert torch.equal(result, torch.tensor([0, 1, 2, 3, 4, 5, 6, 7]))
+        assert torch.equal(result, torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7]]))
         
         result = extract_layer_channels(sorted_channels, 0, "q_proj", torch.device("cpu"))
-        assert torch.equal(result, torch.tensor([8, 9, 10, 11, 12, 13, 14, 15]))
+        assert torch.equal(result, torch.tensor([[8, 9, 10, 11, 12, 13, 14, 15]]))
         
         result = extract_layer_channels(sorted_channels, 1, "k_proj", torch.device("cpu"))
-        assert torch.equal(result, torch.tensor([16, 17, 18, 19, 20, 21, 22, 23]))
+        assert torch.equal(result, torch.tensor([[16, 17, 18, 19, 20, 21, 22, 23]]))
 
     def test_extract_layer_channels_nonexistent_layer(self):
         """Test extracting channels for nonexistent layer raises ValueError."""
@@ -159,7 +159,7 @@ class TestDoubleSparsityUtils:
         }
         
         result = extract_layer_channels(sorted_channels, 0, "k_proj", torch.device("cpu"))  # Default is "k_proj"
-        assert torch.equal(result, torch.tensor([0, 1, 2, 3, 4, 5, 6, 7]))
+        assert torch.equal(result, torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7]]))
 
     def test_validate_channel_data_valid(self):
         """Test validating valid channel data structure."""
@@ -245,10 +245,10 @@ class TestDoubleSparsityUtils:
             
             # Extract specific channels
             layer_0_k = extract_layer_channels(loaded_data, 0, "k_proj", torch.device("cpu"))
-            assert torch.equal(layer_0_k, torch.tensor([0, 1, 2, 3, 4, 5, 6, 7]))
+            assert torch.equal(layer_0_k, torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7]]))
             
             layer_1_q = extract_layer_channels(loaded_data, 1, "q_proj", torch.device("cpu"))
-            assert torch.equal(layer_1_q, torch.tensor([24, 25, 26, 27, 28, 29, 30, 31]))
+            assert torch.equal(layer_1_q, torch.tensor([[24, 25, 26, 27, 28, 29, 30, 31]]))
             
             # Validate the loaded data
             validate_channel_data(loaded_data)
@@ -270,7 +270,7 @@ class TestDoubleSparsityUtils:
         try:
             loaded_data = load_sorted_channels_from_file(temp_file)
             channels = extract_layer_channels(loaded_data, 0, "k_proj", torch.device("cpu"))
-            assert torch.equal(channels, torch.tensor([0]))
+            assert torch.equal(channels, torch.tensor([[0]]))
             validate_channel_data(loaded_data)
         finally:
             Path(temp_file).unlink()
@@ -287,7 +287,7 @@ class TestDoubleSparsityUtils:
         try:
             loaded_data = load_sorted_channels_from_file(temp_file)
             channels = extract_layer_channels(loaded_data, 0, "k_proj", torch.device("cpu"))
-            assert torch.equal(channels, torch.tensor([1000, 2000, 3000, 4000]))
+            assert torch.equal(channels, torch.tensor([[1000, 2000, 3000, 4000]]))
             validate_channel_data(loaded_data)
         finally:
             Path(temp_file).unlink()
