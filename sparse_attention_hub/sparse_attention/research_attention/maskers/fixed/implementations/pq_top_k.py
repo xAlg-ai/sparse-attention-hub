@@ -7,7 +7,9 @@ import numpy as np
 
 
 
+
 import torch
+#from torch_kmeans import KMeans
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
@@ -63,6 +65,7 @@ class PQCache(TopKMasker):
         #sequence length is number of keys in the cache
         n, h_kv, s, dh = keys.shape
         _, h_q, lq, _ = queries.shape
+
         dtype = keys.dtype
         #given (n, h, s, dh)
         dm = self.pq_sub_dim #sub dim
@@ -74,16 +77,23 @@ class PQCache(TopKMasker):
         mask_shape = n, h_q, lq, s
         num_centroids = 2 ** self.pq_bits
         layer_idx = kwargs.get("layer_idx", 0)
+        tensor_dims: AttentionTensorDimensions = self._extract_tensor_dimensions(
+            keys, queries
+        )
 
-        if torch.isnan(keys).any():
-            print("NaN found in layer" + str(layer_idx))
+        #if torch.isnan(keys).any():
+        #    print("NaN found in layer" + str(layer_idx))
         
-        if torch.isnan(queries).any():
-            print("NaN found in queries layer" + str(layer_idx))
+        #if torch.isnan(queries).any():
+        #    print("NaN found in queries layer" + str(layer_idx))
 
         queries_partitioned = self._partition_vectors(queries, num_sub_vectors, dm)
         keys_partitioned = self._partition_vectors(keys, num_sub_vectors, dm)
         #partition the keys, queries using helper
+
+
+
+
 
         if layer_idx == 0:
             print(f"After partition - keys_partitioned has NaN: {torch.isnan(keys_partitioned).any()}")
@@ -103,23 +113,38 @@ class PQCache(TopKMasker):
 
 
         assert "pq_codes" in sparse_meta_data, "pq_codes must be present if pq_centroids are present"
+        current_codebook = sparse_meta_data["pq_codes"][layer_idx][:, :, :s, :]  # Only use first s positions
+
         query_centroid_score = self._compute_query_centroid_score(queries_partitioned, centroids = sparse_meta_data["pq_centroids"][layer_idx], scaling = scaling)
-        if layer_idx == 0:
-            print(f"After query centroid score - query_centroid_score has NaN: {torch.isnan(query_centroid_score).any()}")
         query_key_scores = self._compute_query_key_scores(query_centroid_score, key_codebook = sparse_meta_data["pq_codes"][layer_idx])
+        #_scores, top_k_indices = torch.topk(query_key_scores, self.heavy_size, dim=-1)
+        top_k_indices: torch.Tensor = self._get_topk_indices_from_inactive_positions(
+            query_key_scores, previous_mask, self.heavy_size
+        )
+                
+    
+        # Check if shapes match
+        expected_mask_shape = (n, h_q, lq, s)
+        if previous_mask.shape != expected_mask_shape:
+            previous_mask = Mask.create_full_mask(
+                expected_mask_shape, dtype=dtype
+            )
+        
+        this_mask = self._create_mask_from_rowise_indices(tensor_dims, top_k_indices, keys.device, previous_mask.dtype)
+        print("this mask shape after rowwise indices" + str(this_mask.shape))
         if layer_idx == 0:
-            print(f"After query-key score - query_key_scores has NaN: {torch.isnan(query_key_scores).any()}")
-        top_k_scores, top_k_indices = torch.topk(query_key_scores, self.heavy_size, dim=-1)
-        if layer_idx == 0:
-            print(f"Top-k indices shape: {top_k_indices.shape}, Top-k scores shape: {top_k_scores.shape}")
-        this_mask = Mask.create_from_row_wise_idx(mask_shape, top_k_indices, top_k_scores, type="index", dtype=previous_mask.dtype)
-        self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
-        if layer_idx == 0:
-            print(f"After updating meta data - sparse_meta_data['pq_codes'][0] shape: {sparse_meta_data['pq_codes'][0].shape}")
-            print(f"NaN in sparse_meta_data['pq_codes'][0]: {torch.isnan(sparse_meta_data['pq_codes'][0].float()).any()}")
+            print(f"[DEBUG MASK] this_mask shape: {this_mask.data.shape if hasattr(this_mask, 'data') else 'no data attr'}, keys s={s}")
+        if layer_idx in sparse_meta_data["pq_codes"]:
+            existing_s = sparse_meta_data["pq_codes"][layer_idx].shape[2]
+            if s > existing_s:  # Only if cache actually grew
+                self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
+                if layer_idx == 0:
+                    print(f"[DEBUG AFTER UPDATE] keys.shape[2]={s}, codebook.shape[2]={sparse_meta_data['pq_codes'][layer_idx].shape[2]}")
+
+
+        #self._update_sparse_meta_data(sparse_meta_data, keys, layer_idx=layer_idx)
+        print("this mask shape" + str(this_mask.shape))
         new_mask =  previous_mask.merge_mask(this_mask, inplace=False)
-        if layer_idx == 0:
-            print(f"New mask has NaN: {torch.isnan(new_mask.data).any()}")
         return new_mask
 
         
@@ -167,7 +192,7 @@ class PQCache(TopKMasker):
         keys_flat = keys.reshape(-1, num_sub_vectors, dm)
         N_flat = keys_flat.shape[0]
 
-        all_centroids = torch.zeros((num_sub_vectors, num_centroids, dm), dtype=dtype, device=device)
+        all_centroids = torch.zeros((num_sub_vectors, num_centroids, dm), dtype=torch.float32, device=device)
         all_codes = torch.zeros((N_flat, num_sub_vectors), dtype=torch.long, device=device)
 
         for i in range(num_sub_vectors):
@@ -184,12 +209,12 @@ class PQCache(TopKMasker):
             #sanitize output to prevent nan centroids
             centers = np.nan_to_num(centers, nan=0.0, posinf=0.0, neginf=0.0)
 
-            all_centroids[i] = torch.from_numpy(centers).to(device=device, dtype=dtype)
+            all_centroids[i] = torch.from_numpy(centers).to(device=device, dtype=torch.float32)
             all_codes[:, i] = torch.from_numpy(labels).to(device=device, dtype=torch.long)
 
         codebook = all_codes.reshape(n, h_kv, s, num_sub_vectors) #reshape codebook back
 
-        return codebook, all_centroids
+        return codebook, all_centroids.to(device=device, dtype=dtype)
     
     def _compute_query_centroid_score(self, queries_partitioned: torch.Tensor, centroids: torch.Tensor, scaling: float) -> torch.Tensor:
         """Compute similarity between query sub-vectors and centroids.
@@ -215,6 +240,10 @@ class PQCache(TopKMasker):
         )
         # Apply scaling
         scores *= scaling
+
+        #inf debug
+        #print("torch is inf" + str(torch.isinf(scores).any()))
+
 
         return scores
 
