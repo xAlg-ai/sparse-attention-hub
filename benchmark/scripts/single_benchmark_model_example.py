@@ -49,13 +49,10 @@ def main():
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128), 
         QuestTopKMaskerConfig(
             heavy_size=0.128,
             page_size=16
         )
-        # OracleTopKConfig(heavy_size=0.1)
     ])
     
     print("  ✓ Loading model...")
@@ -69,7 +66,7 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['multifieldqa_en'])
+    benchmark = LongBench(['gov_report'])
 
     result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)

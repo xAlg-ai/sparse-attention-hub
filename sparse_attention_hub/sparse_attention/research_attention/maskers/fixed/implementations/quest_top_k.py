@@ -116,7 +116,7 @@ class QuestTopKMasker(TopKMasker):
             keys_rep, page_size, num_pages
         )
 
-        # Step 2.2: Quest scores (vectorized)
+        # Step 2.2: Quest scores
         page_scores = self._quest_page_scores(queries, page_min, page_max)
 
         # Respect external attention mask by forbidding pages with no valid tokens
@@ -137,7 +137,7 @@ class QuestTopKMasker(TopKMasker):
         if dense_mask.dtype != torch.bool:
             dense_mask = dense_mask != 0
 
-        # Step 4: scatter pages to token mask (vectorized)
+        # Step 4: scatter pages to token mask
         dense_mask = self._scatter_pages_to_dense_mask(
             dense_mask, topk_pages, K, page_size
         )
