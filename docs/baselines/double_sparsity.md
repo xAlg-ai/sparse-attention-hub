@@ -48,6 +48,41 @@ There are two known differences in experimental setup.
 
 Since, we obtain the exact behavior of Attention using author's and our code, and we have known differences in evaluation, we do not further investigate the differences. 
 
+
+## 5. Performance:
+Running the following config with profile/profile_research_attention.py on H100 
+
+Config:
+```
+    masker_configs = [
+        DoubleSparsityTopKMaskerConfig(
+            heavy_size=0.1,
+            group_factor=8,
+            label_bits=16,
+            sorted_channel_file="/workspace/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+        )
+    ]    
+    ResearchAttentionConfig(masker_configs=masker_configs)
+```
+Results
+```
+🔍 Comparative Analysis:
+============================================================
+📈 Masker Overhead Analysis:
+   - Sparse Attention:     1.305 ms
+   - Baseline (no maskers): 0.503 ms
+   - Masker overhead:      0.803 ms (159.7%)
+   ❌ High overhead - significant masker cost
+
+⚡ Flash Attention Comparison:
+   - Sparse Attention:     1.305 ms
+   - Flash Attention:      0.431 ms
+   🐌 Sparse is 3.03x slower than Flash Attention
+   - Relative performance: 33.0% of sparse time
+============================================================
+```
+The overhead is within prescribed limits. 
+
 ## References
 
 [1] Yang, S., Sheng, Y., Gonzalez, J.E., Stoica, I. and Zheng, L., 2024. Post-training sparse attention with double sparsity. arXiv preprint arXiv:2408.07092.

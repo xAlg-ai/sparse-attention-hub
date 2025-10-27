@@ -54,6 +54,34 @@ Matching the settings for method and evaluation closely in our code (i.e. A setu
 There are some differences by using the simpleLSH transformation. But using the transformation is generally theoretically sound, and we do not expect it to significantly affect the quality at least in the negative sense. Also, it gives MagicPig a better chance at MIPS. So we choose to keep it in our implementation.
 
 
+## 5. performance
+The performance currently needs optimization ( overhead is 800% ) on H100
+
+Config:
+```
+MagicPigConfig(
+        lsh_l=75,  # Default value from search space
+        lsh_k=8   # Default value from search space
+    )
+
+```
+Results
+```
+============================================================
+📈 Masker Overhead Analysis:
+   - Sparse Attention:     4.627 ms
+   - Baseline (no maskers): 0.506 ms
+   - Masker overhead:      4.121 ms (814.3%)
+   ❌ High overhead - significant masker cost
+
+⚡ Flash Attention Comparison:
+   - Sparse Attention:     4.627 ms
+   - Flash Attention:      0.384 ms
+   🐌 Sparse is 12.04x slower than Flash Attention
+   - Relative performance: 8.3% of sparse time
+============================================================
+```
+
 ## References
 
 [1] Chen, Z., Sadhukhan, R., Ye, Z., Zhou, Y., Zhang, J., Nolte, N., Tian, Y., Douze, M., Bottou, L., Jia, Z. and Chen, B., 2024. Magicpig: Lsh sampling for efficient llm generation. arXiv preprint arXiv:2410.16179.
