@@ -18,9 +18,9 @@ The **Quest** algorithm is a *sparse attention selection mechanism* that approxi
 1. **Paging Keys**  
    The key sequence of length \(K\) is divided into contiguous *pages* of fixed size \(P_s\).  
    Number of pages:
-   \[
+   $$
    P = \left\lceil \frac{K}{P_s} \right\rceil
-   \]
+   $$
 
 2. **Per-page Bounds**  
    For each page \(p\), compute the **elementwise min and max** of all key vectors inside that page:
