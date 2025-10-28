@@ -32,7 +32,7 @@ The **Quest** algorithm is a *sparse attention selection mechanism* that approxi
 4. **Query–Page Scoring via the Quest Bound**  
    For each query vector $q$ and page $p$, compute a fast *upper bound* on the possible dot-product between $q$ and any key inside page $p$:
 
-   $S(q,p) = \sum_{d=1}^{D} \max\!\big(q_d \, k_{\text{min}}^{(p)}[d],\; q_d \, k_{\text{max}}^{(p)}[d]\big)$
+   $S(q,p) = \sum_{d=1}^{D} \max\big(q_d \, k_{\text{min}}^{(p)}[d],\; q_d \, k_{\text{max}}^{(p)}[d]\big)$
 
    This **Quest bound** overestimates the true maximum similarity but preserves the ranking of highly relevant pages.
 
@@ -41,9 +41,7 @@ The **Quest** algorithm is a *sparse attention selection mechanism* that approxi
 
    $K_p = \left\lceil \frac{K_{\text{heavy}}}{P_s} \right\rceil$
 
-   pages by $S(q,p)$.  
-   All tokens within these pages are activated (unmasked).  
-   The union of their indices defines the **sparse attention mask**.
+   pages by $S(q,p)$. All tokens within these pages are activated (unmasked). The union of their indices defines the **sparse attention mask**.
 
 6. **Final Mask Formation**  
    The page-selected mask is merged with any previous or external attention mask, ensuring that only valid tokens remain active.
