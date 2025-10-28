@@ -4,7 +4,7 @@
 The **Quest** algorithm is a *sparse attention selection mechanism* that approximates full attention by selecting a small subset of key positions that are most likely to contribute high attention scores for each query.
 
 ### Page-level Vectorization
-- Instead of scoring every query–key pair ($O(QKD)$), the algorithm scores only query–page pairs ($O(QPD)$, with $P \ll K$).
+- Instead of scoring every query–key pair $O(QKD)$, the algorithm scores only query–page pairs ($O(QPD)$, with $P \ll K$).
 - Each page is represented by its per-dimension min/max bounds, allowing fully vectorized GPU computation.
 
 ### Quest Bound (Efficient Upper-bound Scoring)
