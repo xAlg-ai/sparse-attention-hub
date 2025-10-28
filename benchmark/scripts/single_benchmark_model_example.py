@@ -44,8 +44,11 @@ def main():
     device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
+        # SinkMaskerConfig(sink_size=128),
+        # LocalMaskerConfig(window_size=128),
+        # OracleTopKConfig(heavy_size=0.128),
         QuestTopKMaskerConfig(
-            heavy_size=0.128,
+            heavy_size=0.008,
             page_size=16
         )
     ])
