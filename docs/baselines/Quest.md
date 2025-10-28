@@ -82,7 +82,7 @@ Some datasets from the LongBench benchmark
 | **Qasper** | 2.9 | 4.08 | 6.33 | 16.34 | 24.27 |
 | **HotpotQA** | 1.97 | 15.19 | 24.06 | 27.96 | 40.06 |
 | **MultifieldQA** | 2.48 | 5.1 | 18.15 | 30.66 | 43.84 |
-| **GovReport** |  |  |  |  | |
+| **GovReport** | 2.68 | 7.63 | 14.87 | 21.34 | 25.21 |
 
 ## 4. Explanations of Differences
 The original paper uses dense layers for first 2 transformer blocks. In our setting we are using all sparse layers.
