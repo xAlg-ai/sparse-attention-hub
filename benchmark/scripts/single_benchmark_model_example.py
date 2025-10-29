@@ -49,11 +49,8 @@ def main():
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        # SinkMaskerConfig(sink_size=128),
-        # LocalMaskerConfig(window_size=128),
-        # OracleTopKConfig(heavy_size=0.128),
         QuestTopKMaskerConfig(
-            heavy_size=0.008,
+            heavy_size=1024,
             page_size=16
         )
     ])
