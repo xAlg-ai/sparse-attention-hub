@@ -11,7 +11,7 @@ This example uses the MockBenchmark (5 simple samples) for quick demonstration:
 - Fast execution for testing and learning
 
 Usage:
-    python 04_simple_benchmark_example.py
+    python simple_benchmark_example.py
 """
 
 import os
@@ -24,29 +24,30 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/sparse-attention-hub')
-sys.path.insert(0, '/workspace/sparse-attention-hub')
+os.chdir('/home/ubuntu/Experiments/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/Experiments/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig
+    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, QuestTopKMaskerConfig
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-    AdaptiveSamplingMaskerConfig
+    AdaptiveSamplingMaskerConfig, MagicPigConfig
 )
 
 from benchmark.ruler32k import Ruler32K
+from benchmark.longbench.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
-    model_name = "meta-llama/Llama-3.1-8B-Instruct"
+    model_name = "lmsys/longchat-7b-v1.5-32k"
     device = 0
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=128),
-        AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128)
+        QuestTopKMaskerConfig(
+            heavy_size=4096,
+            page_size=16
+        )
     ])
     
     print("  ✓ Loading model...")
@@ -58,12 +59,12 @@ def main():
         device=device
     )
     
-    benchmark = Ruler32K(['vt'])
+    benchmark = LongBench(['narrativeqa'])
 
     result_dir = Path("./test_results.5cpt.topk.2/")
     result_dir.mkdir(exist_ok=True)
 
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 1, "max_context_length": 1000000})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 50, "max_context_length": 32000})
     
 if __name__ == "__main__":
     main() 
