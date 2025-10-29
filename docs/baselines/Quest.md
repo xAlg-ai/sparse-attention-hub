@@ -79,10 +79,10 @@ Some datasets from the LongBench benchmark
 
 | Dataset | Token Budget 256 | Token Budget 512 | Token Budget 1024 | Token Budget 2048 | Token Budget 4096 |
 |:--------|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
-| **Qasper** | 2.9 | 4.08 | 6.33 | 16.34 | 24.27 |
-| **HotpotQA** | 1.97 | 15.19 | 24.06 | 27.96 | 40.06 |
-| **MultifieldQA** | 2.48 | 5.1 | 18.15 | 30.66 | 43.84 |
-| **GovReport** | 2.68 | 7.63 | 14.87 | 21.34 | 25.21 |
+| **Qasper** | 17.11 | 24.4 | 29.96 | 32.65 | 30.51 |
+| **HotpotQA** | 13.7 | 27.07 | 28.72 | 37.11 | 38.55 |
+| **MultifieldQA** | 26.49 | 37.52 | 44 | 47.52 | 44.23 |
+| **GovReport** | 10.86 | 16.58 |  |  |  |
 
 ## 4. Explanations of Differences
 The original paper uses dense layers for first 2 transformer blocks. In our setting we are using all sparse layers.

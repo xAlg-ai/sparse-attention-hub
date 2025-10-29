@@ -129,7 +129,9 @@ class QuestTopKMasker(TopKMasker):
             )
 
         # Step 3: choose Kp pages per (B,H,Q)
-        k_pages = max(1, min(num_pages, (heavy_tokens + page_size - 1) // page_size))
+        k_pages = min(num_pages, max(3, heavy_tokens // page_size))
+        if k_pages <= 0:
+            k_pages = 1
         topk_pages = torch.topk(page_scores, k=k_pages, dim=-1, largest=True).indices  # [B,H,Q,Kp]
 
         # Start from previous dense mask
