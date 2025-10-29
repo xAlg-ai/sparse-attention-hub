@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/sj157/Experiments/sparse-attention-hub')
-sys.path.insert(0, '/home/sj157/Experiments/sparse-attention-hub')
+os.chdir('/home/ubuntu/Experiments/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/Experiments/sparse-attention-hub')
 
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
@@ -50,7 +50,7 @@ def main():
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         QuestTopKMaskerConfig(
-            heavy_size=1024,
+            heavy_size=4096,
             page_size=16
         )
     ])
@@ -66,7 +66,7 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['gov_report'])
+    benchmark = LongBench(['narrativeqa'])
 
     result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
