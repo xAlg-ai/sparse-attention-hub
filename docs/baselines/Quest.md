@@ -77,15 +77,22 @@ Some datasets from the LongBench benchmark
 
 ## 3. Comparative Results
 
+Our Results:
+
 | Dataset | Token Budget 256 | Token Budget 512 | Token Budget 1024 | Token Budget 2048 | Token Budget 4096 |
 |:--------|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
 | **Qasper** | 17.11 | 24.4 | 29.96 | 32.65 | 30.51 |
 | **HotpotQA** | 13.7 | 27.07 | 28.72 | 37.11 | 38.55 |
 | **MultifieldQA** | 26.49 | 37.52 | 44 | 47.52 | 44.23 |
-| **GovReport** | 10.86 | 16.58 |  |  |  |
+| **GovReport** | 10.86 | 16.58 | 24.02 | 26.73 | 30.14 |
+
+
+Their Results:
+
+[Quest Plots](docs/quest_plots.png)
 
 ## 4. Explanations of Differences
-The original paper uses dense layers for first 2 transformer blocks. In our setting we are using all sparse layers.
+The original paper uses dense layers for first 2 transformer blocks. In our setting we are using all sparse layers. Therefore, the differences might arise. However, we have done code matching tests, and our results are within the ball park values as reported by the plots (especially as token budget increases).
 
 ## References
 [1] Tang, Jiaming; Zhao, Yilong; Zhu, Kan; Xiao, Guangxuan; Kasikci, Baris; Han, Song (2024). Quest: Query-Aware Sparsity for Efficient Long-Context LLM Inference. arXiv preprint arXiv:2406.10774.
