@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/sj157/Experiments/sparse-attention-hub')
-sys.path.insert(0, '/home/sj157/Experiments/sparse-attention-hub')
+os.chdir('/home/ubuntu/Experiments/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/Experiments/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -45,7 +45,7 @@ def main():
 
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         QuestTopKMaskerConfig(
-            heavy_size=1024,
+            heavy_size=4096,
             page_size=16
         )
     ])
@@ -59,7 +59,7 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['gov_report'])
+    benchmark = LongBench(['narrativeqa'])
 
     result_dir = Path("./test_results.5cpt.topk.2/")
     result_dir.mkdir(exist_ok=True)
