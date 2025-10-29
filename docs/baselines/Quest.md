@@ -89,7 +89,7 @@ Our Results:
 
 Their Results:
 
-[Quest Plots](docs/quest_plots.png)
+[Quest Plots](sparse-attention-hub/docs/quest_plots.png)
 
 ## 4. Explanations of Differences
 The original paper uses dense layers for first 2 transformer blocks. In our setting we are using all sparse layers. Therefore, the differences might arise. However, we have done code matching tests, and our results are within the ball park values as reported by the plots (especially as token budget increases).
