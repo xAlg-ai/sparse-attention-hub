@@ -46,18 +46,12 @@ def main():
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-<<<<<<< HEAD
         DoubleSparsityTopKMaskerConfig(
             heavy_size=4096,
             group_factor=2,
             label_bits=2,
             sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
             channel_selection="q_proj"
-=======
-        QuestTopKMaskerConfig(
-            heavy_size=1024,
-            page_size=16
->>>>>>> Add test for Quest
         )
     ])
     
