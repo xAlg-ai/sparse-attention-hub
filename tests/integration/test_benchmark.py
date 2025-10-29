@@ -388,7 +388,10 @@ class TestLongBenchIntegration:
 
 class TestErrorHandlingIntegration:
     """Test error handling in real integration scenarios."""
-    @pytest.mark.skip(reason="Skipping since we removed error handling for better error dumps")
+
+    @pytest.mark.skip(
+        reason="Skipping since we removed error handling for better error dumps"
+    )
     def test_adapter_failure_recovery(self, temp_result_dir):
         """Test benchmark recovery when adapter fails intermittently."""
         # Create adapter that fails on certain contexts

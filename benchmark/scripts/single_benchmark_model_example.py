@@ -33,13 +33,17 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
     DoubleSparsityTopKMaskerConfig
 )
 
-from benchmark.longbench import LongBench
+#from benchmark.longbench import LongBench
+from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
     device = 0
 
+    # sorted_channel_file is available in the author's repository
+    # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
+    # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         DoubleSparsityTopKMaskerConfig(
             heavy_size=4096,
@@ -51,6 +55,9 @@ def main():
     ])
     
     print("  ✓ Loading model...")
+     # use whichever is available
+     # flash_attention_3 is for Hopper GPU
+     # commonly flash_attention_2 is supported on other GPUs
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
@@ -58,9 +65,10 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['passage_retrieval_en'])
+    #benchmark = LongBench(['passage_retrieval_en'])
+    benchmark = Ruler32K(['vt'])
 
-    result_dir = Path("./test_results.passage_retrieval_en.4096.2.2.q_proj/")
+    result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
     metric_logger = MicroMetricLogger()
     metric_logger.configure_logging(

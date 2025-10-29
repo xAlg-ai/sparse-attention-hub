@@ -8,6 +8,6 @@ from .double_sparsity_utils import (
 
 __all__ = [
     "load_sorted_channels_from_file",
-    "extract_layer_channels", 
+    "extract_layer_channels",
     "validate_channel_data",
 ]

@@ -152,16 +152,18 @@ class TestSparseAttentionConfigsAndFactories:
 
     def test_double_sparsity_top_k_masker_config_and_creation(self):
         """Test DoubleSparsityTopKMaskerConfig and create_from_config method."""
-        import tempfile
         import os
-        
+        import tempfile
+
         from sparse_attention_hub.sparse_attention import (
             DoubleSparsityTopKMasker,
             DoubleSparsityTopKMaskerConfig,
         )
 
         # Create a temporary file for sorted_channel_file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as temp_file:
             temp_file.write('{"test": "data"}')
             temp_file_path = temp_file.name
 

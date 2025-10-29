@@ -1,11 +1,3 @@
-"""
-:author: Aditya Desai
-:copyright: 2025 Sparse Attention Hub
-:license: Apache 2.0
-:date: 2025-01-27
-:summary: Tests for DoubleSparsityTopKMasker implementation.
-"""
-
 import tempfile
 from pathlib import Path
 
@@ -32,7 +24,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         assert config is not None
         assert config.heavy_size == 256
         assert config.group_factor == 16  # Default value
-        assert config.label_bits == 4    # Default value
+        assert config.label_bits == 4  # Default value
 
     def test_double_sparsity_top_k_masker_config_with_custom_values(self):
         """Test config creation with custom group_factor and label_bits."""
@@ -40,7 +32,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
             heavy_size=128,
             sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
             group_factor=8,
-            label_bits=8
+            label_bits=8,
         )
         assert config.group_factor == 8
         assert config.label_bits == 8
@@ -52,7 +44,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
             DoubleSparsityTopKMaskerConfig(
                 heavy_size=256,
                 sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
-                group_factor=0
+                group_factor=0,
             )
 
         # Test invalid label_bits
@@ -60,9 +52,8 @@ class TestDoubleSparsityTopKMaskerImplementation:
             DoubleSparsityTopKMaskerConfig(
                 heavy_size=256,
                 sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
-                label_bits=17
+                label_bits=17,
             )
-
 
     def test_double_sparsity_top_k_masker_creation(self):
         """Test that double sparsity top k masker can be created."""
@@ -98,7 +89,10 @@ class TestDoubleSparsityTopKMaskerImplementation:
 
         # Check that the masker is registered (registry uses config classes as keys)
         assert DoubleSparsityTopKMaskerConfig in MaskerRegistry._registry
-        assert MaskerRegistry._registry[DoubleSparsityTopKMaskerConfig] == DoubleSparsityTopKMasker
+        assert (
+            MaskerRegistry._registry[DoubleSparsityTopKMaskerConfig]
+            == DoubleSparsityTopKMasker
+        )
 
     def test_double_sparsity_top_k_masker_with_temp_file(self):
         """Test masker creation with temporary channel file."""
@@ -109,8 +103,9 @@ class TestDoubleSparsityTopKMaskerImplementation:
             "model.layers.0.self_attn.qk_proj": [[8, 9, 10, 11, 12, 13, 14, 15]],
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             import json
+
             json.dump(test_data, f)
             temp_file = f.name
 
@@ -118,7 +113,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
             config = DoubleSparsityTopKMaskerConfig(
                 heavy_size=256,
                 sorted_channel_file=temp_file,
-                channel_selection="k_proj"
+                channel_selection="k_proj",
             )
             masker = DoubleSparsityTopKMasker.create_from_config(config)
             assert isinstance(masker, DoubleSparsityTopKMasker)
@@ -128,13 +123,12 @@ class TestDoubleSparsityTopKMaskerImplementation:
         finally:
             Path(temp_file).unlink()
 
-
     def test_double_sparsity_top_k_masker_pseudo_quantization(self):
         """Test pseudo-quantization functionality."""
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=256,
             sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
-            label_bits=4
+            label_bits=4,
         )
         masker = DoubleSparsityTopKMasker.create_from_config(config)
 
@@ -156,8 +150,9 @@ class TestDoubleSparsityTopKMaskerImplementation:
             "model.layers.0.self_attn.q_proj": [[0, 1, 2, 3, 4, 5, 6, 7]],
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             import json
+
             json.dump(test_data, f)
             temp_file = f.name
 
@@ -166,7 +161,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
                 heavy_size=128,
                 sorted_channel_file=temp_file,
                 group_factor=4,
-                label_bits=4
+                label_bits=4,
             )
             masker = DoubleSparsityTopKMasker.create_from_config(config)
 
@@ -184,7 +179,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
             previous_mask = Mask.create_empty_mask(
                 shape=(batch_size, num_heads, seq_len, seq_len),
                 dtype=torch.float32,
-                device=keys.device
+                device=keys.device,
             )
 
             # Create sparse meta data
@@ -200,7 +195,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
                 dropout=0.0,
                 sparse_meta_data=sparse_meta_data,
                 previous_mask=previous_mask,
-                layer_idx=0
+                layer_idx=0,
             )
 
             # Check that mask was created

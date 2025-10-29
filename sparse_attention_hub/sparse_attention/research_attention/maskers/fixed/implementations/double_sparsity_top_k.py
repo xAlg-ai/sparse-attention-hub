@@ -3,7 +3,7 @@
 import math
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import torch
 
@@ -32,26 +32,27 @@ class DoubleSparsityTopKMaskerConfig(TopKMaskerConfig):
     sorted_channel_file: str
     group_factor: int = 16
     label_bits: int = 4
-    channel_selection: str = 'qk_proj' 
+    channel_selection: str = "qk_proj"
     # TTBOMU: the original repository does not work with k_proj and GQA
-    search_space: Dict[str, Any] = field(
-        default_factory=lambda: {
-        }
-    )
+    search_space: Dict[str, Any] = field(default_factory=lambda: {})
 
     def __post_init__(self) -> None:
         """Validate post-initialization constraints."""
         super().__post_init__()
-        
+
         if self.group_factor <= 0:
             raise ValueError(f"group_factor must be > 0, got {self.group_factor}")
-        
+
         if not (0 < self.label_bits <= 16):
-            raise ValueError(f"label_bits must be in range (0, 16], got {self.label_bits}")
-        
+            raise ValueError(
+                f"label_bits must be in range (0, 16], got {self.label_bits}"
+            )
+
         # Check if sorted_channel_file exists
         if not os.path.exists(self.sorted_channel_file):
-            raise ValueError(f"sorted_channel_file does not exist: {self.sorted_channel_file}")
+            raise ValueError(
+                f"sorted_channel_file does not exist: {self.sorted_channel_file}"
+            )
 
 
 @MaskerRegistry.register(DoubleSparsityTopKMaskerConfig)
@@ -75,27 +76,33 @@ class DoubleSparsityTopKMasker(TopKMasker):
         # Load sorted channels from file
         self.sorted_channel = None
 
-    def _ensure_sorted_channel_is_loaded(self, layer_idx: int, device: torch.device) -> None:
+    def _ensure_sorted_channel_is_loaded(
+        self, layer_idx: int, device: torch.device
+    ) -> None:
         """Ensure sorted channel is loaded for the given layer."""
         if self.sorted_channel is None:
-            self.sorted_channels = load_sorted_channels_from_file(self.config.sorted_channel_file)
-            self.sorted_channel = extract_layer_channels(self.sorted_channels, layer_idx, self.channel_selection, device)    
+            self.sorted_channels = load_sorted_channels_from_file(
+                self.config.sorted_channel_file
+            )
+            self.sorted_channel = extract_layer_channels(
+                self.sorted_channels, layer_idx, self.channel_selection, device
+            )
 
     def _pseudo_quantize(self, tensor: torch.Tensor, q_bit: int) -> torch.Tensor:
         """Apply pseudo-quantization to reduce memory footprint.
-        
+
         Args:
             tensor: Input tensor to quantize
             q_bit: Number of quantization bits
-            
+
         Returns:
             Quantized tensor
         """
-        max_quant = 2 ** q_bit - 1
+        max_quant = 2**q_bit - 1
 
         min_val = tensor.min(dim=-1, keepdim=True)[0]
         max_val = tensor.max(dim=-1, keepdim=True)[0]
-        
+
         range_val = max_val - min_val
         range_val[range_val == 0] = 1
 
@@ -105,60 +112,69 @@ class DoubleSparsityTopKMasker(TopKMasker):
         dequantized = quantized / scale + min_val
 
         return dequantized
-    
+
     def _compute_grouped_scores(
-        self, 
-        keys: torch.Tensor, 
-        queries: torch.Tensor, 
+        self,
+        keys: torch.Tensor,
+        queries: torch.Tensor,
         attention_mask: torch.Tensor,
-        layer_idx: int
+        layer_idx: int,
     ) -> torch.Tensor:
         """Compute attention scores using grouped channels.
-        
+
         Args:
             keys: Key tensor
             queries: Query tensor
             attention_mask: Attention mask tensor
             layer_idx: Layer index
-            
+
         Returns:
             Attention scores tensor
         """
         b, h, q_len, head_dim = queries.shape
         _, _, kv_len, _ = keys.shape
         self._ensure_sorted_channel_is_loaded(layer_idx, queries.device)
-        sorted_query_states = queries.transpose(1,2)
-        sorted_key_states = keys.transpose(1,2)
-        sorted_query_states = torch.gather(sorted_query_states, -1, self.sorted_channel.unsqueeze(0).unsqueeze(0).expand(b, q_len, -1, -1)).transpose(1,2)
-        sorted_key_states = torch.gather(sorted_key_states, -1, self.sorted_channel.unsqueeze(0).unsqueeze(0).expand(b, kv_len, -1, -1)).transpose(1,2)
+        sorted_query_states = queries.transpose(1, 2)
+        sorted_key_states = keys.transpose(1, 2)
+        sorted_query_states = torch.gather(
+            sorted_query_states,
+            -1,
+            self.sorted_channel.unsqueeze(0).unsqueeze(0).expand(b, q_len, -1, -1),
+        ).transpose(1, 2)
+        sorted_key_states = torch.gather(
+            sorted_key_states,
+            -1,
+            self.sorted_channel.unsqueeze(0).unsqueeze(0).expand(b, kv_len, -1, -1),
+        ).transpose(1, 2)
         outlier_num = queries.shape[-1] // self.group_factor
-        grouped_query = sorted_query_states[:,:,:,:outlier_num]
-        grouped_key = sorted_key_states[:,:,:,:outlier_num]
+        grouped_query = sorted_query_states[:, :, :, :outlier_num]
+        grouped_key = sorted_key_states[:, :, :, :outlier_num]
 
         if self.label_bits < 16:
             grouped_query = self._pseudo_quantize(grouped_query, self.label_bits)
             grouped_key = self._pseudo_quantize(grouped_key, self.label_bits)
 
-        grouped_attn_weights = torch.matmul(grouped_query, grouped_key.transpose(2, 3)) / math.sqrt(head_dim // self.group_factor)
+        grouped_attn_weights = torch.matmul(
+            grouped_query, grouped_key.transpose(2, 3)
+        ) / math.sqrt(head_dim // self.group_factor)
 
         if attention_mask is not None:
-            grouped_attn_weights = grouped_attn_weights + attention_mask[:, :, :, :keys.shape[2]]
+            grouped_attn_weights = (
+                grouped_attn_weights + attention_mask[:, :, :, : keys.shape[2]]
+            )
 
         return grouped_attn_weights
 
     def _apply_topk_selection(
-        self, 
-        scores: torch.Tensor, 
-        previous_mask: Mask, 
-        effective_heavy_size: int
+        self, scores: torch.Tensor, previous_mask: Mask, effective_heavy_size: int
     ) -> torch.Tensor:
         """Apply top-K selection with offset constraints.
-        
+
         Args:
             scores: Attention scores tensor
             previous_mask: Previous mask
             effective_heavy_size: Number of top-K positions to select
-            
+
         Returns:
             Top-K indices tensor
 
@@ -167,16 +183,19 @@ class DoubleSparsityTopKMasker(TopKMasker):
             since sparse_attention_hub uses per head mask and double sparsity uses
             aggregate prediction, we need to aggregate previous mask. We do it using max
             which means that if the token is selected in atleast one head it will be masked
-            for top-k selection. We might want to change this later. 
+            for top-k selection. We might want to change this later.
             In most practical cases, top-k masker is applied after sink and local maskers where
             the either a token is used / unused across heads.
         """
         previous_dense_mask = previous_mask.get_dense_mask()
-        assert previous_dense_mask.shape == scores.shape, "previous_dense_mask and scores must have the same shape. Check the channel selection."
+        assert (
+            previous_dense_mask.shape == scores.shape
+        ), "previous_dense_mask and scores must have the same shape. Check the channel selection."
         scores[previous_dense_mask != 0] = float("-inf")
-        _, top_k_indices = torch.topk(scores, k=effective_heavy_size, dim=-1, largest=True)
+        _, top_k_indices = torch.topk(
+            scores, k=effective_heavy_size, dim=-1, largest=True
+        )
         return top_k_indices
-
 
     def _should_use_full_attention(
         self, dims: AttentionTensorDimensions, heavy_size: int
@@ -230,7 +249,7 @@ class DoubleSparsityTopKMasker(TopKMasker):
             keys, queries, attention_mask, layer_idx
         )
 
-        # Apply top-K selection, 
+        # Apply top-K selection,
         top_k_indices = self._apply_topk_selection(
             grouped_scores, previous_mask, effective_heavy_size
         )
