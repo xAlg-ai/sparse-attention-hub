@@ -477,7 +477,271 @@ DEBUG_TASKS = ["loogle/shortdep_qa"]
 
 RUN_TASKS = [
     "ruler32k/vt",
+    "ruler32k/qa_1",
+    "ruler32k/qa_2",
+    "ruler32k/fwe",
+    "ruler32k/niah_multikey_2",
+    "ruler32k/niah_multikey_3",
 ]
+
+# def get_all_sparse_configs(weight_file: str = None, objective: str = "default") -> List[Tuple[str, Optional[ResearchAttentionConfig], Optional[List]]]:
+#     """Get all sparse attention configurations.
+#     Returns list of (name, full_config, masker_classes) tuples.
+    
+#     Note: The configs returned here are only used to determine which masker classes
+#     to use. The actual parameter values will be determined by Ray Tune search.
+#     """
+#     assert weight_file is not None, "Weight file is required for HashAttention Masker"
+#     optimal_configs = []
+#     to_optimize_configs = []
+    
+
+#     # ############################## optimal configs ##############################
+#     #1. Dense baseline
+#     optimal_configs.append(("dense", None, None))
+    
+#     # 2. Oracle top k (already included above with adaptive, but also standalone)
+#     for heavy_size in [0.1]:
+#         classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig]
+#         name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
+#         config = ResearchAttentionConfig(masker_configs=[
+#             SinkMaskerConfig(sink_size=128),
+#             LocalMaskerConfig(window_size=128),
+#             OracleTopKConfig(heavy_size=heavy_size)
+#         ])
+#         optimal_configs.append((name, config, classes))
+
+#     #3. HashAttention top k
+#     for heavy_size in [0.1]:
+#         classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig]
+#         name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
+#         config = ResearchAttentionConfig(masker_configs=[
+#             SinkMaskerConfig(sink_size=128),
+#             LocalMaskerConfig(window_size=128),
+#             HashAttentionTopKMaskerConfig(
+#                 heavy_size=heavy_size,
+#                 hat_bits=32,
+#                 hat_mlp_layers=3,
+#                 hat_mlp_hidden_size=128,
+#                 hat_mlp_activation="silu",
+#                 hat_weight_file=weight_file
+#             ),
+#         ])
+#         optimal_configs.append((name, config, classes))
+    
+#     # 4. Random sampling with sink and local
+#     classes = [SinkMaskerConfig, LocalMaskerConfig, RandomSamplingMaskerConfig]
+#     name = get_masker_list_name(classes)
+#     config = ResearchAttentionConfig(masker_configs=[
+#         SinkMaskerConfig(sink_size=128),  # Middle value from search space [4, 8, 16, 32, 64, 128]
+#         LocalMaskerConfig(window_size=128),  # Middle value from search space [32, 64, 128, 256]
+#         RandomSamplingMaskerConfig(sampling_rate=0.095)  # Middle value from search space [0.01, 0.05, 0.1, 0.2, 0.3, 0.5]
+#     ])
+#     optimal_configs.append((name, config, classes))
+    
+#     ############################# to optimize configs ##############################
+
+
+#     #1. Adaptive sampling with oracle top k
+#     classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig, AdaptiveSamplingMaskerConfig]
+#     name = get_masker_list_name(classes, other_params={"objective": objective})
+#     config = ResearchAttentionConfig(masker_configs=[
+#         SinkMaskerConfig(sink_size=128),
+#         LocalMaskerConfig(window_size=128),
+#         OracleTopKConfig(heavy_size=0.10),  # Middle value from search space
+#         AdaptiveSamplingMaskerConfig(
+#             base_rate_sampling=0.1,  # Middle value
+#             epsilon=0.25,  # Middle value
+#             delta=0.25,  # Middle value
+#             init_offset=128,  # Middle value
+#             local_offset=128  # Middle value
+#         )
+#     ])
+#     config.masker_configs[2].search_space = {
+#         "heavy_size": tune.grid_search([0.01, 0.02]),
+#     }
+#     config.masker_configs[3].search_space = {
+#         "base_rate_sampling": tune.grid_search([0, 0.01, 0.02]),
+#         "epsilon": tune.grid_search([0.05]),
+#         "delta": tune.grid_search([0.05]),
+#         "init_offset": tune.grid_search([0.01]),
+#         "local_offset": tune.grid_search([0.01]),
+#     }
+#     to_optimize_configs.append((name, config, classes))
+
+#     # 2. Adaptive sampling with oracle top p
+
+#     classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopPMaskerConfig, AdaptiveSamplingMaskerConfig]
+#     name = get_masker_list_name(classes)
+#     config = ResearchAttentionConfig(masker_configs=[
+#         SinkMaskerConfig(sink_size=128),
+#         LocalMaskerConfig(window_size=128),
+#         OracleTopPMaskerConfig(top_p=0.10),  # Middle value from search space
+#         AdaptiveSamplingMaskerConfig(
+#             base_rate_sampling=0.1,  # Middle value
+#             epsilon=0.25,  # Middle value
+#             delta=0.25,  # Middle value
+#             init_offset=128,  # Middle value
+#             local_offset=128  # Middle value
+#         )
+#     ])
+#     to_optimize_configs.append((name, config, classes))
+    
+#     # #3. Adaptive sampling with HAT top k
+#     classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig, AdaptiveSamplingMaskerConfig]
+#     name = get_masker_list_name(classes, other_params={"objective": objective})
+#     config = ResearchAttentionConfig(masker_configs=[
+#         SinkMaskerConfig(sink_size=128),
+#         LocalMaskerConfig(window_size=128),
+#         HashAttentionTopKMaskerConfig(
+#             heavy_size=0.05,  # Required parameter
+#             hat_bits=32,  # Required parameter
+#             hat_mlp_layers=3,  # Required parameter
+#             hat_mlp_hidden_size=128,  # Required parameter
+#             hat_mlp_activation="silu",  # Required parameter
+#             hat_weight_file=weight_file  # Weight file is required
+#         ),
+#         AdaptiveSamplingMaskerConfig(
+#             base_rate_sampling=0.1,
+#             epsilon=0.25,
+#             delta=0.25,
+#             init_offset=128,
+#             local_offset=128
+#         )
+#     ])
+#     to_optimize_configs.append((name, config, classes))
+    
+    
+#     # # 4. Oracle top p
+#     classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopPMaskerConfig]
+#     name = get_masker_list_name(classes, other_params={"objective": objective})
+#     config = ResearchAttentionConfig(masker_configs=[
+#         SinkMaskerConfig(sink_size=128),
+#         LocalMaskerConfig(window_size=128),
+#         OracleTopPMaskerConfig(top_p=0.7)  # Default middle value from search space
+#     ])
+#     to_optimize_configs.append((name, config, classes))
+    
+
+#     # # 5. MagicPig config
+#     classes = [SinkMaskerConfig, LocalMaskerConfig, MagicPigConfig]
+#     name = get_masker_list_name(classes)
+#     config = ResearchAttentionConfig(masker_configs=[
+#         SinkMaskerConfig(sink_size=128),
+#         LocalMaskerConfig(window_size=128),
+#         MagicPigConfig(
+#             lsh_l=8,  # Default value from search space
+#             lsh_k=8   # Default value from search space
+#         )
+#     ])
+#     to_optimize_configs.append((name, config, classes))
+
+
+#     # 5. Double Sparsity Top K config
+#     # sorted_channel_file is available in the author's repository
+#     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
+#     # TODO: fix the path via environment variable or something else
+
+#     for heavy_size in [0.1, 0.2]:
+#         classes = [SinkMaskerConfig, LocalMaskerConfig, DoubleSparsityTopKMaskerConfig]
+#         name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
+
+#         config = ResearchAttentionConfig(masker_configs=[
+#             SinkMaskerConfig(sink_size=128),
+#             LocalMaskerConfig(window_size=128),
+#             DoubleSparsityTopKMaskerConfig(
+#                 heavy_size=heavy_size,
+#                 group_factor=2,
+#                 label_bits=2,
+#                 sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+#                 channel_selection="q_proj"),
+#         ])
+#         optimal_configs.append((name, config, classes))
+    
+#     return optimal_configs, to_optimize_configs
+
+def get_vattention_configs(weight_file: str = None, objective: str = "default") -> List[Tuple[str, Optional[ResearchAttentionConfig], Optional[List]]]:
+    """Get all sparse attention configurations.
+    Returns list of (name, full_config, masker_classes) tuples.
+    
+    Note: The configs returned here are only used to determine which masker classes
+    to use. The actual parameter values will be determined by Ray Tune search.
+    """
+    assert weight_file is not None, "Weight file is required for HashAttention Masker"
+    optimal_configs = []
+    to_optimize_configs = []
+
+    classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig, AdaptiveSamplingMaskerConfig]
+    name = get_masker_list_name(classes, other_params={"objective": objective})
+    config = ResearchAttentionConfig(masker_configs=[
+        SinkMaskerConfig(sink_size=128),
+        LocalMaskerConfig(window_size=128),
+        OracleTopKConfig(heavy_size=0.05),  # Middle value from search space
+        AdaptiveSamplingMaskerConfig(
+            base_rate_sampling=0.05,  # Middle value
+            epsilon=0.05,  # Middle value
+            delta=0.05,  # Middle value
+            init_offset=128,  # Middle value
+            local_offset=128  # Middle value
+        )
+    ])
+    if objective == "sparsity_2":
+        #1. Adaptive sampling with oracle top k
+        config.masker_configs[2].search_space = {
+            "heavy_size": tune.grid_search([0.005, 0.01, 0.02 - (256.0 / 32768)]),
+        }
+        config.masker_configs[3].search_space = {
+            "base_rate_sampling": tune.grid_search([0, 0.005, 0.01]),
+            "epsilon": tune.grid_search([0.1, 0.2, 0.3, 0.4]),
+            "delta": tune.grid_search([0.1, 0.2, 0.3, 0.4])
+        }
+
+
+    elif objective == "sparsity_5":
+        #1. Adaptive sampling with oracle top k
+        config.masker_configs[2].search_space = {
+            "heavy_size": tune.grid_search([0.01, 0.025, 0.05]),
+        }
+        config.masker_configs[3].search_space = {
+            "base_rate_sampling": tune.grid_search([0, 0.01, 0.02, 0.03]),
+            "epsilon": tune.grid_search([0.05, 0.1, 0.2, 0.3]),
+            "delta": tune.grid_search([0.05, 0.1, 0.2, 0.3])
+        }
+
+    elif objective == "sparsity_10":
+        #1. Adaptive sampling with oracle top k
+        config.masker_configs[2].search_space = {
+            "heavy_size": tune.grid_search([0.025, 0.05, 0.075, 0.1]),
+        }
+        config.masker_configs[3].search_space = {
+            "base_rate_sampling": tune.grid_search([0, 0.025, 0.05, 0.075]),
+            "epsilon": tune.grid_search([0.025, 0.05, 0.075]),
+            "delta": tune.grid_search([0.025, 0.05, 0.075])
+        }
+    elif objective == "sparsity_15":
+        #1. Adaptive sampling with oracle top k
+        config.masker_configs[2].search_space = {
+            "heavy_size": tune.grid_search([0.05, 0.1, 0.15]),
+        }
+        config.masker_configs[3].search_space = {
+            "base_rate_sampling": tune.grid_search([0, 0.04, 0.06, 0.1]),
+            "epsilon": tune.grid_search([0.01, 0.025, 0.05, 0.1]),
+            "delta": tune.grid_search([0.01, 0.025, 0.05, 0.1])
+        }
+
+    elif objective == "sparsity_20":
+        #1. Adaptive sampling with oracle top k
+        config.masker_configs[2].search_space = {
+            "heavy_size": tune.grid_search([0.05, 0.1, 0.15]),
+        }
+        config.masker_configs[3].search_space = {
+            "base_rate_sampling": tune.grid_search([0.05, 0.1, 0.15]),
+            "epsilon": tune.grid_search([0.01, 0.025, 0.05, 0.1]),
+            "delta": tune.grid_search([0.01, 0.025, 0.05, 0.1])
+        }
+    to_optimize_configs.append((name, config, classes))
+    return optimal_configs, to_optimize_configs
+
 
 def get_all_sparse_configs(weight_file: str = None, objective: str = "default") -> List[Tuple[str, Optional[ResearchAttentionConfig], Optional[List]]]:
     """Get all sparse attention configurations.
@@ -489,170 +753,9 @@ def get_all_sparse_configs(weight_file: str = None, objective: str = "default") 
     assert weight_file is not None, "Weight file is required for HashAttention Masker"
     optimal_configs = []
     to_optimize_configs = []
-    
-
-    # ############################## optimal configs ##############################
-    #1. Dense baseline
-    optimal_configs.append(("dense", None, None))
-    
-    # 2. Oracle top k (already included above with adaptive, but also standalone)
-    for heavy_size in [0.1]:
-        classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig]
-        name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
-        config = ResearchAttentionConfig(masker_configs=[
-            SinkMaskerConfig(sink_size=128),
-            LocalMaskerConfig(window_size=128),
-            OracleTopKConfig(heavy_size=heavy_size)
-        ])
-        optimal_configs.append((name, config, classes))
-
-    #3. HashAttention top k
-    for heavy_size in [0.1]:
-        classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig]
-        name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
-        config = ResearchAttentionConfig(masker_configs=[
-            SinkMaskerConfig(sink_size=128),
-            LocalMaskerConfig(window_size=128),
-            HashAttentionTopKMaskerConfig(
-                heavy_size=heavy_size,
-                hat_bits=32,
-                hat_mlp_layers=3,
-                hat_mlp_hidden_size=128,
-                hat_mlp_activation="silu",
-                hat_weight_file=weight_file
-            ),
-        ])
-        optimal_configs.append((name, config, classes))
-    
-    # 4. Random sampling with sink and local
-    classes = [SinkMaskerConfig, LocalMaskerConfig, RandomSamplingMaskerConfig]
-    name = get_masker_list_name(classes)
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),  # Middle value from search space [4, 8, 16, 32, 64, 128]
-        LocalMaskerConfig(window_size=128),  # Middle value from search space [32, 64, 128, 256]
-        RandomSamplingMaskerConfig(sampling_rate=0.095)  # Middle value from search space [0.01, 0.05, 0.1, 0.2, 0.3, 0.5]
-    ])
-    optimal_configs.append((name, config, classes))
-    
-    ############################# to optimize configs ##############################
-
-
-    #1. Adaptive sampling with oracle top k
-    classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopKConfig, AdaptiveSamplingMaskerConfig]
-    name = get_masker_list_name(classes, other_params={"objective": objective})
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopKConfig(heavy_size=0.10),  # Middle value from search space
-        AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.1,  # Middle value
-            epsilon=0.25,  # Middle value
-            delta=0.25,  # Middle value
-            init_offset=128,  # Middle value
-            local_offset=128  # Middle value
-        )
-    ])
-    config.masker_configs[2].search_space = {
-        "heavy_size": tune.grid_search([0.01, 0.02]),
-    }
-    config.masker_configs[3].search_space = {
-        "base_rate_sampling": tune.grid_search([0, 0.01, 0.02]),
-        "epsilon": tune.grid_search([0.05]),
-        "delta": tune.grid_search([0.05]),
-        "init_offset": tune.grid_search([0.01]),
-        "local_offset": tune.grid_search([0.01]),
-    }
-    to_optimize_configs.append((name, config, classes))
-
-    # 2. Adaptive sampling with oracle top p
-
-    classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopPMaskerConfig, AdaptiveSamplingMaskerConfig]
-    name = get_masker_list_name(classes)
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopPMaskerConfig(top_p=0.10),  # Middle value from search space
-        AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.1,  # Middle value
-            epsilon=0.25,  # Middle value
-            delta=0.25,  # Middle value
-            init_offset=128,  # Middle value
-            local_offset=128  # Middle value
-        )
-    ])
-    to_optimize_configs.append((name, config, classes))
-    
-    # #3. Adaptive sampling with HAT top k
-    classes = [SinkMaskerConfig, LocalMaskerConfig, HashAttentionTopKMaskerConfig, AdaptiveSamplingMaskerConfig]
-    name = get_masker_list_name(classes, other_params={"objective": objective})
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        HashAttentionTopKMaskerConfig(
-            heavy_size=0.05,  # Required parameter
-            hat_bits=32,  # Required parameter
-            hat_mlp_layers=3,  # Required parameter
-            hat_mlp_hidden_size=128,  # Required parameter
-            hat_mlp_activation="silu",  # Required parameter
-            hat_weight_file=weight_file  # Weight file is required
-        ),
-        AdaptiveSamplingMaskerConfig(
-            base_rate_sampling=0.1,
-            epsilon=0.25,
-            delta=0.25,
-            init_offset=128,
-            local_offset=128
-        )
-    ])
-    to_optimize_configs.append((name, config, classes))
-    
-    
-    # # 4. Oracle top p
-    classes = [SinkMaskerConfig, LocalMaskerConfig, OracleTopPMaskerConfig]
-    name = get_masker_list_name(classes, other_params={"objective": objective})
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        OracleTopPMaskerConfig(top_p=0.7)  # Default middle value from search space
-    ])
-    to_optimize_configs.append((name, config, classes))
-    
-
-    # # 5. MagicPig config
-    classes = [SinkMaskerConfig, LocalMaskerConfig, MagicPigConfig]
-    name = get_masker_list_name(classes)
-    config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(sink_size=128),
-        LocalMaskerConfig(window_size=128),
-        MagicPigConfig(
-            lsh_l=8,  # Default value from search space
-            lsh_k=8   # Default value from search space
-        )
-    ])
-    to_optimize_configs.append((name, config, classes))
-
-
-    # 5. Double Sparsity Top K config
-    # sorted_channel_file is available in the author's repository
-    # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
-    # TODO: fix the path via environment variable or something else
-
-    for heavy_size in [0.1, 0.2]:
-        classes = [SinkMaskerConfig, LocalMaskerConfig, DoubleSparsityTopKMaskerConfig]
-        name = get_masker_list_name(classes, other_params={"heavy_size": heavy_size})
-
-        config = ResearchAttentionConfig(masker_configs=[
-            SinkMaskerConfig(sink_size=128),
-            LocalMaskerConfig(window_size=128),
-            DoubleSparsityTopKMaskerConfig(
-                heavy_size=heavy_size,
-                group_factor=2,
-                label_bits=2,
-                sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
-                channel_selection="q_proj"),
-        ])
-        optimal_configs.append((name, config, classes))
-    
+    o, t = get_vattention_configs(weight_file, objective)
+    optimal_configs.extend(o)
+    to_optimize_configs.extend(t)
     return optimal_configs, to_optimize_configs
 
 
