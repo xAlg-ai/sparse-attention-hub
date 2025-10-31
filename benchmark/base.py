@@ -183,36 +183,28 @@ class Benchmark(ABC):
                 'q': len(questions),
                 'total_q': f"{questions_processed}/{total_questions}"
             })
+            # Create request using current adapter interface (simplified)
+            answer_prefix = df_group["answer_prefix"].iloc[0]
+            request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
             
-            try:
-                # Create request using current adapter interface (simplified)
-                answer_prefix = df_group["answer_prefix"].iloc[0]
-                request: Request = Request(context=context, questions=questions, answer_prefix=answer_prefix)
-                
-                # using the first record for getting max new tokens
-                max_new_tokens = df_group["max_new_tokens"].iloc[0]
-                param_max_new_tokens = generation_kwargs.get("max_new_tokens", sys.maxsize)
-                generation_kwargs["max_new_tokens"] = min(param_max_new_tokens, max_new_tokens)
-                
-                # Process through adapter
-                response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
-                
-                # Assign responses back to DataFrame
-                if isinstance(response.responses, list):
-                    dataset_df.loc[df_group.index, "predicted_answer"] = response.responses
-                else:
-                    # Single response case
-                    dataset_df.loc[df_group.index, "predicted_answer"] = [response.responses] * len(df_group)
-                
-                # Memory cleanup for large contexts
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    
-            except Exception as e:
-                # Log error but continue processing other contexts
-                print(f"Error processing context (length {len(context)}): {str(e)}")
-                # Fill with empty responses for failed contexts
-                dataset_df.loc[df_group.index, "predicted_answer"] = [""] * len(df_group)
+            # using the first record for getting max new tokens
+            max_new_tokens = df_group["max_new_tokens"].iloc[0]
+            param_max_new_tokens = generation_kwargs.get("max_new_tokens", sys.maxsize)
+            generation_kwargs["max_new_tokens"] = min(param_max_new_tokens, max_new_tokens)
+            
+            # Process through adapter
+            response: RequestResponse = adapter.process_request(request, generation_kwargs, request_kwargs)
+            
+            # Assign responses back to DataFrame
+            if isinstance(response.responses, list):
+                dataset_df.loc[df_group.index, "predicted_answer"] = response.responses
+            else:
+                # Single response case
+                dataset_df.loc[df_group.index, "predicted_answer"] = [response.responses] * len(df_group)
+            
+            # Memory cleanup for large contexts
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         
         return dataset_df
 

@@ -159,6 +159,9 @@ class TestBenchmarkBase:
         assert "context" in df.columns
 
     @patch("benchmark.base.load_dataset")
+    @pytest.mark.skip(
+        reason="Skipping since we removed error handling for better error dumps"
+    )
     def test_load_datasets_error_handling(self, mock_load_dataset):
         """Test dataset loading error handling."""
         mock_load_dataset.side_effect = Exception("Dataset not found")
@@ -237,6 +240,9 @@ class TestBenchmarkBase:
         assert len(context1_rows) == 2
         assert all(context1_rows["predicted_answer"] == "Single response")
 
+    @pytest.mark.skip(
+        reason="Skipping since we removed error handling for better error dumps"
+    )
     def test_process_all_requests_error_handling(self, mock_dataset_df):
         """Test error handling during request processing."""
         # Create adapter that throws errors

@@ -152,29 +152,44 @@ class TestSparseAttentionConfigsAndFactories:
 
     def test_double_sparsity_top_k_masker_config_and_creation(self):
         """Test DoubleSparsityTopKMaskerConfig and create_from_config method."""
+        import os
+        import tempfile
+
         from sparse_attention_hub.sparse_attention import (
             DoubleSparsityTopKMasker,
             DoubleSparsityTopKMaskerConfig,
         )
 
-        config = DoubleSparsityTopKMaskerConfig(
-            heavy_size=0.3,
-            group_factor=4,
-            label_bits=8,
-            channel_config="channel_config.json",
-        )
+        # Create a temporary file for sorted_channel_file
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as temp_file:
+            temp_file.write('{"test": "data"}')
+            temp_file_path = temp_file.name
 
-        assert config.heavy_size == 0.3
-        assert config.group_factor == 4
-        assert config.label_bits == 8
-        assert config.channel_config == "channel_config.json"
+        try:
+            config = DoubleSparsityTopKMaskerConfig(
+                heavy_size=0.3,
+                group_factor=4,
+                label_bits=8,
+                sorted_channel_file=temp_file_path,
+            )
 
-        # Test create_from_config
-        double_sparsity = DoubleSparsityTopKMasker.create_from_config(config)
-        assert isinstance(double_sparsity, DoubleSparsityTopKMasker)
-        assert double_sparsity.group_factor == 4
-        assert double_sparsity.label_bits == 8
-        assert double_sparsity.channel_config == "channel_config.json"
+            assert config.heavy_size == 0.3
+            assert config.group_factor == 4
+            assert config.label_bits == 8
+            assert config.sorted_channel_file == temp_file_path
+
+            # Test create_from_config
+            double_sparsity = DoubleSparsityTopKMasker.create_from_config(config)
+            assert isinstance(double_sparsity, DoubleSparsityTopKMasker)
+            assert double_sparsity.group_factor == 4
+            assert double_sparsity.label_bits == 8
+            assert double_sparsity.config.sorted_channel_file == temp_file_path
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
 
     def test_hash_attention_top_k_masker_config_and_creation(self):
         """Test HashAttentionTopKMaskerConfig and create_from_config method."""
