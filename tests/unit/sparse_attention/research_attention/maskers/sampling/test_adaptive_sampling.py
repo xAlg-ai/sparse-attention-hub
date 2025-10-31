@@ -38,21 +38,32 @@ class TestAdaptiveSamplingMaskerConfig:
         )
         assert config.base_rate_sampling == 10
 
+    def test_valid_zero_float_base_rate_sampling(self):
+        """Test valid float base_rate_sampling with 0.0."""
+        config = AdaptiveSamplingMaskerConfig(
+            base_rate_sampling=0.0,
+            epsilon=0.1,
+            delta=0.05,
+            init_offset=0,
+            local_offset=0,
+        )
+        assert config.base_rate_sampling == 0.0
+
+    def test_valid_zero_int_base_rate_sampling(self):
+        """Test valid int base_rate_sampling with 0."""
+        config = AdaptiveSamplingMaskerConfig(
+            base_rate_sampling=0,
+            epsilon=0.1,
+            delta=0.05,
+            init_offset=0,
+            local_offset=0,
+        )
+        assert config.base_rate_sampling == 0
+
     def test_invalid_float_base_rate_sampling(self):
         """Test invalid float base_rate_sampling values."""
         with pytest.raises(
-            ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"
-        ):
-            AdaptiveSamplingMaskerConfig(
-                base_rate_sampling=0.0,
-                epsilon=0.1,
-                delta=0.05,
-                init_offset=0,
-                local_offset=0,
-            )
-
-        with pytest.raises(
-            ValueError, match="base_rate_sampling must be in \\(0, 1\\) if float"
+            ValueError, match="base_rate_sampling must be in \\[0, 1\\) if float"
         ):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=1.0,
@@ -65,18 +76,7 @@ class TestAdaptiveSamplingMaskerConfig:
     def test_invalid_int_base_rate_sampling(self):
         """Test invalid int base_rate_sampling values."""
         with pytest.raises(
-            ValueError, match="base_rate_sampling must be positive if int"
-        ):
-            AdaptiveSamplingMaskerConfig(
-                base_rate_sampling=0,
-                epsilon=0.1,
-                delta=0.05,
-                init_offset=0,
-                local_offset=0,
-            )
-
-        with pytest.raises(
-            ValueError, match="base_rate_sampling must be positive if int"
+            ValueError, match="base_rate_sampling must be non-negative if int"
         ):
             AdaptiveSamplingMaskerConfig(
                 base_rate_sampling=-1,
@@ -377,6 +377,80 @@ class TestAdaptiveSamplingMasker:
         )
 
         assert result is full_mask
+
+    def test_add_mask_with_zero_base_rate_sampling(self, sample_tensors):
+        """Test that add_mask returns previous mask when base_rate_sampling is 0."""
+        keys, queries, values, attention_mask = sample_tensors
+
+        # Create a masker with base_rate_sampling=0
+        config_zero = AdaptiveSamplingMaskerConfig(
+            base_rate_sampling=0,
+            epsilon=0.1,
+            delta=0.05,
+            init_offset=0,
+            local_offset=0,
+        )
+        masker_zero = AdaptiveSamplingMasker(config_zero)
+
+        # Create an empty mask
+        empty_mask = Mask.create_empty_mask(
+            (2, 4, 8, 16), dtype=torch.float32, device=torch.device("cpu")
+        )
+
+        # Call add_mask and verify it returns the previous mask unchanged
+        result = masker_zero.add_mask(
+            keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
+            previous_mask=empty_mask,
+        )
+
+        # Verify that the result is the same as the previous mask
+        assert result is empty_mask
+        assert result.is_empty
+
+    def test_add_mask_with_zero_float_base_rate_sampling(self, sample_tensors):
+        """Test that add_mask returns previous mask when base_rate_sampling is 0.0."""
+        keys, queries, values, attention_mask = sample_tensors
+
+        # Create a masker with base_rate_sampling=0.0
+        config_zero = AdaptiveSamplingMaskerConfig(
+            base_rate_sampling=0.0,
+            epsilon=0.1,
+            delta=0.05,
+            init_offset=0,
+            local_offset=0,
+        )
+        masker_zero = AdaptiveSamplingMasker(config_zero)
+
+        # Create a random mask with ~30% sparsity
+        torch.manual_seed(42)
+        shape: tuple[int, int, int, int] = (2, 4, 8, 16)
+        mask_tensor: torch.Tensor = (torch.rand(shape) > 0.3).to(torch.float32)
+        # Add some random weights
+        mask_tensor = mask_tensor * torch.rand(shape, dtype=torch.float32)
+        previous_mask = Mask.create_mask_from_dense_mask(
+            shape, mask_tensor, dtype=torch.float32
+        )
+
+        # Call add_mask and verify it returns the previous mask unchanged
+        result = masker_zero.add_mask(
+            keys,
+            queries,
+            values,
+            attention_mask,
+            scaling=1.0,
+            dropout=0.0,
+            sparse_meta_data={},
+            previous_mask=previous_mask,
+        )
+
+        # Verify that the result is the same as the previous mask
+        assert result is previous_mask
 
     def test_add_mask_basic(self, masker, sample_tensors):
         """Test basic add_mask functionality."""
