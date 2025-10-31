@@ -79,7 +79,6 @@ def _get_doublesparse_path() -> str:
 _doublesparse_path = _get_doublesparse_path()
 # _doublesparse_path = "/home/ubuntu/DoubleSparse"
 sys.path.append(_doublesparse_path)
-from evaluation.modify_llama import LlamaAttention_heavy_hitter, pseudo_quantize
 
 
 def get_custom_attention_function(sparse_attention: SparseAttention) -> Callable:
@@ -186,6 +185,8 @@ def original_attention(
     test_params: Dict[str, int],
 ) -> nn.Module:
     """Create the original implementation from DoubleSparse."""
+    from evaluation.modify_llama import LlamaAttention_heavy_hitter
+
     # Test parameters from config
     heavy_const = test_params["heavy_const"]
     group_factor = test_params["group_factor"]
@@ -338,9 +339,9 @@ def attention_mask(
     attention_mask = torch.zeros(
         small_sequence_length, total_seq_len, dtype=torch.float16
     )
-    attention_mask = attention_mask.masked_fill(
-        ~boolean_mask, float("-inf")
-    ).view(1, 1, small_sequence_length, total_seq_len)
+    attention_mask = attention_mask.masked_fill(~boolean_mask, float("-inf")).view(
+        1, 1, small_sequence_length, total_seq_len
+    )
     return None
 
 
@@ -419,7 +420,7 @@ class TestDoubleSparsityCorrectness:
 
         for key in original_attention_dict:
             if key not in new_dict:
-                raise ValueError(f"Key {key} not found in new attention")
+                raise ValueError(f"Key {key} missing from new attention")
             assert torch.allclose(
                 original_attention_dict[key], new_dict[key], atol=tolerance
             )

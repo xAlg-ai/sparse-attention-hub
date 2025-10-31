@@ -1,3 +1,5 @@
+import os
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -11,6 +13,43 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 
+def _get_doublesparse_path() -> str:
+    """Get the path to DoubleSparse repository, downloading it if necessary."""
+    # Create a temporary directory for DoubleSparse
+    temp_dir = tempfile.gettempdir()
+    doublesparse_path = os.path.join(temp_dir, "DoubleSparse")
+
+    # Check if DoubleSparse already exists
+    if os.path.exists(doublesparse_path):
+        return doublesparse_path
+
+    # Download DoubleSparse from GitHub
+    print(f"Downloading DoubleSparse from GitHub to {doublesparse_path}...")
+    try:
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "https://github.com/andy-yang-1/DoubleSparse.git",
+                doublesparse_path,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        print(f"✅ Successfully downloaded DoubleSparse to {doublesparse_path}")
+        return doublesparse_path
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to download DoubleSparse: {e.stderr}") from e
+
+
+# Import the original implementation from DoubleSparse
+_doublesparse_path = _get_doublesparse_path()
+_meta_llama_config = (
+    _doublesparse_path + "/config/meta-llama/Llama-3.1-8B-Instruct.json"
+)
+
+
 @pytest.mark.unit
 class TestDoubleSparsityTopKMaskerImplementation:
     """Test class for DoubleSparsityTopKMasker implementation."""
@@ -19,7 +58,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         """Test that double sparsity top k masker config can be created."""
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=256,
-            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            sorted_channel_file=_meta_llama_config,
         )
         assert config is not None
         assert config.heavy_size == 256
@@ -30,7 +69,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         """Test config creation with custom group_factor and label_bits."""
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=128,
-            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            sorted_channel_file=_meta_llama_config,
             group_factor=8,
             label_bits=8,
         )
@@ -43,7 +82,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         with pytest.raises(ValueError, match="group_factor must be > 0"):
             DoubleSparsityTopKMaskerConfig(
                 heavy_size=256,
-                sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+                sorted_channel_file=_meta_llama_config,
                 group_factor=0,
             )
 
@@ -51,7 +90,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         with pytest.raises(ValueError, match="label_bits must be in range \\(0, 16\\]"):
             DoubleSparsityTopKMaskerConfig(
                 heavy_size=256,
-                sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+                sorted_channel_file=_meta_llama_config,
                 label_bits=17,
             )
 
@@ -59,7 +98,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         """Test that double sparsity top k masker can be created."""
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=256,
-            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            sorted_channel_file=_meta_llama_config,
         )
         masker = DoubleSparsityTopKMasker.create_from_config(config)
         assert isinstance(masker, DoubleSparsityTopKMasker)
@@ -127,7 +166,7 @@ class TestDoubleSparsityTopKMaskerImplementation:
         """Test pseudo-quantization functionality."""
         config = DoubleSparsityTopKMaskerConfig(
             heavy_size=256,
-            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            sorted_channel_file=_meta_llama_config,
             label_bits=4,
         )
         masker = DoubleSparsityTopKMasker.create_from_config(config)
