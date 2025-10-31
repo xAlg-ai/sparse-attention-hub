@@ -553,10 +553,10 @@ def get_all_sparse_configs(weight_file: str = None, objective: str = "default") 
         )
     ])
     config.masker_configs[2].search_space = {
-        "heavy_size": tune.grid_search([0.01]),
+        "heavy_size": tune.grid_search([0.01, 0.02]),
     }
     config.masker_configs[3].search_space = {
-        "base_rate_sampling": tune.grid_search([0.01, 0.02]),
+        "base_rate_sampling": tune.grid_search([0, 0.01, 0.02]),
         "epsilon": tune.grid_search([0.05]),
         "delta": tune.grid_search([0.05]),
         "init_offset": tune.grid_search([0.01]),
