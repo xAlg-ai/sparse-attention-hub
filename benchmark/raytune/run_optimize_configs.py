@@ -22,6 +22,7 @@ root_path = current_dir.parent.parent
 sys.path.extend([str(current_dir), str(root_path)])
 os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH", "") + f":{current_dir}:{root_path}"
 
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 import torch
 import ray
 from ray import tune
@@ -248,17 +249,17 @@ class ConfigSearchManager:
                 score, density, error = runner(attention_config, task, model)
                 return {"combined_score": score, "density": density, "error": error}
             
-            # ### run a sample objective to ensure there are no errors
-            print("="*10, "Running a short test objective to ensure there are no errors", flush=True)
-            sample_config = {
-                "AdaptiveSamplingMaskerConfig_base_rate_sampling": 0.1,
-                "AdaptiveSamplingMaskerConfig_epsilon": 0.25,
-                "AdaptiveSamplingMaskerConfig_delta": 0.25
-            }
-            result = objective(sample_config)
-            print("="*10, "Successfully ran a short test objective", flush=True)
-            print(sample_config)
-            print(result)
+            # # ### run a sample objective to ensure there are no errors
+            # print("="*10, "Running a short test objective to ensure there are no errors", flush=True)
+            # sample_config = {
+            #     "AdaptiveSamplingMaskerConfig_base_rate_sampling": 0.1,
+            #     "AdaptiveSamplingMaskerConfig_epsilon": 0.25,
+            #     "AdaptiveSamplingMaskerConfig_delta": 0.25
+            # }
+            # result = objective(sample_config)
+            # print("="*10, "Successfully ran a short test objective", flush=True)
+            # print(sample_config)
+            # print(result)
             print("="*100, flush=True)
             
             # Run Ray Tune
@@ -467,10 +468,14 @@ MODEL_CONFIGS = {
     "mistral": {
         "weight_file": os.path.join(weights_dir, "Mistral-7B-Instruct-v0.3.24K.20.500.hat_weights.pkl"),
         "model_name": "mistralai/Mistral-7B-Instruct-v0.3"
+    },
+    "qwen3": {
+        "weight_file": os.path.join(weights_dir, "Mistral-7B-Instruct-v0.3.24K.20.500.hat_weights.pkl"),
+        "model_name": "Qwen/Qwen3-30B-A3B-Instruct-2507"
     }
 }
 
-DEFAULT_MODEL = "llama"
+DEFAULT_MODEL = "qwen3"
 
 # Task configurations
 DEBUG_TASKS = ["loogle/shortdep_qa"]
