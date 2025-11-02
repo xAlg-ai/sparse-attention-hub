@@ -11,7 +11,7 @@ This example uses the MockBenchmark (5 simple samples) for quick demonstration:
 - Fast execution for testing and learning
 
 Usage:
-    python simple_benchmark_example.py
+    python 04_simple_benchmark_example.py
 """
 
 import os
@@ -24,34 +24,33 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/ubuntu/Experiments/sparse-attention-hub')
-sys.path.insert(0, '/home/ubuntu/Experiments/sparse-attention-hub')
+os.chdir('/home/ubuntu/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/sparse-attention-hub')
 
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, QuestTopKMaskerConfig
-)
-from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
-    AdaptiveSamplingMaskerConfig, MagicPigConfig
+    DoubleSparsityTopKMaskerConfig
 )
 
 #from benchmark.longbench import LongBench
 from benchmark.ruler32k import Ruler32K
-from benchmark.longbench.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
-    model_name = "lmsys/longchat-7b-v1.5-32k"
+    model_name = "meta-llama/Llama-3.1-8B-Instruct"
     device = 0
 
     # sorted_channel_file is available in the author's repository
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        QuestTopKMaskerConfig(
+        DoubleSparsityTopKMaskerConfig(
             heavy_size=4096,
-            page_size=16
+            group_factor=2,
+            label_bits=2,
+            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            channel_selection="q_proj"
         )
     ])
     
@@ -66,12 +65,21 @@ def main():
         device=device
     )
     
-    benchmark = LongBench(['narrativeqa'])
+    #benchmark = LongBench(['passage_retrieval_en'])
+    benchmark = Ruler32K(['vt'])
 
     result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
-
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 50, "max_context_length": 32000})
+    metric_logger = MicroMetricLogger()
+    metric_logger.configure_logging(
+            log_path=result_dir,
+            enabled_metrics=[
+                "research_attention_density",
+                "research_attention_output_error",
+            ],
+        )
+    metric_logger.flush()
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 10, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
     
 if __name__ == "__main__":
     main() 

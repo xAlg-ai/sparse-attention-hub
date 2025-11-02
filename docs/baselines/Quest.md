@@ -77,7 +77,7 @@ Some datasets from the LongBench benchmark
 
 ## 3. Comparative Results
 
-Our Results:
+Our Results with model - lmsys/longchat-7b-v1.5-32k:
 
 | Dataset | Token Budget 256 | Token Budget 512 | Token Budget 1024 | Token Budget 2048 | Token Budget 4096 |
 |:--------|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
@@ -89,7 +89,7 @@ Our Results:
 
 Their Results:
 
-[Quest Plots](sparse-attention-hub/docs/quest_plots.png)
+[Quest Plots](sparse-attention-hub/docs/images/quest_plots.png)
 
 ## 4. Explanations of Differences
 The original paper uses dense layers for first 2 transformer blocks. In our setting we are using all sparse layers. Therefore, the differences might arise. However, we have done code matching tests, and our results are within the ball park values as reported by the plots (especially as token budget increases).

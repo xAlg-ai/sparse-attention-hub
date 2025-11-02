@@ -1,7 +1,7 @@
 """Quest Top-K masker implementation."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 import torch
 import torch.nn.functional as F
@@ -19,7 +19,10 @@ from sparse_attention_hub.sparse_attention.utils.kv_utils import (
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
-
+from .utils.quest_utils import (
+    compute_page_min_max,
+    quest_page_scores
+)
 
 @dataclass
 class QuestTopKMaskerConfig(TopKMaskerConfig):
@@ -34,16 +37,14 @@ class QuestTopKMaskerConfig(TopKMaskerConfig):
         }
     )
 
-
 @MaskerRegistry.register(QuestTopKMaskerConfig)
 class QuestTopKMasker(TopKMasker):
-    """Quest page-Top-K masker (vectorized implementation)."""
+    """Quest page-Top-K masker."""
 
     page_size: int
 
     def __init__(self, config: QuestTopKMaskerConfig) -> None:
         super().__init__(config)
-        
         if config.page_size <= 0:
             raise ValueError("page_size must be a positive integer")
         self.page_size = int(config.page_size)
@@ -66,17 +67,12 @@ class QuestTopKMasker(TopKMasker):
             return previous_mask
 
         dims: AttentionTensorDimensions = self._extract_tensor_dimensions(keys, queries)
-
-        effective_heavy_size: int = self._calculate_effective_heavy_size(
-            dims.seq_len_keys
-        )
+        effective_heavy_size: int = self._calculate_effective_heavy_size(dims.seq_len_keys)
 
         if self._should_use_full_attention(dims, effective_heavy_size):
-            return self._create_full_mask(
-                dims, previous_mask.dtype, previous_mask.device
-            )
+            return self._create_full_mask(dims, previous_mask.dtype, previous_mask.device)
 
-        quest_mask = self._create_quest_page_topk_mask(
+        return self._create_quest_page_topk_mask(
             dims,
             effective_heavy_size,
             keys,
@@ -84,7 +80,6 @@ class QuestTopKMasker(TopKMasker):
             attention_mask,
             previous_mask,
         )
-        return previous_mask.merge_mask(quest_mask, inplace=False)
 
     def _create_quest_page_topk_mask(
         self,
@@ -96,63 +91,129 @@ class QuestTopKMasker(TopKMasker):
         previous_mask: Mask,
     ) -> Mask:
         """
-        1) Repeat KV to match query heads (GQA/MQA -> MHA).
-        2) Page the keys, compute per-page min/max: [B,H,P,D].
-        3) Score pages with Quest bound using queries: [B,H,Q,P].
-        4) Select Top-K pages where K_pages = ceil(heavy_tokens / page_size).
-        5) Activate all tokens in selected pages, AND with attention_mask.
+        Steps:
+          1) Repeat KV for GQA/MQA -> MHA.
+          2) Page keys; compute per-page min/max: [B,H,P,D].
+          3) Score pages with Quest bound: [B,H,Q,P].
+          4) Pick Top-K pages where K_pages ~= heavy_tokens / page_size.
+          5) Convert chosen pages to token-level {0,1} (float), then probabilistic-OR (max) with previous probabilities.
+          6) Gate by external attention_mask probabilities (multiply).
         """
+        # 1) Handle GQA/MQA
         ngroups = _get_num_key_value_groups(queries, keys)
-        keys_rep = repeat_kv(keys, ngroups)
+        keys_rep = repeat_kv(keys, ngroups)  # [B,H,K,D]
 
-        B, H, K, D = keys_rep.shape
+        B, H, K, _ = keys_rep.shape
         _, _, Q, _ = queries.shape
 
         page_size = self.page_size
         num_pages = (K + page_size - 1) // page_size
 
-        # Step 2.1: per-page min/max (vectorized)
-        page_min, page_max = self._compute_page_min_max(
-            keys_rep, page_size, num_pages
-        )
+        # 2) Per-page min/max (vectorized) via shared utility
+        page_min, page_max = compute_page_min_max(keys_rep, page_size, num_pages)  # [B,H,P,D]
 
-        # Step 2.2: Quest scores
-        page_scores = self._quest_page_scores(queries, page_min, page_max)
+        # 3) Quest page scores via shared utility
+        page_scores = quest_page_scores(queries, page_min, page_max)  # [B,H,Q,P]
 
-        # Respect external attention mask by forbidding pages with no valid tokens
+        # Convert external attention mask to allowed probabilities in [0,1]
+        # and compute which pages are valid (have any allowed tokens).
+        allowed_prob = None
         if attention_mask is not None:
-            valid_tok = (attention_mask[..., :K] == 0)  # broadcastable to [B,1,Q,K]
-            page_any_valid = self._page_any_valid(valid_tok, page_size, num_pages)  # [B,Q,P]
-            page_any_valid = page_any_valid.unsqueeze(1).expand(B, H, Q, num_pages)  # [B,H,Q,P]
+            allowed_prob = self._attention_mask_to_allowed_prob(attention_mask, K)  # [B,1,*,K] float
+            page_any_valid = self._page_any_valid(allowed_prob, page_size, num_pages)  # [B,Q,P] bool
+            page_any_valid = page_any_valid.unsqueeze(1).expand(B, H, Q, num_pages)    # [B,H,Q,P]
+            # Invalidate pages with no allowed tokens by pushing scores to -inf
             page_scores = torch.where(
-                page_any_valid, page_scores, torch.finfo(page_scores.dtype).min
+                page_any_valid,
+                page_scores,
+                torch.finfo(page_scores.dtype).min,
             )
 
-        # Step 3: choose Kp pages per (B,H,Q)
+        # 4) Select top-k pages per (B,H,Q)
         k_pages = min(num_pages, max(3, heavy_tokens // page_size))
         if k_pages <= 0:
             k_pages = 1
         topk_pages = torch.topk(page_scores, k=k_pages, dim=-1, largest=True).indices  # [B,H,Q,Kp]
 
-        # Start from previous dense mask
-        dense_mask = previous_mask.get_dense_mask()
-        if dense_mask.dtype != torch.bool:
-            dense_mask = dense_mask != 0
+        # Previous dense mask as probabilities in [0,1] (no boolean casts)
+        dense_prev = previous_mask.get_dense_mask()  # [B,H,Q,K]
+        if not dense_prev.dtype.is_floating_point:
+            dense_prev = dense_prev.to(page_scores.dtype)
+        dense_prev = dense_prev.clamp_(0.0, 1.0)
 
-        # Step 4: scatter pages to token mask
-        dense_mask = self._scatter_pages_to_dense_mask(
-            dense_mask, topk_pages, K, page_size
-        )
+        # 5) Build {0,1} (float) token mask from selected pages, then probabilistic-OR via max
+        page_union = self._pages_to_token_mask(
+            topk_pages, K, page_size, device=dense_prev.device, dtype=dense_prev.dtype
+        )  # [B,H,Q,K], values in {0,1} (float)
+        dense_mask = torch.maximum(dense_prev, page_union)
 
-        # Respect token-level attention mask
-        if attention_mask is not None:
-            allowed = (attention_mask[..., :K] == 0)  # [B,1,Q,K] or [B,1,1,K]
-            dense_mask = dense_mask & allowed.expand_as(dense_mask)
+        # 6) Gate by external attention mask via multiplication with allowed probs
+        if allowed_prob is not None:
+            ap = allowed_prob.to(dense_mask.dtype)
+            dense_mask = dense_mask * ap.expand_as(dense_mask)
 
         mask_shape = (B, H, Q, K)
-        return Mask.create_mask_from_dense_mask(
-            mask_shape, dense_mask, dtype=previous_mask.dtype
-        )
+        return Mask.create_mask_from_dense_mask(mask_shape, dense_mask, dtype=previous_mask.dtype)
+
+    
+    def _attention_mask_to_allowed_prob(self, attention_mask: torch.Tensor, K: int) -> torch.Tensor:
+        """
+        Convert attention_mask to allowed-probabilities in [0,1], shape [B,1,*,K].
+        Heuristics:
+            - bool masks: 0 => allow (1.0), 1 => forbid (0.0)
+            - additive float masks: >=0 => allow (1.0), negative => forbid (0.0)
+        """
+        am = attention_mask[..., :K]
+        if am.dtype == torch.bool:
+            allowed = (am == 0).to(torch.float32)
+        else:
+            allowed = (am >= 0).to(torch.float32)
+        if allowed.dim() == 3:
+            allowed = allowed.unsqueeze(1)  # [B,1,*,K]
+        return allowed
+
+    def _page_any_valid(self, allowed_prob: torch.Tensor, page_size: int, num_pages: int) -> torch.Tensor:
+        """
+        allowed_prob: [B,1,Q,K] or [B,1,1,K], float in [0,1]
+        Returns: [B,Q,P] (bool) whether each page has any token with allowed_prob > 0.
+        """
+        B, _, Q_or_one, K = allowed_prob.shape
+        Q = Q_or_one
+        K_pad = num_pages * page_size
+        pad_k = K_pad - K
+
+        if pad_k > 0:
+            ap = F.pad(allowed_prob, (0, pad_k), value=0.0)
+        else:
+            ap = allowed_prob
+
+        ap = ap.view(B, 1, Q, num_pages, page_size)  # [B,1,Q,P,ps]
+        return (ap.max(dim=-1).values > 0).squeeze(1)  # [B,Q,P] bool
+
+    def _pages_to_token_mask(self, topk_pages: torch.Tensor, K: int, page_size: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+        """
+        Convert selected page indices into a {0,1} token mask (float) of shape [B,H,Q,K].
+        Boolean ops are used only locally; the returned mask is float.
+        """
+        if K == 0 or topk_pages.numel() == 0:
+            return torch.zeros((*topk_pages.shape[:3], K), device=device, dtype=dtype)
+
+        B, H, Q, Kp = topk_pages.shape
+        P = (K + page_size - 1) // page_size
+
+        token_idx = torch.arange(K, device=device)       # [K]
+        page_idx  = torch.arange(P, device=device)       # [P]
+        start = page_idx * page_size                     # [P]
+        end   = torch.clamp(start + page_size, max=K)    # [P]
+
+        # [P,K] bool: token k is inside page p (local boolean usage)
+        page_token_mask_bool = (token_idx.unsqueeze(0) >= start.unsqueeze(1)) & \
+                               (token_idx.unsqueeze(0) <  end.unsqueeze(1))
+
+        # Gather masks for the selected pages: [B,H,Q,Kp,K] -> union across pages
+        selected = page_token_mask_bool[topk_pages]          # bool
+        union_selected = selected.any(dim=3).to(dtype)       # float in {0,1}
+        return union_selected
 
     def _calculate_effective_heavy_size(self, seq_len_keys: int) -> int:
         """Token budget based on TopKMaskerConfig.heavy_size (ratio or absolute)."""
@@ -163,107 +224,6 @@ class QuestTopKMasker(TopKMasker):
     ) -> bool:
         """Full attention if the sequence is within the token budget."""
         return dims.seq_len_keys <= max(1, heavy_tokens)
-
-    @staticmethod
-    def _compute_page_min_max(
-        keys_rep: torch.Tensor, page_size: int, num_pages: int
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Compute per-page elementwise min/max over keys.
-        keys_rep: [B, H, K, D]
-        Returns:
-            page_min, page_max: [B, H, P, D]
-        """
-        B, H, K, D = keys_rep.shape
-        K_pad = num_pages * page_size
-        pad_k = K_pad - K  # >= 0
-
-        if pad_k > 0:
-            # Pad along K with constants that won't affect reductions
-            pad_min = F.pad(keys_rep, (0, 0, 0, pad_k), value=float("inf"))
-            pad_max = F.pad(keys_rep, (0, 0, 0, pad_k), value=float("-inf"))
-        else:
-            pad_min = keys_rep
-            pad_max = keys_rep
-
-        # Reshape to [B,H,P,page_size,D]
-        pad_min = pad_min.view(B, H, num_pages, page_size, D)
-        pad_max = pad_max.view(B, H, num_pages, page_size, D)
-
-        # Reduce across the page token axis
-        page_min = pad_min.amin(dim=3)  # [B,H,P,D]
-        page_max = pad_max.amax(dim=3)  # [B,H,P,D]
-        return page_min, page_max
-
-    @staticmethod
-    def _quest_page_scores(
-        queries: torch.Tensor, page_min: torch.Tensor, page_max: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        queries:  [B,H,Q,D]
-        page_min: [B,H,P,D]
-        page_max: [B,H,P,D]
-        Returns:
-            scores: [B,H,Q,P] = sum_j max(q_j * min_j, q_j * max_j)
-        """
-        q = queries.unsqueeze(3)   # [B,H,Q,1,D]
-        pmin = page_min.unsqueeze(2)  # [B,H,1,P,D]
-        pmax = page_max.unsqueeze(2)  # [B,H,1,P,D]
-        prod_min = q * pmin
-        prod_max = q * pmax
-        return torch.maximum(prod_min, prod_max).sum(dim=-1)  # [B,H,Q,P]
-
-    @staticmethod
-    def _page_any_valid(
-        valid_mask: torch.Tensor, page_size: int, num_pages: int
-    ) -> torch.Tensor:
-        """
-        valid_mask: [B,1,Q,K] (bool)
-        Returns: [B,Q,P] (bool) whether each page has any valid token.
-        """
-        B, _, Q, K = valid_mask.shape
-        K_pad = num_pages * page_size
-        pad_k = K_pad - K
-
-        if pad_k > 0:
-            vm = F.pad(valid_mask, (0, pad_k), value=False)
-        else:
-            vm = valid_mask
-
-        # [B,1,Q,P,ps] -> any over page tokens
-        vm = vm.view(B, 1, Q, num_pages, page_size)
-        return vm.any(dim=-1).squeeze(1)  # [B,Q,P]
-
-    @staticmethod
-    def _scatter_pages_to_dense_mask(
-        dense_mask: torch.Tensor, topk_pages: torch.Tensor, K: int, page_size: int
-    ) -> torch.Tensor:
-        """
-        Convert selected page indices into token-level mask and OR with dense_mask.
-        dense_mask: [B,H,Q,K] (bool)
-        topk_pages: [B,H,Q,Kp] (int)
-        """
-        if K == 0 or topk_pages.numel() == 0:
-            return dense_mask
-
-        device = dense_mask.device
-        B, H, Q, Kp = topk_pages.shape
-        P = (K + page_size - 1) // page_size
-
-        # Build [P,K] lookup: True exactly where token k is inside page p
-        token_idx = torch.arange(K, device=device)  # [K]
-        page_idx = torch.arange(P, device=device)   # [P]
-        start = page_idx * page_size                # [P]
-        end = torch.clamp(start + page_size, max=K) # [P]
-        page_token_mask = (token_idx.unsqueeze(0) >= start.unsqueeze(1)) & \
-                          (token_idx.unsqueeze(0) <  end.unsqueeze(1))    # [P,K]
-
-        # Gather masks for the selected pages: [B,H,Q,Kp,K]
-        selected_masks = page_token_mask[topk_pages]  # advanced indexing
-
-        # OR across selected pages: [B,H,Q,K]
-        union_selected = selected_masks.any(dim=3)
-        return dense_mask | union_selected
 
     @classmethod
     def create_from_config(cls, config: MaskerConfig) -> "QuestTopKMasker":

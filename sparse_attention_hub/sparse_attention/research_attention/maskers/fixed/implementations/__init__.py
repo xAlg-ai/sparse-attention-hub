@@ -22,7 +22,6 @@ __all__ = [
     "CausalMasker",
     "SinkMasker",
     "OracleTopK",
-    "OracleTopKMasker",
     "QuestTopKMasker",
     "OracleTopPMasker",
     "PQCache",
