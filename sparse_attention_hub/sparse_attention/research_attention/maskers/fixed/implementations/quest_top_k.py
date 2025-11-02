@@ -132,11 +132,7 @@ class QuestTopKMasker(TopKMasker):
                 torch.finfo(page_scores.dtype).min,
             )
 
-<<<<<<< HEAD
         # 4) Select top-k pages per (B,H,Q)
-=======
-        # Step 3: choose Kp pages per (B,H,Q)
->>>>>>> Add test for Quest
         k_pages = min(num_pages, max(3, heavy_tokens // page_size))
         if k_pages <= 0:
             k_pages = 1
