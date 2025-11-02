@@ -1,11 +1,3 @@
-"""
-:author: Sahil Joshi
-:copyright: 2025 Sparse Attention Hub
-:license: Apache 2.0
-:date: 2025-01-27
-:summary: Correctness tests comparing new QuestTopKMasker with original Quest attention.
-"""
-
 import math
 import os
 import sys
@@ -379,7 +371,6 @@ class TestQuestSparsityCorrectness_Upstream:
 
         with torch.no_grad():
             # ORIGINAL (upstream Quest) — pass a tuple so it concatenates past even with use_cache=False
-            # IMPORTANT: do NOT deepcopy here; some HF builds drop ad-hoc attrs on deepcopy.
             past_k, past_v = _extract_layer_kv(past_key_value, layer_idx=32)
             out_orig, attn_orig, _ = original_attention(
                 hidden_states=hidden_states,
