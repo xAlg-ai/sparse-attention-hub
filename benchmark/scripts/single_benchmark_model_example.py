@@ -11,7 +11,7 @@ This example uses the MockBenchmark (5 simple samples) for quick demonstration:
 - Fast execution for testing and learning
 
 Usage:
-    python 04_simple_benchmark_example.py
+    python simple_benchmark_example.py
 """
 
 import os
@@ -35,10 +35,11 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
 
 #from benchmark.longbench import LongBench
 from benchmark.ruler32k import Ruler32K
+from benchmark.longbench.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
 
 def main():
-    model_name = "meta-llama/Llama-3.1-8B-Instruct"
+    model_name = "lmsys/longchat-7b-v1.5-32k"
     device = 0
 
     # sorted_channel_file is available in the author's repository

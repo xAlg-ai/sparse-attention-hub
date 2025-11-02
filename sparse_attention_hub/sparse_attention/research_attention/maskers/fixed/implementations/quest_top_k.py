@@ -1,7 +1,11 @@
 """Quest Top-K masker implementation."""
 
 from dataclasses import dataclass, field
+<<<<<<< HEAD
 from typing import Any, Dict
+=======
+from typing import Any, Dict, Tuple
+>>>>>>> 04e0cdfe3932c7df97feb4eeb6ef95aebe11e670
 
 import torch
 import torch.nn.functional as F
