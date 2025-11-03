@@ -1,26 +1,33 @@
-import math, os, sys, types, tempfile, subprocess, shutil, time, copy
+import copy
+import importlib.util
+import math
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import types
 from itertools import product
-from typing import Any, Callable, Dict, Optional, Tuple
 from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Tuple
+
 import pytest
 import torch
 import torch.nn as nn
-import importlib.util
-
+from transformers.cache_utils import Cache, DynamicCache
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers.models.llama.modeling_llama import (
     LlamaAttention,
     LlamaRotaryEmbedding,
 )
-from transformers.cache_utils import Cache, DynamicCache
 
+from sparse_attention_hub.sparse_attention.base import SparseAttention
+from sparse_attention_hub.sparse_attention.research_attention import ResearchAttention
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.quest_top_k import (
     QuestTopKMasker,
     QuestTopKMaskerConfig,
 )
-from sparse_attention_hub.sparse_attention.research_attention import ResearchAttention
-from sparse_attention_hub.sparse_attention.base import SparseAttention
-
 
 # ------------------------- Repo bootstrap -------------------------
 
@@ -344,9 +351,8 @@ def new_attention(test_config: LlamaConfig, test_params: Dict[str, Any]) -> nn.M
     """
     Build LlamaAttention using ResearchAttention + QuestTopKMasker.
     """
-    from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
+    from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS, eager_mask
     from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
-    from transformers.masking_utils import eager_mask
 
     past_len = int(test_params["past_sequence_length"])
     page_size = int(test_params["page_size"])

@@ -1,10 +1,10 @@
 """Double sparsity utility functions."""
 
 import json
-import torch.nn.functional as F
 from typing import Dict, List, Tuple
 
 import torch
+import torch.nn.functional as F
 
 
 def compute_page_min_max(

@@ -20,11 +20,11 @@ from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
 from .utils.quest_utils import (
-    compute_page_min_max,
-    quest_page_scores,
-    pages_to_token_mask,
     attention_mask_to_allowed_prob,
+    compute_page_min_max,
+    pages_to_token_mask,
     pages_valid,
+    quest_page_scores,
 )
 
 
