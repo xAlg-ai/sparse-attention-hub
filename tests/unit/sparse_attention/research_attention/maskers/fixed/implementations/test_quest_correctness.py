@@ -1,14 +1,7 @@
-import math
-import os
-import sys
-import types
-import tempfile
-import subprocess
+import math, os, sys, types, tempfile, subprocess, shutil, time, copy
 from itertools import product
 from typing import Any, Callable, Dict, Optional, Tuple
 from pathlib import Path
-import time
-import copy
 import pytest
 import torch
 import torch.nn as nn
@@ -28,55 +21,9 @@ from sparse_attention_hub.sparse_attention.base import SparseAttention
 
 # ------------------------- Repo bootstrap -------------------------
 
-# def _get_quest_path() -> str:
-#     """
-#     Clone https://github.com/mit-han-lab/Quest into a temp dir if not present.
-#     Return the local path.
-#     """
-#     tmp = tempfile.gettempdir()
-#     quest_path = os.path.join(tmp, "Quest")
-#     if os.path.exists(quest_path):
-#         return quest_path
-#     try:
-#         subprocess.run(
-#             ["git", "clone", "--depth", "1",
-#              "https://github.com/mit-han-lab/Quest.git", quest_path],
-#             check=True, capture_output=True, text=True
-#         )
-#     except subprocess.CalledProcessError as e:
-#         raise RuntimeError(f"Failed to clone Quest: {e.stderr}") from e
-#     return quest_path
-
-
-# def _load_quest_forward():
-#     """
-#     Import evaluation/quest_attention.py and return the forward function
-#     to monkey-patch onto HF LlamaAttention.
-#     """
-#     quest_path = _get_quest_path()
-#     if quest_path not in sys.path:
-#         sys.path.append(quest_path)
-
-#     import importlib
-#     mod = importlib.import_module("evaluation.quest_attention")
-
-#     candidates = [
-#         "forward",
-#     ]
-#     for name in candidates:
-#         fn = getattr(mod, name, None)
-#         if callable(fn):
-#             return fn
-
-#     raise ImportError(
-#         "Could not find a quest attention forward function in evaluation/quest_attention.py. "
-#         "Checked: " + ", ".join(candidates)
-#     )
-
-
 QUEST_REPO = os.environ.get("QUEST_REPO", "https://github.com/mit-han-lab/Quest.git")
 # Optionally pin to a known commit/branch/tag for stability:
-QUEST_REF  = os.environ.get("QUEST_REF", "")  # e.g., "main" or a commit hash
+QUEST_REF  = os.environ.get("QUEST_REF", "")
 
 CACHE_ROOT = Path(tempfile.gettempdir()) / "quest_cache"
 FINAL_DIR  = CACHE_ROOT / "Quest"
