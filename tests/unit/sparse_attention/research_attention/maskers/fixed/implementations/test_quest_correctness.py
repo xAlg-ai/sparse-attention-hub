@@ -8,7 +8,10 @@ import torch.nn as nn
 import importlib.util
 
 from transformers.models.llama.configuration_llama import LlamaConfig
-from transformers.models.llama.modeling_llama import LlamaAttention, LlamaRotaryEmbedding
+from transformers.models.llama.modeling_llama import (
+    LlamaAttention,
+    LlamaRotaryEmbedding,
+)
 from transformers.cache_utils import Cache, DynamicCache
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.quest_top_k import (
@@ -23,10 +26,10 @@ from sparse_attention_hub.sparse_attention.base import SparseAttention
 
 QUEST_REPO = os.environ.get("QUEST_REPO", "https://github.com/mit-han-lab/Quest.git")
 # Optionally pin to a known commit/branch/tag for stability:
-QUEST_REF  = os.environ.get("QUEST_REF", "")
+QUEST_REF = os.environ.get("QUEST_REF", "")
 
 CACHE_ROOT = Path(tempfile.gettempdir()) / "quest_cache"
-FINAL_DIR  = CACHE_ROOT / "Quest"
+FINAL_DIR = CACHE_ROOT / "Quest"
 MODULE_REL = Path("evaluation/quest_attention.py")
 
 
@@ -47,17 +50,34 @@ def _atomic_clone_quest() -> Path:
         env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
         # If you pin a ref, do a full clone + checkout; else shallow clone is fine
         if QUEST_REF:
-            subprocess.run(["git", "clone", QUEST_REPO, str(tmp_dir)],
-                           check=True, capture_output=True, text=True, env=env)
-            subprocess.run(["git", "-C", str(tmp_dir), "checkout", QUEST_REF],
-                           check=True, capture_output=True, text=True, env=env)
+            subprocess.run(
+                ["git", "clone", QUEST_REPO, str(tmp_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            subprocess.run(
+                ["git", "-C", str(tmp_dir), "checkout", QUEST_REF],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
         else:
-            subprocess.run(["git", "clone", "--depth", "1", QUEST_REPO, str(tmp_dir)],
-                           check=True, capture_output=True, text=True, env=env)
+            subprocess.run(
+                ["git", "clone", "--depth", "1", QUEST_REPO, str(tmp_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
 
         candidate = tmp_dir / MODULE_REL
         if not candidate.exists():
-            raise RuntimeError(f"Quest clone OK but missing {MODULE_REL} at {candidate}")
+            raise RuntimeError(
+                f"Quest clone OK but missing {MODULE_REL} at {candidate}"
+            )
 
         # Replace existing atomically (best effort on same filesystem)
         if FINAL_DIR.exists():
@@ -111,7 +131,9 @@ def get_custom_attention_function(sparse_attention: SparseAttention) -> Callable
             sparse_meta_data: Dict[Any, Any] = kwargs["sparse_meta_data"]
             kwargs.pop("sparse_meta_data", None)
         else:
-            raise ValueError("sparse_meta_data must be provided while calling model.forward()")
+            raise ValueError(
+                "sparse_meta_data must be provided while calling model.forward()"
+            )
 
         return sparse_attention.custom_attention(
             module=module,
@@ -151,6 +173,7 @@ TEST_CONFIGS = [
 
 
 # ------------------------- Fixtures -------------------------
+
 
 @pytest.fixture
 def test_config() -> LlamaConfig:
@@ -195,13 +218,19 @@ def tolerance() -> float:
 
 
 @pytest.fixture
-def hidden_states(test_config: LlamaConfig, batch_size: int, small_sequence_length: int) -> torch.Tensor:
+def hidden_states(
+    test_config: LlamaConfig, batch_size: int, small_sequence_length: int
+) -> torch.Tensor:
     g = torch.Generator().manual_seed(1)
-    return torch.randn(batch_size, small_sequence_length, test_config.hidden_size, generator=g)
+    return torch.randn(
+        batch_size, small_sequence_length, test_config.hidden_size, generator=g
+    )
 
 
 @pytest.fixture
-def past_key_value(test_config: LlamaConfig, batch_size: int, past_sequence_length: int) -> Optional[Cache]:
+def past_key_value(
+    test_config: LlamaConfig, batch_size: int, past_sequence_length: int
+) -> Optional[Cache]:
     """
     Make a DynamicCache and ALSO stash the generated tensors on it so we
     don't depend on private HF internals in different versions.
@@ -210,8 +239,20 @@ def past_key_value(test_config: LlamaConfig, batch_size: int, past_sequence_leng
     head_dim = test_config.hidden_size // test_config.num_attention_heads
     gk = torch.Generator().manual_seed(2)
     gv = torch.Generator().manual_seed(3)
-    past_k = torch.randn(batch_size, test_config.num_key_value_heads, past_sequence_length, head_dim, generator=gk)
-    past_v = torch.randn(batch_size, test_config.num_key_value_heads, past_sequence_length, head_dim, generator=gv)
+    past_k = torch.randn(
+        batch_size,
+        test_config.num_key_value_heads,
+        past_sequence_length,
+        head_dim,
+        generator=gk,
+    )
+    past_v = torch.randn(
+        batch_size,
+        test_config.num_key_value_heads,
+        past_sequence_length,
+        head_dim,
+        generator=gv,
+    )
     cache_kwargs = {"cache_position": torch.arange(past_sequence_length)}
     layer_idx = 32
     cache.update(past_k, past_v, layer_idx=layer_idx, cache_kwargs=cache_kwargs)
@@ -230,7 +271,9 @@ def attention_mask() -> Optional[torch.Tensor]:
 
 
 @pytest.fixture
-def position_ids(small_sequence_length: int, past_sequence_length: int) -> torch.LongTensor:
+def position_ids(
+    small_sequence_length: int, past_sequence_length: int
+) -> torch.LongTensor:
     start_pos = past_sequence_length
     end_pos = start_pos + small_sequence_length
     return torch.arange(start_pos, end_pos).unsqueeze(0)
@@ -240,7 +283,9 @@ def position_ids(small_sequence_length: int, past_sequence_length: int) -> torch
 def position_embeddings(test_config: LlamaConfig, position_ids: torch.LongTensor):
     rotary = LlamaRotaryEmbedding(config=test_config)
     head_dim = test_config.hidden_size // test_config.num_attention_heads
-    dummy = torch.randn(1, test_config.num_attention_heads, position_ids.shape[1], head_dim)
+    dummy = torch.randn(
+        1, test_config.num_attention_heads, position_ids.shape[1], head_dim
+    )
     cos, sin = rotary(dummy, position_ids)
     return cos, sin
 
@@ -253,7 +298,9 @@ def _effective_ratio(past_len: int, page_size: int, ratio: float) -> float:
 
 
 @pytest.fixture
-def original_attention(test_config: LlamaConfig, test_params: Dict[str, Any]) -> nn.Module:
+def original_attention(
+    test_config: LlamaConfig, test_params: Dict[str, Any]
+) -> nn.Module:
     """
     Build a LlamaAttention and monkeypatch its forward with the upstream Quest implementation.
     """
@@ -301,9 +348,9 @@ def new_attention(test_config: LlamaConfig, test_params: Dict[str, Any]) -> nn.M
     from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
     from transformers.masking_utils import eager_mask
 
-    past_len  = int(test_params["past_sequence_length"])
+    past_len = int(test_params["past_sequence_length"])
     page_size = int(test_params["page_size"])
-    ratio     = float(test_params["heavy_ratio"])
+    ratio = float(test_params["heavy_ratio"])
     eff_ratio = _effective_ratio(past_len, page_size, ratio)
 
     cfg = QuestTopKMaskerConfig(
@@ -311,7 +358,9 @@ def new_attention(test_config: LlamaConfig, test_params: Dict[str, Any]) -> nn.M
         page_size=page_size,
     )
     masker = QuestTopKMasker.create_from_config(cfg)
-    research_attention = ResearchAttention(sparse_attention_config=cfg, maskers=[masker])
+    research_attention = ResearchAttention(
+        sparse_attention_config=cfg, maskers=[masker]
+    )
     custom_fn = get_custom_attention_function(research_attention)
 
     custom_name = f"quest_top_k_masker_{page_size}_{ratio}"
@@ -324,6 +373,7 @@ def new_attention(test_config: LlamaConfig, test_params: Dict[str, Any]) -> nn.M
 
 
 # ------------------------- Helpers -------------------------
+
 
 def _extract_layer_kv(dc: DynamicCache, layer_idx: int):
     """
@@ -362,6 +412,7 @@ def _extract_layer_kv(dc: DynamicCache, layer_idx: int):
 
 # ------------------------- Test -------------------------
 
+
 @pytest.mark.unit
 class TestQuestSparsityCorrectness_Upstream:
     def test_compare_outputs(
@@ -386,7 +437,9 @@ class TestQuestSparsityCorrectness_Upstream:
         new_dict = new_attention.state_dict()
         for k, v in original_attention.state_dict().items():
             assert k in new_dict, f"Missing key in new attention: {k}"
-            assert torch.allclose(v, new_dict[k], atol=tolerance), f"Param mismatch at {k}"
+            assert torch.allclose(
+                v, new_dict[k], atol=tolerance
+            ), f"Param mismatch at {k}"
 
         with torch.no_grad():
             # ORIGINAL (upstream Quest) — pass a tuple so it concatenates past even with use_cache=False
@@ -411,5 +464,9 @@ class TestQuestSparsityCorrectness_Upstream:
                 sparse_meta_data={},
             )
 
-        assert torch.allclose(out_orig, out_new, atol=tolerance), "Attention outputs differ"
-        assert torch.allclose(attn_orig, attn_new, atol=tolerance), "Attention weights differ"
+        assert torch.allclose(
+            out_orig, out_new, atol=tolerance
+        ), "Attention outputs differ"
+        assert torch.allclose(
+            attn_orig, attn_new, atol=tolerance
+        ), "Attention weights differ"

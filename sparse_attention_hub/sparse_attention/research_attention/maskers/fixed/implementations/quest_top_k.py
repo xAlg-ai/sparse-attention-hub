@@ -24,12 +24,14 @@ from .utils.quest_utils import (
     quest_page_scores,
     pages_to_token_mask,
     attention_mask_to_allowed_prob,
-    pages_valid
+    pages_valid,
 )
+
 
 @dataclass
 class QuestTopKMaskerConfig(TopKMaskerConfig):
     """Configuration for QuestTopKMasker."""
+
     page_size: int
     search_space: Dict[str, Any] = field(
         default_factory=lambda: {
@@ -40,6 +42,7 @@ class QuestTopKMaskerConfig(TopKMaskerConfig):
         }
     )
 
+
 @MaskerRegistry.register(QuestTopKMaskerConfig)
 class QuestTopKMasker(TopKMasker):
     """Quest page-Top-K masker."""
@@ -48,7 +51,7 @@ class QuestTopKMasker(TopKMasker):
 
     def __init__(self, config: QuestTopKMaskerConfig) -> None:
         super().__init__(config)
-        
+
         if config.page_size <= 0:
             raise ValueError("page_size must be a positive integer")
         self.page_size = int(config.page_size)
@@ -71,7 +74,9 @@ class QuestTopKMasker(TopKMasker):
             return previous_mask
 
         dims: AttentionTensorDimensions = self._extract_tensor_dimensions(keys, queries)
-        effective_heavy_size: int = self._calculate_effective_size(self.heavy_size, dims.seq_len_keys)
+        effective_heavy_size: int = self._calculate_effective_size(
+            self.heavy_size, dims.seq_len_keys
+        )
 
         if self._should_use_full_attention(dims, effective_heavy_size):
             return self._create_full_mask(
@@ -116,7 +121,9 @@ class QuestTopKMasker(TopKMasker):
         num_pages = (K + page_size - 1) // page_size
 
         # 2) Per-page min/max (vectorized) via shared utility
-        page_min, page_max = compute_page_min_max(keys_rep, page_size, num_pages)  # [B,H,P,D]
+        page_min, page_max = compute_page_min_max(
+            keys_rep, page_size, num_pages
+        )  # [B,H,P,D]
 
         # 3) Quest page scores via shared utility
         page_scores = quest_page_scores(queries, page_min, page_max)  # [B,H,Q,P]
@@ -125,9 +132,15 @@ class QuestTopKMasker(TopKMasker):
         # and compute which pages are valid (have any allowed tokens).
         allowed_prob = None
         if attention_mask is not None:
-            allowed_prob = attention_mask_to_allowed_prob(attention_mask, K)  # [B,1,*,K] float
-            page_any_valid = pages_valid(allowed_prob, page_size, num_pages)  # [B,Q,P] bool
-            page_any_valid = page_any_valid.unsqueeze(1).expand(B, H, Q, num_pages)    # [B,H,Q,P]
+            allowed_prob = attention_mask_to_allowed_prob(
+                attention_mask, K
+            )  # [B,1,*,K] float
+            page_any_valid = pages_valid(
+                allowed_prob, page_size, num_pages
+            )  # [B,Q,P] bool
+            page_any_valid = page_any_valid.unsqueeze(1).expand(
+                B, H, Q, num_pages
+            )  # [B,H,Q,P]
             # Invalidate pages with no allowed tokens by pushing scores to -inf
             page_scores = torch.where(
                 page_any_valid,
@@ -139,7 +152,9 @@ class QuestTopKMasker(TopKMasker):
         k_pages = min(num_pages, max(3, heavy_tokens // page_size))
         if k_pages <= 0:
             k_pages = 1
-        topk_pages = torch.topk(page_scores, k=k_pages, dim=-1, largest=True).indices  # [B,H,Q,Kp]
+        topk_pages = torch.topk(
+            page_scores, k=k_pages, dim=-1, largest=True
+        ).indices  # [B,H,Q,Kp]
 
         # Previous dense mask as probabilities in [0,1] (no boolean casts)
         dense_prev = previous_mask.get_dense_mask()  # [B,H,Q,K]
@@ -159,7 +174,9 @@ class QuestTopKMasker(TopKMasker):
             dense_mask = dense_mask * ap.expand_as(dense_mask)
 
         mask_shape = (B, H, Q, K)
-        return Mask.create_mask_from_dense_mask(mask_shape, dense_mask, dtype=previous_mask.dtype)
+        return Mask.create_mask_from_dense_mask(
+            mask_shape, dense_mask, dtype=previous_mask.dtype
+        )
 
     def _should_use_full_attention(
         self, dims: AttentionTensorDimensions, heavy_tokens: int
