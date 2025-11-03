@@ -12,6 +12,7 @@ import copy
 import pytest
 import torch
 import torch.nn as nn
+import importlib.util
 
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaAttention, LlamaRotaryEmbedding
@@ -73,78 +74,75 @@ from sparse_attention_hub.sparse_attention.base import SparseAttention
 #     )
 
 
-QUEST_REPO = "https://github.com/mit-han-lab/Quest.git"
-QUEST_CACHE_ROOT = Path(tempfile.gettempdir()) / "quest_cache"
-QUEST_FINAL_DIR = QUEST_CACHE_ROOT / "Quest"
-QUEST_MODULE_PATH = QUEST_FINAL_DIR / "evaluation" / "quest_attention.py"
+QUEST_REPO = os.environ.get("QUEST_REPO", "https://github.com/mit-han-lab/Quest.git")
+# Optionally pin to a known commit/branch/tag for stability:
+QUEST_REF  = os.environ.get("QUEST_REF", "")  # e.g., "main" or a commit hash
 
-def _ensure_quest_checked_out() -> Path:
-    QUEST_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+CACHE_ROOT = Path(tempfile.gettempdir()) / "quest_cache"
+FINAL_DIR  = CACHE_ROOT / "Quest"
+MODULE_REL = Path("evaluation/quest_attention.py")
 
-    # Fast path: already fully present
-    if QUEST_MODULE_PATH.exists():
-        return QUEST_FINAL_DIR
 
-    # Clone into a unique temp dir then atomically replace the cache dir
-    tmp_dir = QUEST_CACHE_ROOT / f"Quest_tmp_{os.getpid()}_{int(time.time()*1000)}"
+def _atomic_clone_quest() -> Path:
+    """
+    Ensure Quest is present in FINAL_DIR with evaluation/quest_attention.py available.
+    Uses an atomic temp-dir -> os.replace workflow to avoid races on CI.
+    Returns the FINAL_DIR path.
+    """
+    CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+
+    # Fast path: already present AND file exists
+    if (FINAL_DIR / MODULE_REL).exists():
+        return FINAL_DIR
+
+    tmp_dir = CACHE_ROOT / f"Quest_tmp_{os.getpid()}_{int(time.time() * 1000)}"
     try:
-        env = os.environ.copy()
-        env.setdefault("GIT_TERMINAL_PROMPT", "0")
-        subprocess.run(
-            ["git", "clone", "--depth", "1", QUEST_REPO, str(tmp_dir)],
-            check=True, capture_output=True, text=True, env=env,
-        )
-        # Validate expected layout before swapping in
-        candidate = tmp_dir / "evaluation" / "quest_attention.py"
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+        # If you pin a ref, do a full clone + checkout; else shallow clone is fine
+        if QUEST_REF:
+            subprocess.run(["git", "clone", QUEST_REPO, str(tmp_dir)],
+                           check=True, capture_output=True, text=True, env=env)
+            subprocess.run(["git", "-C", str(tmp_dir), "checkout", QUEST_REF],
+                           check=True, capture_output=True, text=True, env=env)
+        else:
+            subprocess.run(["git", "clone", "--depth", "1", QUEST_REPO, str(tmp_dir)],
+                           check=True, capture_output=True, text=True, env=env)
+
+        candidate = tmp_dir / MODULE_REL
         if not candidate.exists():
-            raise RuntimeError(
-                "Quest repo layout changed or clone incomplete: "
-                f"missing {candidate}"
-            )
+            raise RuntimeError(f"Quest clone OK but missing {MODULE_REL} at {candidate}")
 
         # Replace existing atomically (best effort on same filesystem)
-        if QUEST_FINAL_DIR.exists():
-            shutil.rmtree(QUEST_FINAL_DIR)
-        os.replace(str(tmp_dir), str(QUEST_FINAL_DIR))
+        if FINAL_DIR.exists():
+            shutil.rmtree(FINAL_DIR)
+        os.replace(str(tmp_dir), str(FINAL_DIR))
     except Exception:
-        # Cleanup temp dir on failure
         with contextlib.suppress(Exception):
             shutil.rmtree(tmp_dir)
         raise
 
-    return QUEST_FINAL_DIR
+    return FINAL_DIR
 
-def _get_quest_path() -> str:
-    return str(_ensure_quest_checked_out())
 
 def _load_quest_forward():
     """
-    Import evaluation/quest_attention.py from the Quest repo and
-    return a callable forward function.
+    Import Quest's evaluation/quest_attention.py by *file path* and return its `forward` callable.
+    This does NOT rely on sys.path package imports, so it avoids race/namespace issues on CI.
     """
-    quest_path = _get_quest_path()
-    if quest_path not in sys.path:
-        sys.path.insert(0, quest_path)  # ensure highest priority
+    repo = _atomic_clone_quest()
+    mod_path = repo / MODULE_REL
 
-    import importlib
-    try:
-        mod = importlib.import_module("evaluation.quest_attention")
-    except ModuleNotFoundError as e:
-        # Extra diagnostics to help CI debugging
-        raise ModuleNotFoundError(
-            f"Could not import evaluation.quest_attention from {quest_path}. "
-            f"Contents of {quest_path!r}: {os.listdir(quest_path)}"
-        ) from e
+    spec = importlib.util.spec_from_file_location("quest_attention_mod", mod_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot create import spec for {mod_path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-    for name in ("forward",):
-        fn = getattr(mod, name, None)
-        if callable(fn):
-            return fn
+    fn = getattr(mod, "forward", None)
+    if not callable(fn):
+        raise ImportError("`forward` not found or not callable in quest_attention.py")
+    return fn
 
-    raise ImportError(
-        "Could not find a quest attention forward function in evaluation/quest_attention.py. "
-        "Checked: forward"
-    )
 
 def get_custom_attention_function(sparse_attention: SparseAttention) -> Callable:
     def custom_attention_callable(
