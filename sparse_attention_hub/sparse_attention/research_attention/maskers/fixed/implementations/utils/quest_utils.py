@@ -1,7 +1,5 @@
-"""Double sparsity utility functions."""
-
-import json
-from typing import Dict, List, Tuple
+"""Quest utility functions."""
+from typing import Tuple
 
 import torch
 import torch.nn.functional as F

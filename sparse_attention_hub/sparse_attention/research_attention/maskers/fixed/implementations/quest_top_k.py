@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict
 
 import torch
-import torch.nn.functional as F
 from ray import tune
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
