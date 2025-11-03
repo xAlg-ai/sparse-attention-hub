@@ -113,7 +113,7 @@ def pages_valid(
     allowed_prob: [B,1,Q,K] or [B,1,1,K], float in [0,1]
     Returns: [B,Q,P] (bool) whether each page has any token with allowed_prob > 0.
     """
-    B, _, Q_or_one, K = allowed_prob.shape
+    B, H, Q_or_one, K = allowed_prob.shape
     Q = Q_or_one
     K_pad = num_pages * page_size
     pad_k = K_pad - K
@@ -123,5 +123,7 @@ def pages_valid(
     else:
         ap = allowed_prob
 
+    if H != 1:
+        ap = ap.max(dim=1, keepdim=True).values  # [B,1,Q,K_pad]
     ap = ap.view(B, 1, Q, num_pages, page_size)  # [B,1,Q,P,ps]
     return (ap.max(dim=-1).values > 0).squeeze(1)  # [B,Q,P] bool
