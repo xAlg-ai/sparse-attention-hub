@@ -71,7 +71,7 @@ class QuestTopKMasker(TopKMasker):
             return previous_mask
 
         dims: AttentionTensorDimensions = self._extract_tensor_dimensions(keys, queries)
-        effective_heavy_size: int = self._calculate_effective_size(self.heavy_size, seq_len_keys)
+        effective_heavy_size: int = self._calculate_effective_size(self.heavy_size, dims.seq_len_keys)
 
         if self._should_use_full_attention(dims, effective_heavy_size):
             return self._create_full_mask(
@@ -160,7 +160,6 @@ class QuestTopKMasker(TopKMasker):
 
         mask_shape = (B, H, Q, K)
         return Mask.create_mask_from_dense_mask(mask_shape, dense_mask, dtype=previous_mask.dtype)
-        
 
     def _should_use_full_attention(
         self, dims: AttentionTensorDimensions, heavy_tokens: int
