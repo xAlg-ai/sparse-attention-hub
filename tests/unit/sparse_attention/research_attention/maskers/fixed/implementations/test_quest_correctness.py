@@ -6,7 +6,8 @@ import tempfile
 import subprocess
 from itertools import product
 from typing import Any, Callable, Dict, Optional, Tuple
-
+from pathlib import Path
+import time
 import copy
 import pytest
 import torch
@@ -26,51 +27,124 @@ from sparse_attention_hub.sparse_attention.base import SparseAttention
 
 # ------------------------- Repo bootstrap -------------------------
 
-def _get_quest_path() -> str:
-    """
-    Clone https://github.com/mit-han-lab/Quest into a temp dir if not present.
-    Return the local path.
-    """
-    tmp = tempfile.gettempdir()
-    quest_path = os.path.join(tmp, "Quest")
-    if os.path.exists(quest_path):
-        return quest_path
-    try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1",
-             "https://github.com/mit-han-lab/Quest.git", quest_path],
-            check=True, capture_output=True, text=True
-        )
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to clone Quest: {e.stderr}") from e
-    return quest_path
+# def _get_quest_path() -> str:
+#     """
+#     Clone https://github.com/mit-han-lab/Quest into a temp dir if not present.
+#     Return the local path.
+#     """
+#     tmp = tempfile.gettempdir()
+#     quest_path = os.path.join(tmp, "Quest")
+#     if os.path.exists(quest_path):
+#         return quest_path
+#     try:
+#         subprocess.run(
+#             ["git", "clone", "--depth", "1",
+#              "https://github.com/mit-han-lab/Quest.git", quest_path],
+#             check=True, capture_output=True, text=True
+#         )
+#     except subprocess.CalledProcessError as e:
+#         raise RuntimeError(f"Failed to clone Quest: {e.stderr}") from e
+#     return quest_path
 
+
+# def _load_quest_forward():
+#     """
+#     Import evaluation/quest_attention.py and return the forward function
+#     to monkey-patch onto HF LlamaAttention.
+#     """
+#     quest_path = _get_quest_path()
+#     if quest_path not in sys.path:
+#         sys.path.append(quest_path)
+
+#     import importlib
+#     mod = importlib.import_module("evaluation.quest_attention")
+
+#     candidates = [
+#         "forward",
+#     ]
+#     for name in candidates:
+#         fn = getattr(mod, name, None)
+#         if callable(fn):
+#             return fn
+
+#     raise ImportError(
+#         "Could not find a quest attention forward function in evaluation/quest_attention.py. "
+#         "Checked: " + ", ".join(candidates)
+#     )
+
+
+QUEST_REPO = "https://github.com/mit-han-lab/Quest.git"
+QUEST_CACHE_ROOT = Path(tempfile.gettempdir()) / "quest_cache"
+QUEST_FINAL_DIR = QUEST_CACHE_ROOT / "Quest"
+QUEST_MODULE_PATH = QUEST_FINAL_DIR / "evaluation" / "quest_attention.py"
+
+def _ensure_quest_checked_out() -> Path:
+    QUEST_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+
+    # Fast path: already fully present
+    if QUEST_MODULE_PATH.exists():
+        return QUEST_FINAL_DIR
+
+    # Clone into a unique temp dir then atomically replace the cache dir
+    tmp_dir = QUEST_CACHE_ROOT / f"Quest_tmp_{os.getpid()}_{int(time.time()*1000)}"
+    try:
+        env = os.environ.copy()
+        env.setdefault("GIT_TERMINAL_PROMPT", "0")
+        subprocess.run(
+            ["git", "clone", "--depth", "1", QUEST_REPO, str(tmp_dir)],
+            check=True, capture_output=True, text=True, env=env,
+        )
+        # Validate expected layout before swapping in
+        candidate = tmp_dir / "evaluation" / "quest_attention.py"
+        if not candidate.exists():
+            raise RuntimeError(
+                "Quest repo layout changed or clone incomplete: "
+                f"missing {candidate}"
+            )
+
+        # Replace existing atomically (best effort on same filesystem)
+        if QUEST_FINAL_DIR.exists():
+            shutil.rmtree(QUEST_FINAL_DIR)
+        os.replace(str(tmp_dir), str(QUEST_FINAL_DIR))
+    except Exception:
+        # Cleanup temp dir on failure
+        with contextlib.suppress(Exception):
+            shutil.rmtree(tmp_dir)
+        raise
+
+    return QUEST_FINAL_DIR
+
+def _get_quest_path() -> str:
+    return str(_ensure_quest_checked_out())
 
 def _load_quest_forward():
     """
-    Import evaluation/quest_attention.py and return the forward function
-    to monkey-patch onto HF LlamaAttention.
+    Import evaluation/quest_attention.py from the Quest repo and
+    return a callable forward function.
     """
     quest_path = _get_quest_path()
     if quest_path not in sys.path:
-        sys.path.append(quest_path)
+        sys.path.insert(0, quest_path)  # ensure highest priority
 
     import importlib
-    mod = importlib.import_module("evaluation.quest_attention")
+    try:
+        mod = importlib.import_module("evaluation.quest_attention")
+    except ModuleNotFoundError as e:
+        # Extra diagnostics to help CI debugging
+        raise ModuleNotFoundError(
+            f"Could not import evaluation.quest_attention from {quest_path}. "
+            f"Contents of {quest_path!r}: {os.listdir(quest_path)}"
+        ) from e
 
-    candidates = [
-        "forward",
-    ]
-    for name in candidates:
+    for name in ("forward",):
         fn = getattr(mod, name, None)
         if callable(fn):
             return fn
 
     raise ImportError(
         "Could not find a quest attention forward function in evaluation/quest_attention.py. "
-        "Checked: " + ", ".join(candidates)
+        "Checked: forward"
     )
-
 
 def get_custom_attention_function(sparse_attention: SparseAttention) -> Callable:
     def custom_attention_callable(
