@@ -1,4 +1,5 @@
 """Quest utility functions."""
+
 from typing import Tuple
 
 import torch
@@ -9,30 +10,43 @@ def compute_page_min_max(
     keys_rep: torch.Tensor, page_size: int, num_pages: int
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Compute per-page elementwise min/max over keys.
     keys_rep: [B, H, K, D]
-    Returns:
-        page_min, page_max: [B, H, P, D]
+    returns:
+      page_min, page_max: [B, H, P=num_pages, D]
     """
     B, H, K, D = keys_rep.shape
-    K_pad = num_pages * page_size
-    pad_k = K_pad - K  # >= 0
 
-    if pad_k > 0:
-        # Pad along K with constants that won't affect reductions
-        pad_min = F.pad(keys_rep, (0, 0, 0, pad_k), value=float("inf"))
-        pad_max = F.pad(keys_rep, (0, 0, 0, pad_k), value=float("-inf"))
-    else:
-        pad_min = keys_rep
-        pad_max = keys_rep
+    # Number of full pages and size of the trailing (partial) page
+    P_full = K // page_size
+    tail = K - P_full * page_size  # 0..page_size-1
 
-    # Reshape to [B,H,P,page_size,D]
-    pad_min = pad_min.view(B, H, num_pages, page_size, D)
-    pad_max = pad_max.view(B, H, num_pages, page_size, D)
+    # Fast path: no tail -> just reshape and reduce once
+    if tail == 0:
+        x = keys_rep.reshape(B, H, P_full, page_size, D)  # safe even if non-contig
+        page_min = x.amin(dim=3)  # [B,H,P_full,D]
+        page_max = x.amax(dim=3)  # [B,H,P_full,D]
+        return page_min, page_max  # here num_pages == P_full
 
-    # Reduce across the page token axis
-    page_min = pad_min.amin(dim=3)  # [B,H,P,D]
-    page_max = pad_max.amax(dim=3)  # [B,H,P,D]
+    # General path: full pages + a tiny tail reduction, NO padding
+    # Full pages part
+    K_main = P_full * page_size
+    main = keys_rep[..., :K_main, :].reshape(
+        B, H, P_full, page_size, D
+    )  # [B,H,P_full,ps,D]
+    page_min_main = main.amin(dim=3)  # [B,H,P_full,D]
+    page_max_main = main.amax(dim=3)  # [B,H,P_full,D]
+
+    # Tail page (size = tail)
+    tail_chunk = keys_rep[..., K_main:, :]  # [B,H,tail,D]
+    tail_min = tail_chunk.amin(dim=2).unsqueeze(2)  # [B,H,1,D]
+    tail_max = tail_chunk.amax(dim=2).unsqueeze(2)  # [B,H,1,D]
+
+    # Concatenate full pages + tail to reach num_pages
+    page_min = torch.cat([page_min_main, tail_min], dim=2)  # [B,H,P_full+1,D]
+    page_max = torch.cat([page_max_main, tail_max], dim=2)  # [B,H,P_full+1,D]
+
+    # Sanity: P_full + 1 must equal num_pages
+    # (If your caller precomputed num_pages, it should already be ceil(K/page_size))
     return page_min, page_max
 
 
@@ -62,8 +76,7 @@ def pages_to_token_mask(
     dtype: torch.dtype,
 ) -> torch.Tensor:
     """
-    Convert selected page indices into a {0,1} token mask (float) of shape [B,H,Q,K].
-    Boolean ops are used only locally; the returned mask is float.
+    Return dense {0,1} float mask [B,H,Q,K] without constructing [P,K].
     """
     if K == 0 or topk_pages.numel() == 0:
         return torch.zeros((*topk_pages.shape[:3], K), device=device, dtype=dtype)
@@ -71,20 +84,13 @@ def pages_to_token_mask(
     B, H, Q, Kp = topk_pages.shape
     P = (K + page_size - 1) // page_size
 
-    token_idx = torch.arange(K, device=device)  # [K]
-    page_idx = torch.arange(P, device=device)  # [P]
-    start = page_idx * page_size  # [P]
-    end = torch.clamp(start + page_size, max=K)  # [P]
+    # [B,H,Q,P] page flags
+    page_sel = torch.zeros((B, H, Q, P), device=device, dtype=dtype)
+    page_sel.scatter_(-1, topk_pages, 1.0)  # in-place, no big temps
 
-    # [P,K] bool: token k is inside page p (local boolean usage)
-    page_token_mask_bool = (token_idx.unsqueeze(0) >= start.unsqueeze(1)) & (
-        token_idx.unsqueeze(0) < end.unsqueeze(1)
-    )
-
-    # Gather masks for the selected pages: [B,H,Q,Kp,K] -> union across pages
-    selected = page_token_mask_bool[topk_pages]  # bool
-    union_selected = selected.any(dim=3).to(dtype)  # float in {0,1}
-    return union_selected
+    # Expand to tokens (blocks of size page_size), then trim tail
+    token_mask = page_sel.repeat_interleave(page_size, dim=-1)[..., :K]
+    return token_mask
 
 
 def attention_mask_to_allowed_prob(
