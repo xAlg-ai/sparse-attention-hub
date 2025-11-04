@@ -19,6 +19,7 @@ from sparse_attention_hub.sparse_attention.utils.kv_utils import (
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
+from .utils.common_utils import pseudo_quantize
 from .utils.double_sparsity_utils import (
     extract_layer_channels,
     load_sorted_channels_from_file,
@@ -88,31 +89,6 @@ class DoubleSparsityTopKMasker(TopKMasker):
                 self.sorted_channels, layer_idx, self.channel_selection, device
             )
 
-    def _pseudo_quantize(self, tensor: torch.Tensor, q_bit: int) -> torch.Tensor:
-        """Apply pseudo-quantization to reduce memory footprint.
-
-        Args:
-            tensor: Input tensor to quantize
-            q_bit: Number of quantization bits
-
-        Returns:
-            Quantized tensor
-        """
-        max_quant = 2**q_bit - 1
-
-        min_val = tensor.min(dim=-1, keepdim=True)[0]
-        max_val = tensor.max(dim=-1, keepdim=True)[0]
-
-        range_val = max_val - min_val
-        range_val[range_val == 0] = 1
-
-        scale = max_quant / range_val
-        quantized = torch.round((tensor - min_val) * scale).clamp(0, max_quant)
-
-        dequantized = quantized / scale + min_val
-
-        return dequantized
-
     def _compute_grouped_scores(
         self,
         keys: torch.Tensor,
@@ -151,8 +127,8 @@ class DoubleSparsityTopKMasker(TopKMasker):
         grouped_key = sorted_key_states[:, :, :, :outlier_num]
 
         if self.label_bits < 16:
-            grouped_query = self._pseudo_quantize(grouped_query, self.label_bits)
-            grouped_key = self._pseudo_quantize(grouped_key, self.label_bits)
+            grouped_query = pseudo_quantize(grouped_query, self.label_bits)
+            grouped_key = pseudo_quantize(grouped_key, self.label_bits)
 
         grouped_attn_weights = torch.matmul(
             grouped_query, grouped_key.transpose(2, 3)

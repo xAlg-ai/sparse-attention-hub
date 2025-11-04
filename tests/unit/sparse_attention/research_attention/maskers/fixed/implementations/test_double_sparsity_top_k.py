@@ -10,6 +10,9 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
     DoubleSparsityTopKMasker,
     DoubleSparsityTopKMaskerConfig,
 )
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.common_utils import (
+    pseudo_quantize,
+)
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 
@@ -164,16 +167,9 @@ class TestDoubleSparsityTopKMaskerImplementation:
 
     def test_double_sparsity_top_k_masker_pseudo_quantization(self):
         """Test pseudo-quantization functionality."""
-        config = DoubleSparsityTopKMaskerConfig(
-            heavy_size=256,
-            sorted_channel_file=_meta_llama_config,
-            label_bits=4,
-        )
-        masker = DoubleSparsityTopKMasker.create_from_config(config)
-
         # Create test tensor
         test_tensor = torch.randn(2, 8, 1024, 8)
-        quantized_tensor = masker._pseudo_quantize(test_tensor, 4)
+        quantized_tensor = pseudo_quantize(test_tensor, 4)
 
         # Shape should remain the same
         assert quantized_tensor.shape == test_tensor.shape
