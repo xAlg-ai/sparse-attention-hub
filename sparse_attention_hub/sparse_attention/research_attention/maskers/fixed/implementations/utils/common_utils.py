@@ -11,7 +11,7 @@ def pseudo_quantize(tensor: torch.Tensor, q_bit: int) -> torch.Tensor:
         q_bit: Number of quantization bits
 
     Returns:
-        Quantized tensor
+        Quantized (uncompressed)tensor
     """
     max_quant = 2**q_bit - 1
 

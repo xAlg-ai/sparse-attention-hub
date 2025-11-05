@@ -50,6 +50,8 @@ class QuestTopKMaskerConfig(TopKMaskerConfig):
             raise ValueError(
                 f"label_bits must be in range (0, 16], got {self.label_bits}"
             )
+        if self.page_size <= 0:
+            raise ValueError("page_size must be greater than 0")
 
 
 @MaskerRegistry.register(QuestTopKMaskerConfig)
