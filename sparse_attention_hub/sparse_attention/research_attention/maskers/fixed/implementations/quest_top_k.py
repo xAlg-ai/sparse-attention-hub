@@ -18,6 +18,7 @@ from sparse_attention_hub.sparse_attention.utils.kv_utils import (
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
 
 from ..base import TopKMasker, TopKMaskerConfig
+from .utils.common_utils import pseudo_quantize
 from .utils.quest_utils import (
     attention_mask_to_allowed_prob,
     compute_page_min_max,
@@ -32,6 +33,7 @@ class QuestTopKMaskerConfig(TopKMaskerConfig):
     """Configuration for QuestTopKMasker."""
 
     page_size: int
+    label_bits: int = 16
     search_space: Dict[str, Any] = field(
         default_factory=lambda: {
             "heavy_size": tune.grid_search(
@@ -41,12 +43,23 @@ class QuestTopKMaskerConfig(TopKMaskerConfig):
         }
     )
 
+    def __post_init__(self) -> None:
+        """Validate post-initialization constraints."""
+        super().__post_init__()
+        if not (0 < self.label_bits <= 16):
+            raise ValueError(
+                f"label_bits must be in range (0, 16], got {self.label_bits}"
+            )
+        if self.page_size <= 0:
+            raise ValueError("page_size must be greater than 0")
+
 
 @MaskerRegistry.register(QuestTopKMaskerConfig)
 class QuestTopKMasker(TopKMasker):
     """Quest page-Top-K masker."""
 
     page_size: int
+    label_bits: int
 
     def __init__(self, config: QuestTopKMaskerConfig) -> None:
         super().__init__(config)
@@ -55,6 +68,7 @@ class QuestTopKMasker(TopKMasker):
             raise ValueError("page_size must be a positive integer")
         self.page_size = int(config.page_size)
         self.heavy_size = config.heavy_size
+        self.label_bits = config.label_bits
 
     def add_mask(
         self,
@@ -123,6 +137,11 @@ class QuestTopKMasker(TopKMasker):
         page_min, page_max = compute_page_min_max(
             keys_rep, page_size, num_pages
         )  # [B,H,P,D]
+
+        # Quantize page_min and page_max if label_bits < 16
+        if self.label_bits < 16:
+            page_min = pseudo_quantize(page_min, self.label_bits)
+            page_max = pseudo_quantize(page_max, self.label_bits)
 
         # 3) Quest page scores via shared utility
         page_scores = quest_page_scores(queries, page_min, page_max)  # [B,H,Q,P]
