@@ -15,6 +15,7 @@ Usage:
 """
 
 import os
+from re import L
 import time
 from pathlib import Path
 
@@ -24,13 +25,13 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/ubuntu/sparse-attention-hub')
-sys.path.insert(0, '/home/ubuntu/sparse-attention-hub')
+os.chdir('/workspace/aditya/sparse-attention-hub')
+sys.path.insert(0, '/workspace/aditya/sparse-attention-hub')
 
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    DoubleSparsityTopKMaskerConfig
+    SinkMaskerConfig, PQCacheConfig, LocalMaskerConfig, QuestTopKMaskerConfig
 )
 
 #from benchmark.longbench import LongBench
@@ -45,13 +46,25 @@ def main():
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        DoubleSparsityTopKMaskerConfig(
-            heavy_size=4096,
-            group_factor=2,
-            label_bits=2,
-            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
-            channel_selection="q_proj"
-        )
+        SinkMaskerConfig(
+            sink_size=128,
+        ),
+        LocalMaskerConfig(
+            window_size=128,
+        ),
+        PQCacheConfig(
+            heavy_size=0.1,
+            pq_sub_dim=8,
+            pq_bits=6,
+            kmeans_iter=20,
+            init_offset=128,
+            metric="euclidean",
+        ),
+    #    QuestTopKMaskerConfig(
+    #         heavy_size=0.1,
+    #         page_size=16,
+    #         label_bits=16,
+    #     ),
     ])
     
     print("  ✓ Loading model...")
@@ -61,7 +74,7 @@ def main():
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_3"},
+        model_kwargs= {"torch_dtype": torch.bfloat16},
         device=device
     )
     
