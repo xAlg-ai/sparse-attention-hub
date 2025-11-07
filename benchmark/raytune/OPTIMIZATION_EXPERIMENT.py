@@ -10,21 +10,44 @@ from typing import Dict, List, Optional
 # Model configurations
 # Weight files are loaded from SPARSE_ATTENTION_WEIGHTS_DIR environment variable
 # Set it to the directory containing your HashAttention weight files
-weights_dir: str = os.environ.get("SPARSE_ATTENTION_WEIGHTS_DIR", "./weights")
+hashattention_dir: str = os.environ.get("HASHATTENTION_WEIGHTS_DIR", "./")
+doublesparsity_config_dir: str = os.environ.get("DOUBLE_SPARSITY_CONFIG_DIR", "./")
+
 
 MODEL_CONFIGS: Dict[str, Dict[str, str]] = {
-    "llama": {
-        "weight_file": os.path.join(weights_dir, "llama3.1-8b-patch.64K.v1.hat_weights.pkl"),
-        "model_name": "meta-llama/Llama-3.1-8B-Instruct"
+    "llama3.1-8b": {
+        "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "llama3.1-8b-patch.64K.v1.hat_weights.pkl"),
+        "double_sparsity_config_file": os.path.join(doublesparsity_config_dir, "meta-llama/Llama-3.1-8B-Instruct.json"),
+    },
+    "llama3.2-1b": {
+        "model_name": "meta-llama/Llama-3.2-1B-Instruct",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "DNE.pkl"),
+        "double_sparsity_config_file": os.path.join(doublesparsity_config_dir, "meta-llama/Llama-3.2-1B-Instruct.json"),
+    },
+    "llama3.2-3b": {
+        "model_name": "meta-llama/Llama-3.2-3B-Instruct",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "DNE.pkl"),
+        "double_sparsity_config_file": os.path.join(doublesparsity_config_dir, "meta-llama/Llama-3.2-3B-Instruct.json"),
     },
     "deepseek": {
-        "weight_file": os.path.join(weights_dir, "DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K_hat_weights.pkl"),
-        "model_name": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+        "model_name": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "DeepSeek-R1-Distill-Llama-8B-patch-layers2-dim64-max-context-24K_hat_weights.pkl"),
     },
     "mistral": {
-        "weight_file": os.path.join(weights_dir, "Mistral-7B-Instruct-v0.3.24K.20.500.hat_weights.pkl"),
-        "model_name": "mistralai/Mistral-7B-Instruct-v0.3"
-    }
+        "model_name": "mistralai/Mistral-7B-Instruct-v0.3",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "Mistral-7B-Instruct-v0.3.24K.20.500.hat_weights.pkl"),
+    },
+    "qwen3-30b-moe": {
+        "model_name": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "DNE.pkl"),
+        "double_sparsity_config_file": os.path.join(doublesparsity_config_dir, "Qwen/Qwen3-30B-A3B-Instruct-2507.json"),
+    },
+    "qwen3-4b": {
+        "model_name": "Qwen/Qwen3-4B-Instruct-2507",
+        "hash_attention_weight_file": os.path.join(hashattention_dir, "DNE.pkl"),
+        "double_sparsity_config_file": os.path.join(doublesparsity_config_dir, "Qwen/Qwen3-4B-Instruct-2507.json"),
+    },
 }
 
 DEFAULT_MODEL: str = "llama"
