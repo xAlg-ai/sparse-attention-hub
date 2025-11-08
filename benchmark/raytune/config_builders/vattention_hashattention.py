@@ -21,7 +21,10 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
 from .base import BaseConfigBuilder
 from .factory import register_builder
 from .utility import get_masker_list_name
+import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 def _validity_check(config: ResearchAttentionConfig, sparsity_val: float) -> bool:
     """Check if the config meets the sparsity constraint."""
@@ -58,6 +61,10 @@ class VAttentionHashAttentionConfigBuilder(BaseConfigBuilder):
         
         optimal_configs: List[Tuple[str, Optional[ResearchAttentionConfig], Optional[List]]] = []
         to_optimize_configs: List[Tuple[str, Optional[ResearchAttentionConfig], Optional[List]]] = []
+        
+        if not weight_file or not os.path.isfile(weight_file):
+            logger.warning(f"Weight file {weight_file} for model {model_config['model_name']} does not exist. Skipping HashAttention TopK configurations.")
+            return optimal_configs, to_optimize_configs
 
         for sparsity_objective in sparsity_objectives:
             sparsity_val: float = float(sparsity_objective) / 100.0

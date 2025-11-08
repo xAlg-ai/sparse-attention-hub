@@ -92,8 +92,8 @@ class BenchmarkHelper:
             benchmark_name, subset_name = task_name.split("/", 1) if "/" in task_name else (task_name, None)
             
             # Create result directory for this specific run
-            result_dir: Path = self.base_result_dir / f"{model_name}_{task_name}_{hash(str(attention_config)) % 1000000}"
-            result_dir.mkdir(parents=True, exist_ok=True)
+            result_dir: Path = os.path.join(self.base_result_dir, f"{model_name}_{task_name}_{hash(str(attention_config)) % 1000000}")
+            os.makedirs(result_dir, exist_ok=True)
             
             # Create model adapter
             adapter: ModelAdapterHF = ModelAdapterHF(
@@ -138,7 +138,7 @@ class BenchmarkHelper:
                 score: float = 100.0  # Small baseline score for dense
             else:
                 # Use the selected objective function
-                score = self.objective_function(error, density)
+                score = objective_function(error, density)
                 # Also print to stdout so the test script can detect it
                 print(f"Objective: {objective_function.__name__}, Error: {error:.4f}, Density: {density:.4f}, Score: {score:.4f}")
                 logging.info(f"Objective: {objective_function.__name__}, Error: {error:.4f}, Density: {density:.4f}, Score: {score:.4f}")
@@ -163,8 +163,8 @@ class BenchmarkHelper:
                 - attention_error: Average attention output error (0.0 to 1.0)
                 - density: Average attention density (0.0 to 1.0)
         """
-        micro_metrics_file: Path = result_dir / "micro_metrics.jsonl"
-        if not micro_metrics_file.exists():
+        micro_metrics_file: Path = os.path.join(result_dir, "micro_metrics.jsonl")
+        if not os.path.exists(micro_metrics_file):
             # For dense configuration, micro_metrics.jsonl won't exist since no sparse attention is used
             # Return default values: 0 error (perfect) and 1.0 density (fully dense)
             logging.info(f"micro_metrics.jsonl not found in {result_dir}, using dense defaults")

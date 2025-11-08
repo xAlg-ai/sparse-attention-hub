@@ -139,18 +139,18 @@ class ConfigSearchManager:
                 score, density, error = runner(attention_config, task, model)
                 return {"combined_score": score, "density": density, "error": error}
             
-            # ### run a sample objective to ensure there are no errors
-            print("="*10, "Running a short test objective to ensure there are no errors", flush=True)
-            sample_config: Dict[str, float] = {
-                "AdaptiveSamplingMaskerConfig_base_rate_sampling": 0.1,
-                "AdaptiveSamplingMaskerConfig_epsilon": 0.25,
-                "AdaptiveSamplingMaskerConfig_delta": 0.25
-            }
-            result: Dict[str, float] = objective(sample_config)
-            print("="*10, "Successfully ran a short test objective", flush=True)
-            print(sample_config)
-            print(result)
-            print("="*100, flush=True)
+            # # ### run a sample objective to ensure there are no errors
+            # print("="*10, "Running a short test objective to ensure there are no errors", flush=True)
+            # sample_config: Dict[str, float] = {
+            #     "AdaptiveSamplingMaskerConfig_base_rate_sampling": 0.1,
+            #     "AdaptiveSamplingMaskerConfig_epsilon": 0.25,
+            #     "AdaptiveSamplingMaskerConfig_delta": 0.25
+            # }
+            # result: Dict[str, float] = objective(sample_config)
+            # print("="*10, "Successfully ran a short test objective", flush=True)
+            # print(sample_config)
+            # print(result)
+            # print("="*100, flush=True)
             
             # Run Ray Tune
             sanitized_name: str = f"{model}_{task}_{masker_name}".replace("/", "_")
