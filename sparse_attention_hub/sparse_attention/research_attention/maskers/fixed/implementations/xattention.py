@@ -20,7 +20,7 @@ from ..base import TopKMasker, TopKMaskerConfig
 class XAttentionConfig(TopKMaskerConfig):
     """Configuration for XAttention masker."""
     block_size: int = 64
-    importance_threshold: float = .9
+    importance_threshold: float = .2
 
  
 
@@ -99,7 +99,7 @@ class XAttention(TopKMasker):
                 )
             # Expand keys to match query heads by repeating each key head
             num_queries_per_kv = H_q // H_k
-            keys = keys.repeat_interleave(num_queries_per_kv, dim=1)
+            keys = keys.repeat_interleave(num_queries_per_kv, dim=1).contiguous()
             # Now keys has shape (B, H_q, Nk, D)
         
         H = H_q  # Use query heads as the number of heads
@@ -109,8 +109,8 @@ class XAttention(TopKMasker):
         pad_k  = (B_size - (Nk % B_size)) % B_size
 
         #F.pad format (left, right, top, bottom) for last two dims
-        queries_padded = F.pad(queries, (0, 0, 0, pad_q))
-        keys_padded = F.pad(keys, (0, 0, 0, pad_k))
+        queries_padded = F.pad(queries, (0, 0, 0, pad_q)).contiguous()
+        keys_padded = F.pad(keys, (0, 0, 0, pad_k)).contiguous()
 
         Nq_p, Nk_p = queries_padded.shape[-2], keys_padded.shape[-2]
         Nq_b, Nk_b = Nq_p // B_size, Nk_p // B_size
@@ -175,20 +175,28 @@ class XAttention(TopKMasker):
         # Reshape to (B*H, num_total_blocks)
         flat_scores = proxy_scores.reshape(batch_heads, -1)
 
+        # Sort by raw scores (descending = best first)
         sorted_scores, sort_indices = torch.sort(flat_scores, dim=-1, descending=True)
 
-        cumulative_scores = torch.cumsum(sorted_scores, dim=-1)
-        total_scores = cumulative_scores[:, -1].unsqueeze(-1)
+        # Use absolute values to handle negative scores correctly
+        abs_sorted_scores = torch.abs(sorted_scores)
+        cumulative_abs_scores = torch.cumsum(abs_sorted_scores, dim=-1)
+        total_abs_score = cumulative_abs_scores[:, -1].unsqueeze(-1) + 1e-6
 
-        #small epsilon to avoid division by zero
-        total_scores = total_scores + 1e-6
-
-        is_above_threshold = cumulative_scores >= (threshold * total_scores)
-
-        k_per_head = torch.argmax(is_above_threshold.int(), dim=-1) + 1        # Clamp to ensure we don't exceed available blocks
+        # Select blocks until cumulative magnitude reaches threshold fraction
+        cumulative_fraction = cumulative_abs_scores / total_abs_score
+        mask = cumulative_fraction < threshold
+        k_per_head = mask.sum(dim=-1) + 1
         k_per_head = torch.clamp(k_per_head, min=1, max=num_total_blocks)
 
+        # Debug logging (uncomment to debug)
+        # print(f"Top 10 scores: {sorted_scores[0, :10].cpu().tolist()}")
+        # print(f"Total abs score: {total_abs_score[0].item():.2f}, k_per_head: {k_per_head[0].item()} out of {num_total_blocks}")
+        # print(f"Threshold: {threshold}, cumsum_fraction at k: {cumulative_fraction[0, k_per_head[0].item()-1].item():.3f}")
+        
         return sort_indices, k_per_head
+
+        
 
     def _create_mask_from_block_indices(
         self, 
@@ -260,7 +268,7 @@ class XAttention(TopKMasker):
 
         full_res_mask = full_res_mask[
             :, :, :dims.seq_len_queries, :dims.seq_len_keys
-        ]
+        ].contiguous()
 
         return Mask.create_mask_from_dense_mask(shape=full_res_mask.shape, mask=full_res_mask, dtype=dtype)
 
@@ -280,3 +288,35 @@ class XAttention(TopKMasker):
 #1 attention matrix divided into bxb blocks
 #softmax normalize antidiagonal sums, select minimal set of blocks who have high enough importance scores
 #create mask from selected,
+
+
+
+#algorithm steps
+#1
+    #Divide length by block size, floor divide L/b
+    #begin loop to process query one at a time
+        #for each loop, extracts a slice of Q called Qslice which corresponds to current block
+
+#2: reshaping logic
+    #Takes Qslice and creates S (stride) different views of it
+    #start at row i, take every s-th row from that starting point, add this new smaller matri to the Q reshaped list
+    #compresses the query block
+
+    #reshaping K same thing for keys
+
+#approximate attention
+    #intead of computing full attention, computes approxiate
+    #softmax on compressed Q reshaped and K reshape
+    #scaling factor is sqrt(dhS)
+
+#finding and storing blocks
+    #takes small matrix (A approx)and threshold tau
+    #looks for any scores in A approx that are higher than the threshold
+    #any region with high approximate score is important
+    #crates a block mask that cselects this entire coarse grained block for real attention computation later
+
+    #stitch blocks together to get full attention mask
+
+#final result
+    #output is sparse mask, 1 means it is important, 0 means it is not
+    

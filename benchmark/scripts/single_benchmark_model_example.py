@@ -39,6 +39,7 @@ from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 
+
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
     device = 0
@@ -50,7 +51,7 @@ def main():
         #OracleTopKConfig(heavy_size=5644),
         #AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
         #PQCacheConfig(heavy_size=1024,pq_sub_dim=64, pq_bits=7, kmeans_iters=25, sink_size = 4)
-        XAttentionConfig(heavy_size=5644, block_size=128)
+        XAttentionConfig(heavy_size=0, importance_threshold=0.2, block_size=128)
     ])
 
     
