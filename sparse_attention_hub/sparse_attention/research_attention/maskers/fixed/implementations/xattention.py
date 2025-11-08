@@ -76,11 +76,33 @@ class XAttention(TopKMasker):
     def _compute_antidiagonal_proxy_scores(
         self, keys: torch.Tensor, queries: torch.Tensor, tensor_dims: AttentionTensorDimensions
     ) -> torch.Tensor:
-        """Compute antidiagonal proxy scores."""
+        """Compute antidiagonal proxy scores.
+        
+        Supports Grouped Query Attention (GQA) where keys/values have fewer heads than queries.
+        """
         #get query, key shape
-        B, H, Nq, D = queries.shape
-        _, _, Nk, _ = keys.shape
+        B, H_q, Nq, D = queries.shape
+        B_k, H_k, Nk, D_k = keys.shape
         B_size = self.block_size
+        
+        # Validate dimensions
+        if B != B_k:
+            raise ValueError(f"Batch size mismatch: queries batch={B}, keys batch={B_k}")
+        if D != D_k:
+            raise ValueError(f"Head dimension mismatch: queries D={D}, keys D={D_k}")
+        
+        # Handle Grouped Query Attention (GQA)
+        if H_k != H_q:
+            if H_q % H_k != 0:
+                raise ValueError(
+                    f"GQA requires query heads ({H_q}) to be a multiple of key heads ({H_k})"
+                )
+            # Expand keys to match query heads by repeating each key head
+            num_queries_per_kv = H_q // H_k
+            keys = keys.repeat_interleave(num_queries_per_kv, dim=1)
+            # Now keys has shape (B, H_q, Nk, D)
+        
+        H = H_q  # Use query heads as the number of heads
 
         #1 pad Q and K to be divisible by block_size
         pad_q  = (B_size - (Nq % B_size)) % B_size
@@ -95,10 +117,10 @@ class XAttention(TopKMasker):
 
         #reshape to make blocks
         #(B, H, Nq, D) -> (B, H, Nq_b, B_size, D)
-        q_blocks = queries_padded.view(B, H, Nq_b, B_size, D)
+        q_blocks = queries_padded.reshape(B, H, Nq_b, B_size, D)
 
         #(B, H, Nk, D) -> (B, H, Nk_b, B_size, D)
-        k_blocks = keys_padded.view(B, H, Nk_b, B_size, D)
+        k_blocks = keys_padded.reshape(B, H, Nk_b, B_size, D)
 
         #blockwise matmul
         #using einsum to compute (B, H, Nq_b, Nk_b, B_size, B_size)
@@ -151,7 +173,7 @@ class XAttention(TopKMasker):
         num_total_blocks = num_q_blocks * num_k_blocks
 
         # Reshape to (B*H, num_total_blocks)
-        flat_scores = proxy_scores.view(batch_heads, -1)
+        flat_scores = proxy_scores.reshape(batch_heads, -1)
 
         sorted_scores, sort_indices = torch.sort(flat_scores, dim=-1, descending=True)
 
@@ -163,8 +185,7 @@ class XAttention(TopKMasker):
 
         is_above_threshold = cumulative_scores >= (threshold * total_scores)
 
-        k_per_head = torch.argmax(is_above_threshold, dim=-1) + 1
-        # Clamp to ensure we don't exceed available blocks
+        k_per_head = torch.argmax(is_above_threshold.int(), dim=-1) + 1        # Clamp to ensure we don't exceed available blocks
         k_per_head = torch.clamp(k_per_head, min=1, max=num_total_blocks)
 
         return sort_indices, k_per_head
@@ -209,7 +230,7 @@ class XAttention(TopKMasker):
                 block_mask_flat[i, selected_indices] = 1.0
 
         # Reshape back to (B, H, Nq_b, Nk_b)
-        block_mask = block_mask_flat.view(B, H, orig_Nq_b, orig_Nk_b)
+        block_mask = block_mask_flat.reshape(B, H, orig_Nq_b, orig_Nk_b)
         return block_mask
 
     
@@ -241,7 +262,7 @@ class XAttention(TopKMasker):
             :, :, :dims.seq_len_queries, :dims.seq_len_keys
         ]
 
-        return Mask.create_from_dense_mask(full_res_mask, dtype=dtype)
+        return Mask.create_mask_from_dense_mask(shape=full_res_mask.shape, mask=full_res_mask, dtype=dtype)
 
     
     
@@ -252,13 +273,6 @@ class XAttention(TopKMasker):
         if not isinstance(config, XAttentionConfig):
             raise ValueError(f"Invalid config type: {type(config)}")
         return cls(config)
-
-
-
-
-
-
-
 
 
 ###

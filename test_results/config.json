@@ -1,0 +1,29 @@
+{
+  "model_kwargs": {
+    "torch_dtype": "torch.bfloat16"
+  },
+  "tokenizer_kwargs": {},
+  "sparse_attention_config": {
+    "masker_configs": [
+      {
+        "sink_size": 128
+      },
+      {
+        "window_size": 128
+      },
+      {
+        "heavy_size": 5644
+      }
+    ]
+  },
+  "generation_kwargs": {},
+  "request_kwargs": {
+    "max_requests": 10,
+    "max_context_length": 1000000
+  },
+  "benchmark_name": "ruler32k",
+  "subsets_to_run": [
+    "vt"
+  ],
+  "huggingface_dataset_id": "xAlg-AI/att-hub-ruler-32k"
+}

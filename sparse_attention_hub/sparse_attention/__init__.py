@@ -28,6 +28,8 @@ from .research_attention.maskers.fixed import (
     TopKMasker,
     TopKMaskerConfig,
     TopPMasker,
+    XAttentionConfig,
+    XAttention,
 )
 from .research_attention.maskers.sampling import (
     MagicPig,

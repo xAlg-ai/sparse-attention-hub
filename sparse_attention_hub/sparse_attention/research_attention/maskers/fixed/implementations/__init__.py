@@ -15,6 +15,7 @@ from .hashattention_top_k import HashAttentionTopKMasker, HashAttentionTopKMaske
 from .oracle_top_k import OracleTopK, OracleTopKConfig
 from .oracle_top_p import OracleTopPMasker, OracleTopPMaskerConfig
 from .pq_top_k import PQCache, PQCacheConfig
+from .xattention import XAttention, XAttentionConfig
 
 __all__ = [
     "LocalMasker",
@@ -32,4 +33,6 @@ __all__ = [
     "PQCacheConfig",
     "HashAttentionTopKMaskerConfig",
     "DoubleSparsityTopKMaskerConfig",
+    "XAttentionConfig",
+    "XAttention",
 ]

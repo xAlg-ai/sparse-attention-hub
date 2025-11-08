@@ -24,12 +24,12 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/home/ubuntu/prithvi/sparse-attention-hub')
-sys.path.insert(0, '/home/ubuntu/prithvi/sparse-attention-hub')
+os.chdir('/root/prithvi/sparse-attention-hub')
+sys.path.insert(0, '/root/prithvi/sparse-attention-hub')
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, PQCacheConfig
+    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, PQCacheConfig, XAttentionConfig
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
     AdaptiveSamplingMaskerConfig
@@ -47,9 +47,10 @@ def main():
         SinkMaskerConfig(sink_size=128),
         LocalMaskerConfig(window_size=128),
 
-        #OracleTopKConfig(heavy_size=128),
+        #OracleTopKConfig(heavy_size=5644),
         #AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
-        PQCacheConfig(heavy_size=1024,pq_sub_dim=64, pq_bits=7, kmeans_iters=25, sink_size = 4)
+        #PQCacheConfig(heavy_size=1024,pq_sub_dim=64, pq_bits=7, kmeans_iters=25, sink_size = 4)
+        XAttentionConfig(heavy_size=5644, block_size=128)
     ])
 
     

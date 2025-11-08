@@ -24,6 +24,8 @@ from .implementations import (
     PQCacheConfig,
     SinkMasker,
     SinkMaskerConfig,
+    XAttention,
+    XAttentionConfig,
 )
 
 __all__ = [
