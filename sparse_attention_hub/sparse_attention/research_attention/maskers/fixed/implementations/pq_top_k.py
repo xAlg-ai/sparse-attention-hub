@@ -12,7 +12,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.base impor
 )
 from sparse_attention_hub.sparse_attention.utils.kv_utils import repeat_kv
 from sparse_attention_hub.sparse_attention.utils.mask import Mask
-from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
     ip2l2_augment,
     ip2l2_augment_queries,
     kmeans_batched_pytorch

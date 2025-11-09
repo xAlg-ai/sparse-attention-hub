@@ -12,7 +12,7 @@ import importlib.util
 # Direct import from pq_utils to avoid package dependencies
 pq_utils_path = os.path.join(
     os.path.dirname(__file__), 
-    "../../sparse_attention_hub/sparse_attention/utils/pq_utils.py"
+    "../../sparse_attention_hub/sparse_attention/research_attention/maskers/fixed/implementations/utils/pq_utils.py"
 )
 spec = importlib.util.spec_from_file_location("pq_utils", pq_utils_path)
 pq_utils = importlib.util.module_from_spec(spec)

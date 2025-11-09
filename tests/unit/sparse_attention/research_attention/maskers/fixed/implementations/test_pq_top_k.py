@@ -170,7 +170,7 @@ class TestPQCacheMaskerImplementation:
         assert sparse_meta_data["pq_ip2l2_phi"][layer_idx] is None
 
         # Test reconstruction: compute errors using utility function
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
             compute_reconstruction_errors,
         )
 
@@ -262,7 +262,7 @@ class TestPQCacheMaskerImplementation:
         assert (ip2l2_phi > 0).all()
 
         # Test reconstruction: compute errors using utility function
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
             compute_reconstruction_errors,
         )
 
@@ -329,7 +329,7 @@ class TestPQCacheMaskerImplementation:
             assert centroids.shape[3] == cent_cnt  # Check number of centroids
 
             # Test reconstruction for this init_offset using utility function
-            from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+            from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
                 compute_reconstruction_errors,
             )
 
@@ -360,7 +360,7 @@ class TestPQCacheMaskerImplementation:
             PQCache,
             PQCacheConfig,
         )
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
             compute_reconstruction_errors,
         )
 
@@ -510,7 +510,7 @@ class TestPQCacheMaskerImplementation:
             PQCache,
             PQCacheConfig,
         )
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
             compute_reconstruction_errors,
         )
 
@@ -624,7 +624,7 @@ class TestPQCacheMaskerImplementation:
             PQCache,
             PQCacheConfig,
         )
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
             compute_reconstruction_errors,
         )
 

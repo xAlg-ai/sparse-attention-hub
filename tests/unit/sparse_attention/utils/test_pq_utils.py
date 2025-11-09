@@ -14,7 +14,7 @@ import torch
 class TestPQUtilityFunctions:
     def test_ip2l2_augment(self):
         """Test IP2L2 augmentation for key vectors."""
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import ip2l2_augment
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import ip2l2_augment
 
         n_groups = 2
         n_samples = 5
@@ -71,7 +71,7 @@ class TestPQUtilityFunctions:
 
     def test_ip2l2_augment_queries(self):
         """Test IP2L2 augmentation for query vectors (should add zero column)."""
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import (
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import (
             ip2l2_augment_queries,
         )
 
@@ -112,7 +112,7 @@ class TestPQUtilityFunctions:
         
         ip = torch.sum(x * q).item()
         
-        from sparse_attention_hub.sparse_attention.utils.pq_utils import ip2l2_augment
+        from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations.utils.pq_utils import ip2l2_augment
         x_aug, phi = ip2l2_augment(x)
         q_aug = ip2l2_augment_queries(q, phi)
         
