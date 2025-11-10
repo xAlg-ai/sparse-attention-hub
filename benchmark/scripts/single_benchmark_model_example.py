@@ -15,7 +15,6 @@ Usage:
 """
 
 import os
-from re import L
 import time
 from pathlib import Path
 
@@ -25,16 +24,16 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/workspace/aditya/sparse-attention-hub')
-sys.path.insert(0, '/workspace/aditya/sparse-attention-hub')
+os.chdir('/home/ubuntu/sparse-attention-hub')
+sys.path.insert(0, '/home/ubuntu/sparse-attention-hub')
 
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    SinkMaskerConfig, PQCacheConfig, LocalMaskerConfig, QuestTopKMaskerConfig
+    DoubleSparsityTopKMaskerConfig
 )
 
-from benchmark.longbench import LongBench
+#from benchmark.longbench import LongBench
 from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
 
@@ -46,20 +45,13 @@ def main():
     # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
     # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
-        SinkMaskerConfig(
-            sink_size=128,
-        ),
-        LocalMaskerConfig(
-            window_size=128,
-        ),
-        PQCacheConfig(
-            heavy_size=0.1,
-            pq_sub_dim=64, # m = 2
-            pq_bits=6,
-            kmeans_iter=10,
-            init_offset=128,
-            metric="euclidean",
-        ),
+        DoubleSparsityTopKMaskerConfig(
+            heavy_size=4096,
+            group_factor=2,
+            label_bits=2,
+            sorted_channel_file="/home/ubuntu/DoubleSparse/config/meta-llama/Llama-3.1-8B-Instruct.json",
+            channel_selection="q_proj"
+        )
     ])
     
     print("  ✓ Loading model...")
@@ -69,14 +61,14 @@ def main():
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16},
+        model_kwargs= {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_3"},
         device=device
     )
     
-    benchmark = LongBench(['hotpotqa'])
-    # benchmark = Ruler32K(['vt'])
+    #benchmark = LongBench(['passage_retrieval_en'])
+    benchmark = Ruler32K(['vt'])
 
-    result_dir = Path("./hotpotqa_en/")
+    result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
     metric_logger = MicroMetricLogger()
     metric_logger.configure_logging(
@@ -87,7 +79,7 @@ def main():
             ],
         )
     metric_logger.flush()
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 200, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 10, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
     
 if __name__ == "__main__":
     main() 
