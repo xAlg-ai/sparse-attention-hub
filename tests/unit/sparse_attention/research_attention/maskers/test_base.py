@@ -169,7 +169,14 @@ class TestConcreteMaskerCreation:
             PQCacheConfig,
         )
 
-        config = PQCacheConfig(heavy_size=100, pq_sub_dim=8, pq_bits=4)
+        config = PQCacheConfig(
+            heavy_size=100,
+            pq_sub_dim=8,
+            pq_bits=4,
+            kmeans_iter=10,
+            init_offset=0,
+            metric="euclidean",
+        )
         masker = ResearchMasker.create_masker_from_config(config)
         assert type(masker) is PQCache
         assert masker.config == config
