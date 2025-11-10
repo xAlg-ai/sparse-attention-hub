@@ -60,7 +60,7 @@ class MagicPigConfigBuilder(BaseConfigBuilder):
             # Set up search space for LSH parameters
             config.masker_configs[2].search_space = {
                 "lsh_l": tune.grid_search([16, 32, 64, 128]),
-                "lsh_k": tune.grid_search([2, 4, 8, 16, 32]),
+                "lsh_k": tune.grid_search([2, 4, 8, 16]),
             }
             
             # Set validity to default (doesn't depend on memory objectives)
