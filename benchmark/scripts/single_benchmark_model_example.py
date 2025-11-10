@@ -34,7 +34,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.impl
     SinkMaskerConfig, PQCacheConfig, LocalMaskerConfig, QuestTopKMaskerConfig
 )
 
-#from benchmark.longbench import LongBench
+from benchmark.longbench import LongBench
 from benchmark.ruler32k import Ruler32K
 from sparse_attention_hub.adapters import ModelAdapterHF
 
@@ -54,17 +54,12 @@ def main():
         ),
         PQCacheConfig(
             heavy_size=0.1,
-            pq_sub_dim=8,
+            pq_sub_dim=64, # m = 2
             pq_bits=6,
-            kmeans_iter=20,
+            kmeans_iter=10,
             init_offset=128,
             metric="euclidean",
         ),
-    #    QuestTopKMaskerConfig(
-    #         heavy_size=0.1,
-    #         page_size=16,
-    #         label_bits=16,
-    #     ),
     ])
     
     print("  ✓ Loading model...")
@@ -78,10 +73,10 @@ def main():
         device=device
     )
     
-    #benchmark = LongBench(['passage_retrieval_en'])
-    benchmark = Ruler32K(['vt'])
+    benchmark = LongBench(['hotpotqa'])
+    # benchmark = Ruler32K(['vt'])
 
-    result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
+    result_dir = Path("./hotpotqa_en/")
     result_dir.mkdir(exist_ok=True)
     metric_logger = MicroMetricLogger()
     metric_logger.configure_logging(
@@ -92,7 +87,7 @@ def main():
             ],
         )
     metric_logger.flush()
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 10, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests": 200, "max_context_length": 1000000}, generation_kwargs={"max_new_tokens": 500})
     
 if __name__ == "__main__":
     main() 
