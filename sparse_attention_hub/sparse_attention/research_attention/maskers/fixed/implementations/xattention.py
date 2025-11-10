@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
+import math
+
 import torch
 import torch.nn.functional as F
 
@@ -20,7 +22,8 @@ from ..base import TopKMasker, TopKMaskerConfig
 class XAttentionConfig(TopKMaskerConfig):
     """Configuration for XAttention masker."""
     block_size: int = 64
-    importance_threshold: float = .2
+    importance_threshold: float = .9
+    stride: int = 8
 
  
 
@@ -33,6 +36,7 @@ class XAttention(TopKMasker):
         super().__init__(config)
         self.block_size = config.block_size
         self.importance_threshold = config.importance_threshold
+        self.stride = config.stride
         
     def add_mask(
         self,
@@ -76,92 +80,88 @@ class XAttention(TopKMasker):
     def _compute_antidiagonal_proxy_scores(
         self, keys: torch.Tensor, queries: torch.Tensor, tensor_dims: AttentionTensorDimensions
     ) -> torch.Tensor:
-        """Compute antidiagonal proxy scores.
+        """Compute block-level proxy scores using strided approximation.
+        
+        Uses downsampled blocks to compute cheap O(N^2/S^2) proxy scores instead of
+        expensive O(N^2) full attention. This is A_approx from Algorithm 1.
         
         Supports Grouped Query Attention (GQA) where keys/values have fewer heads than queries.
         """
-        #get query, key shape
+        # Get query, key shape
         B, H_q, Nq, D = queries.shape
-        B_k, H_k, Nk, D_k = keys.shape
+        _, H_k, Nk, D_k = keys.shape
         B_size = self.block_size
         
-        # Validate dimensions
-        if B != B_k:
-            raise ValueError(f"Batch size mismatch: queries batch={B}, keys batch={B_k}")
-        if D != D_k:
-            raise ValueError(f"Head dimension mismatch: queries D={D}, keys D={D_k}")
-        
-        # Handle Grouped Query Attention (GQA)
+        # --- GQA Handling (Keep this part) ---
         if H_k != H_q:
             if H_q % H_k != 0:
                 raise ValueError(
                     f"GQA requires query heads ({H_q}) to be a multiple of key heads ({H_k})"
                 )
-            # Expand keys to match query heads by repeating each key head
             num_queries_per_kv = H_q // H_k
             keys = keys.repeat_interleave(num_queries_per_kv, dim=1).contiguous()
-            # Now keys has shape (B, H_q, Nk, D)
         
-        H = H_q  # Use query heads as the number of heads
+        H = H_q
+        # --- End GQA Handling ---
 
-        #1 pad Q and K to be divisible by block_size
+        # Pad Q and K to be divisible by block_size
         pad_q  = (B_size - (Nq % B_size)) % B_size
         pad_k  = (B_size - (Nk % B_size)) % B_size
 
-        #F.pad format (left, right, top, bottom) for last two dims
         queries_padded = F.pad(queries, (0, 0, 0, pad_q)).contiguous()
         keys_padded = F.pad(keys, (0, 0, 0, pad_k)).contiguous()
 
         Nq_p, Nk_p = queries_padded.shape[-2], keys_padded.shape[-2]
         Nq_b, Nk_b = Nq_p // B_size, Nk_p // B_size
 
-        #reshape to make blocks
-        #(B, H, Nq, D) -> (B, H, Nq_b, B_size, D)
+        # Reshape into blocks
+        # (B, H, Nq_p, D) -> (B, H, Nq_b, B_size, D)
         q_blocks = queries_padded.reshape(B, H, Nq_b, B_size, D)
-
-        #(B, H, Nk, D) -> (B, H, Nk_b, B_size, D)
+        # (B, H, Nk_p, D) -> (B, H, Nk_b, B_size, D)
         k_blocks = keys_padded.reshape(B, H, Nk_b, B_size, D)
 
-        #blockwise matmul
-        #using einsum to compute (B, H, Nq_b, Nk_b, B_size, B_size)
-        #b,h is batch, head
-        #n = num_q_blocks, i = q_block_size
-        #m = num_k_blocks, j = k_block_size
-        #d = head_dim
-        #result = (b, h, n, m, i, j)
-        attn_blocks = torch.einsum("bhnid,bhmjd->bhnmij", q_blocks, k_blocks)
-        #get sum of main antidiagonal
-            #flip blocks left-to-right to get antidiagonal
+        # Downsample the blocks using the stride to create cheap approximation
+        # (B, H, Nq_b, B_size, D) -> (B, H, Nq_b, B_size/S, D)
+        q_blocks_downsampled = q_blocks[:, :, :, ::self.stride, :]
+        
+        # (B, H, Nk_b, B_size, D) -> (B, H, Nk_b, B_size/S, D)
+        k_blocks_downsampled = k_blocks[:, :, :, ::self.stride, :]
 
-        flipped_attn_blocks = torch.flip(attn_blocks, dims=[-1])
-        #get the main diagonal (from the antidiagonal)
+        # Compute proxy scores by multiplying the downsampled blocks
+        # This computes ONE score per block pair, not a full B_size x B_size matrix
+        # (b)atch, (h)ead, (n)um_q_blocks, (i)_downsampled, (d)im
+        # (b)atch, (h)ead, (m)um_k_blocks, (j)_downsampled, (d)im
+        # Result: (b)atch, (h)ead, (n)um_q_blocks, (m)um_k_blocks
 
-        #(b,h,n,m,i,j) -> (b,h,n,m,i) (j gets collapsed)
-        main_antidiagonal = torch.diagonal(
-            flipped_attn_blocks, offset=0, dim1=-2, dim2=-1
-        )
 
-        #sum diagonals to get one score per block
-        #(b,h,n,m,i) -> (b,h,n,m)
-        proxy_scores = torch.sum(main_antidiagonal, dim=-1)
+        scaling_factor = 1.0 / math.sqrt(D * self.stride)
+        proxy_scores = torch.einsum(
+            "bhnid,bhmjd->bhnm", q_blocks_downsampled, k_blocks_downsampled
+        ) * scaling_factor
 
-        #crop back to the original number of blocks (pre-padding)
-
+        # Crop back to the original number of blocks (pre-padding)
         orig_Nq_b = -(-Nq // B_size) 
         orig_Nk_b = -(-Nk // B_size)
 
-        return proxy_scores[:, :, :orig_Nq_b, :orig_Nk_b]
+        # Apply softmax normalization per query block (normalize over key dimension)
+        proxy_scores = proxy_scores[:, :, :orig_Nq_b, :orig_Nk_b]
+        proxy_scores = torch.softmax(proxy_scores, dim=-1)  # Normalize over key blocks
+        
+        return proxy_scores
 
     def _select_top_blocks(
         self, 
         proxy_scores: torch.Tensor,
-        threshold: float
+        score_threshold: float
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Select top blocks based on threshold.
+        """Select top blocks based on fixed score threshold.
+        
+        This implements the find_blocks(A_approx, tau) logic from the paper.
+        Blocks with scores > tau are selected, giving adaptive density behavior.
         
         Args:
             proxy_scores: Block importance scores with shape (B, H, Nq_b, Nk_b)
-            threshold: Importance threshold for cumulative score selection
+            score_threshold: Fixed score threshold (tau) to select blocks
             
         Returns:
             Tuple of (sorted_indices, k_per_head) where:
@@ -175,25 +175,27 @@ class XAttention(TopKMasker):
         # Reshape to (B*H, num_total_blocks)
         flat_scores = proxy_scores.reshape(batch_heads, -1)
 
-        # Sort by raw scores (descending = best first)
-        sorted_scores, sort_indices = torch.sort(flat_scores, dim=-1, descending=True)
+        probabilities = torch.softmax(flat_scores, dim=-1)
+        sorted_probs, sort_indices = torch.sort(probabilities, dim=-1, descending=True)
 
-        # Use absolute values to handle negative scores correctly
-        abs_sorted_scores = torch.abs(sorted_scores)
-        cumulative_abs_scores = torch.cumsum(abs_sorted_scores, dim=-1)
-        total_abs_score = cumulative_abs_scores[:, -1].unsqueeze(-1) + 1e-6
-
-        # Select blocks until cumulative magnitude reaches threshold fraction
-        cumulative_fraction = cumulative_abs_scores / total_abs_score
-        mask = cumulative_fraction < threshold
-        k_per_head = mask.sum(dim=-1) + 1
-        k_per_head = torch.clamp(k_per_head, min=1, max=num_total_blocks)
-
-        # Debug logging (uncomment to debug)
-        # print(f"Top 10 scores: {sorted_scores[0, :10].cpu().tolist()}")
-        # print(f"Total abs score: {total_abs_score[0].item():.2f}, k_per_head: {k_per_head[0].item()} out of {num_total_blocks}")
-        # print(f"Threshold: {threshold}, cumsum_fraction at k: {cumulative_fraction[0, k_per_head[0].item()-1].item():.3f}")
+        #find minimum k where cumsum >= threshold
+        cumsum = torch.cumsum(sorted_probs, dim=-1)
         
+        #first index where cumsum >= threshold
+        mask = cumsum >= score_threshold
+        k_per_head = torch.zeros(batch_heads, dtype=torch.long, device=flat_scores.device)
+
+        for i in range(batch_heads):
+            indices = torch.where(mask[i])[0]
+            if len(indices) > 0:
+                k_per_head[i] = indices[0] + 1
+            else:
+                k_per_head[i] = probabilities.shape[-1]
+         
+        #ensure at least 1 block
+        k_per_head = torch.clamp(k_per_head, min=1, max=probabilities.shape[-1])
+
+
         return sort_indices, k_per_head
 
         
@@ -319,4 +321,3 @@ class XAttention(TopKMasker):
 
 #final result
     #output is sparse mask, 1 means it is important, 0 means it is not
-    
