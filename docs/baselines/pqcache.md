@@ -16,7 +16,7 @@ PQCache partitions the KV cache into three regions: initial tokens (handled by S
         ),
         PQCacheConfig(
             heavy_size=0.1,
-            pq_sub_dim=64, # m = 2
+            pq_group_factor=2,  # pq_sub_dim = head_dim // pq_group_factor (e.g., 128 // 2 = 64)
             pq_bits=6,
             kmeans_iter=10,
             init_offset=128,

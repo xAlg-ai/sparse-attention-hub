@@ -27,14 +27,14 @@ class PQCacheConfig(TopKMaskerConfig):
 
     Attributes:
         heavy_size: Number of top-K tokens to select (from TopKMaskerConfig)
-        pq_sub_dim: Dimension of each subvector for product quantization
+        pq_group_factor: Group factor for product quantization (pq_sub_dim = head_dim // pq_group_factor)
         pq_bits: Number of bits for codebook (codebook size = 2^pq_bits)
         kmeans_iter: Number of K-means iterations for clustering
         init_offset: Number of sink tokens to skip from front
         metric: Distance metric - "euclidean" or "ip" (inner product)
     """
 
-    pq_sub_dim: int
+    pq_group_factor: int
     pq_bits: int
     kmeans_iter: int
     init_offset: int
@@ -44,8 +44,8 @@ class PQCacheConfig(TopKMaskerConfig):
         """Validate configuration parameters."""
         super().__post_init__()
 
-        if self.pq_sub_dim <= 0:
-            raise ValueError(f"pq_sub_dim must be > 0, got {self.pq_sub_dim}")
+        if self.pq_group_factor <= 0:
+            raise ValueError(f"pq_group_factor must be > 0, got {self.pq_group_factor}")
 
         if self.pq_bits <= 0:
             raise ValueError(f"pq_bits must be > 0, got {self.pq_bits}")
@@ -68,7 +68,7 @@ class PQCache(TopKMasker):
         """Initialize PQ cache masker with configuration."""
         super().__init__(config)
         self.heavy_size = config.heavy_size
-        self.pq_sub_dim = config.pq_sub_dim
+        self.pq_group_factor = config.pq_group_factor
         self.pq_bits = config.pq_bits
         self.kmeans_iter = config.kmeans_iter
         self.init_offset = config.init_offset
@@ -211,8 +211,9 @@ class PQCache(TopKMasker):
         bsz, num_heads, seq_len_keys, head_dim = keys.shape
 
         # Calculate subvector parameters
-        n_subvec_per_head: int = head_dim // self.pq_sub_dim
-        subvec_d: int = self.pq_sub_dim
+        pq_sub_dim: int = head_dim // self.pq_group_factor
+        n_subvec_per_head: int = self.pq_group_factor
+        subvec_d: int = pq_sub_dim
         cent_cnt: int = 2**self.pq_bits
 
         # Extract keys to cluster (skip init_offset from front)

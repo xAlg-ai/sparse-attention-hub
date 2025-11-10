@@ -20,7 +20,7 @@ class TestPQCacheMaskerImplementation:
 
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -28,7 +28,7 @@ class TestPQCacheMaskerImplementation:
         )
         assert config is not None
         assert config.heavy_size == 10
-        assert config.pq_sub_dim == 8
+        assert config.pq_group_factor == 2
         assert config.pq_bits == 4
         assert config.kmeans_iter == 10
         assert config.init_offset == 4
@@ -43,7 +43,7 @@ class TestPQCacheMaskerImplementation:
 
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -62,7 +62,7 @@ class TestPQCacheMaskerImplementation:
 
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -104,7 +104,7 @@ class TestPQCacheMaskerImplementation:
         # Setup config
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,  # Each subvector has 8 dimensions
+            pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
             pq_bits=4,  # 2^4 = 16 centroids per subvector
             kmeans_iter=10,
             init_offset=4,  # Skip first 4 tokens (sink)
@@ -133,7 +133,8 @@ class TestPQCacheMaskerImplementation:
         )
 
         # Check output shapes
-        n_subvec_per_head = head_dim // config.pq_sub_dim  # 16 // 8 = 2
+        pq_sub_dim = head_dim // config.pq_group_factor  # 16 // 2 = 8
+        n_subvec_per_head = head_dim // pq_sub_dim  # 16 // 8 = 2
         cent_cnt = 2**config.pq_bits  # 2^4 = 16
         n_quantized_keys = seq_len_keys - config.init_offset  # 20 - 4 = 16
 
@@ -143,7 +144,7 @@ class TestPQCacheMaskerImplementation:
             num_heads,
             n_subvec_per_head,
             cent_cnt,
-            config.pq_sub_dim,
+            pq_sub_dim,
         )
         assert centroids.shape == (1, 2, 2, 16, 8)
 
@@ -175,11 +176,12 @@ class TestPQCacheMaskerImplementation:
         )
 
         original_keys = keys[:, :, config.init_offset :, :]
+        pq_sub_dim = head_dim // config.pq_group_factor
         errors = compute_reconstruction_errors(
             original_keys=original_keys,
             centroids=centroids,
             codebook=codebook,
-            pq_sub_dim=config.pq_sub_dim,
+            pq_sub_dim=pq_sub_dim,
             use_ip_metric=False,
         )
 
@@ -203,7 +205,7 @@ class TestPQCacheMaskerImplementation:
         # Setup config with IP metric
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -231,7 +233,8 @@ class TestPQCacheMaskerImplementation:
         )
 
         # Check output shapes
-        n_subvec_per_head = head_dim // config.pq_sub_dim
+        pq_sub_dim = head_dim // config.pq_group_factor
+        n_subvec_per_head = head_dim // pq_sub_dim
         cent_cnt = 2**config.pq_bits
         n_quantized_keys = seq_len_keys - config.init_offset
 
@@ -241,7 +244,7 @@ class TestPQCacheMaskerImplementation:
             num_heads,
             n_subvec_per_head,
             cent_cnt,
-            config.pq_sub_dim + 1,  # +1 for augmentation
+            pq_sub_dim + 1,  # +1 for augmentation
         )
         assert centroids.shape == (1, 2, 2, 16, 9)
 
@@ -267,11 +270,12 @@ class TestPQCacheMaskerImplementation:
         )
 
         original_keys = keys[:, :, config.init_offset :, :]
+        pq_sub_dim = head_dim // config.pq_group_factor
         errors = compute_reconstruction_errors(
             original_keys=original_keys,
             centroids=centroids,
             codebook=codebook,
-            pq_sub_dim=config.pq_sub_dim,
+            pq_sub_dim=pq_sub_dim,
             use_ip_metric=True,  # IP metric: centroids are augmented
         )
 
@@ -297,7 +301,7 @@ class TestPQCacheMaskerImplementation:
         for init_offset in [0, 5, 10]:
             config = PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
                 pq_bits=3,  # 2^3 = 8 centroids (need at least 8 samples)
                 kmeans_iter=10,
                 init_offset=init_offset,
@@ -335,11 +339,12 @@ class TestPQCacheMaskerImplementation:
             )
 
             original_keys = keys[:, :, init_offset:, :]
+            pq_sub_dim = head_dim // config.pq_group_factor
             errors = compute_reconstruction_errors(
                 original_keys=original_keys,
                 centroids=centroids,
                 codebook=codebook,
-                pq_sub_dim=config.pq_sub_dim,
+                pq_sub_dim=pq_sub_dim,
                 use_ip_metric=False,
             )
 
@@ -368,7 +373,7 @@ class TestPQCacheMaskerImplementation:
         # Fixed parameters
         bsz, num_heads, seq_len_keys, head_dim = 1, 1, 128, 16
         init_offset = 0
-        pq_sub_dim = 2
+        pq_group_factor = 8  # head_dim=16 // pq_sub_dim=2 = 8
         kmeans_iter = 100  # More iterations for better convergence
 
         # Create data sample
@@ -391,7 +396,7 @@ class TestPQCacheMaskerImplementation:
             # Test Euclidean metric
             config_euclidean = PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=pq_sub_dim,
+                pq_group_factor=pq_group_factor,
                 pq_bits=pq_bits,
                 kmeans_iter=kmeans_iter,
                 init_offset=init_offset,
@@ -408,6 +413,7 @@ class TestPQCacheMaskerImplementation:
             )
 
             original_keys = keys[:, :, init_offset:, :]
+            pq_sub_dim = head_dim // pq_group_factor
             errors_euc = compute_reconstruction_errors(
                 original_keys=original_keys,
                 centroids=centroids_euc,
@@ -419,7 +425,7 @@ class TestPQCacheMaskerImplementation:
             # Test IP metric
             config_ip = PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=pq_sub_dim,
+                pq_group_factor=pq_group_factor,
                 pq_bits=pq_bits,
                 kmeans_iter=kmeans_iter,
                 init_offset=init_offset,
@@ -456,7 +462,7 @@ class TestPQCacheMaskerImplementation:
         # Just verify that error with 2 centroids > error with 128 centroids
         config_min = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=pq_sub_dim,
+            pq_group_factor=pq_group_factor,
             pq_bits=1,  # 2 centroids
             kmeans_iter=kmeans_iter,
             init_offset=init_offset,
@@ -468,6 +474,7 @@ class TestPQCacheMaskerImplementation:
         centroids_min, codebook_min = masker_min._perform_kmeans_clustering(
             keys, 0, sparse_meta_data_min
         )
+        pq_sub_dim = head_dim // pq_group_factor
         errors_min = compute_reconstruction_errors(
             original_keys=keys[:, :, init_offset:, :],
             centroids=centroids_min,
@@ -478,7 +485,7 @@ class TestPQCacheMaskerImplementation:
 
         config_max = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=pq_sub_dim,
+            pq_group_factor=pq_group_factor,
             pq_bits=7,  # 128 centroids
             kmeans_iter=kmeans_iter,
             init_offset=init_offset,
@@ -518,7 +525,7 @@ class TestPQCacheMaskerImplementation:
         # Setup config
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
             pq_bits=4,  # 16 centroids
             kmeans_iter=10,
             init_offset=4,
@@ -596,11 +603,12 @@ class TestPQCacheMaskerImplementation:
 
         # Test reconstruction for all quantized keys (including new ones)
         original_keys = combined_keys[:, :, config.init_offset :, :]
+        pq_sub_dim = head_dim // config.pq_group_factor
         errors = compute_reconstruction_errors(
             original_keys=original_keys,
             centroids=updated_centroids,
             codebook=updated_codebook,
-            pq_sub_dim=config.pq_sub_dim,
+            pq_sub_dim=pq_sub_dim,
             use_ip_metric=False,
         )
 
@@ -636,7 +644,7 @@ class TestPQCacheMaskerImplementation:
             # Setup config
             config = PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,  # head_dim=16 // pq_sub_dim=8 = 2
                 pq_bits=4,  # 16 centroids
                 kmeans_iter=10,
                 init_offset=4,
@@ -674,7 +682,8 @@ class TestPQCacheMaskerImplementation:
             )
 
             # Verify output shape
-            n_subvec_per_head = head_dim // config.pq_sub_dim  # 16 // 8 = 2
+            pq_sub_dim = head_dim // config.pq_group_factor
+            n_subvec_per_head = head_dim // pq_sub_dim  # 16 // 8 = 2
             assert new_codes.shape == (bsz, n_new_keys, num_heads, n_subvec_per_head)
             assert new_codes.shape == (1, 5, 2, 2)
 
@@ -692,7 +701,7 @@ class TestPQCacheMaskerImplementation:
                 original_keys=new_keys,
                 centroids=centroids,
                 codebook=new_codes,
-                pq_sub_dim=config.pq_sub_dim,
+                pq_sub_dim=pq_sub_dim,
                 use_ip_metric=(metric == "ip"),
             )
 
@@ -739,7 +748,7 @@ class TestPQCacheMaskerImplementation:
         # Setup config
         config = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=4,  # 4 dimensions per subvector
+            pq_group_factor=2,  # head_dim=8 // pq_sub_dim=4 = 2
             pq_bits=2,  # 4 centroids per subvector
             kmeans_iter=10,
             init_offset=4,
@@ -754,7 +763,8 @@ class TestPQCacheMaskerImplementation:
         seq_len_queries = 2
         seq_len_keys = 10
         head_dim = 8  # Will be split into 2 subvectors of 4 dims each
-        n_subvec = head_dim // config.pq_sub_dim  # 2
+        pq_sub_dim = head_dim // config.pq_group_factor
+        n_subvec = head_dim // pq_sub_dim  # 2
         cent_cnt = 2**config.pq_bits  # 4
         n_clustered = 5  # Number of quantized keys
 
@@ -768,7 +778,7 @@ class TestPQCacheMaskerImplementation:
 
         # Manually construct centroids: [bsz, kv_heads, n_subvec, cent_cnt, subvec_d]
         centroids = torch.randn(
-            bsz, kv_heads, n_subvec, cent_cnt, config.pq_sub_dim, dtype=torch.float32
+            bsz, kv_heads, n_subvec, cent_cnt, pq_sub_dim, dtype=torch.float32
         )
 
         # Manually construct codebook: [bsz, n_clustered, kv_heads, n_subvec]
@@ -792,7 +802,7 @@ class TestPQCacheMaskerImplementation:
         q = queries[0, 0, 0, :]  # [head_dim]
 
         # Split query into subvectors
-        q_subvec = q.reshape(n_subvec, config.pq_sub_dim)  # [n_subvec, subvec_d]
+        q_subvec = q.reshape(n_subvec, pq_sub_dim)  # [n_subvec, subvec_d]
 
         # For each subvector, get the centroid index from codebook
         expected_score = 0.0
@@ -845,7 +855,7 @@ class TestPQCacheMaskerImplementation:
             kv_heads,
             n_subvec,
             cent_cnt,
-            config.pq_sub_dim + 1,
+            pq_sub_dim + 1,
             dtype=torch.float32,
         )
 
@@ -868,21 +878,21 @@ class TestPQCacheMaskerImplementation:
             PQCacheConfig,
         )
 
-        # Test invalid pq_sub_dim (must be > 0)
-        with pytest.raises(ValueError, match="pq_sub_dim must be > 0"):
+        # Test invalid pq_group_factor (must be > 0)
+        with pytest.raises(ValueError, match="pq_group_factor must be > 0"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=0,  # Invalid
+                pq_group_factor=0,  # Invalid
                 pq_bits=4,
                 kmeans_iter=10,
                 init_offset=4,
                 metric="euclidean",
             )
 
-        with pytest.raises(ValueError, match="pq_sub_dim must be > 0"):
+        with pytest.raises(ValueError, match="pq_group_factor must be > 0"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=-1,  # Invalid
+                pq_group_factor=-1,  # Invalid
                 pq_bits=4,
                 kmeans_iter=10,
                 init_offset=4,
@@ -893,7 +903,7 @@ class TestPQCacheMaskerImplementation:
         with pytest.raises(ValueError, match="pq_bits must be > 0"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,
                 pq_bits=0,  # Invalid
                 kmeans_iter=10,
                 init_offset=4,
@@ -904,7 +914,7 @@ class TestPQCacheMaskerImplementation:
         with pytest.raises(ValueError, match="kmeans_iter must be > 0"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,
                 pq_bits=4,
                 kmeans_iter=-5,  # Invalid
                 init_offset=4,
@@ -915,7 +925,7 @@ class TestPQCacheMaskerImplementation:
         with pytest.raises(ValueError, match="init_offset must be >= 0"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,
                 pq_bits=4,
                 kmeans_iter=10,
                 init_offset=-1,  # Invalid
@@ -926,7 +936,7 @@ class TestPQCacheMaskerImplementation:
         with pytest.raises(ValueError, match="metric must be 'euclidean' or 'ip'"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,
                 pq_bits=4,
                 kmeans_iter=10,
                 init_offset=4,
@@ -936,7 +946,7 @@ class TestPQCacheMaskerImplementation:
         with pytest.raises(ValueError, match="metric must be 'euclidean' or 'ip'"):
             PQCacheConfig(
                 heavy_size=10,
-                pq_sub_dim=8,
+                pq_group_factor=2,
                 pq_bits=4,
                 kmeans_iter=10,
                 init_offset=4,
@@ -952,7 +962,7 @@ class TestPQCacheMaskerImplementation:
 
         config: PQCacheConfig = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -987,7 +997,7 @@ class TestPQCacheMaskerImplementation:
 
         config: PQCacheConfig = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,
             pq_bits=4,  # 2^4 = 16 centroids
             kmeans_iter=10,
             init_offset=4,
@@ -1041,7 +1051,7 @@ class TestPQCacheMaskerImplementation:
 
         config: PQCacheConfig = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -1109,7 +1119,7 @@ class TestPQCacheMaskerImplementation:
 
         config: PQCacheConfig = PQCacheConfig(
             heavy_size=10,
-            pq_sub_dim=8,
+            pq_group_factor=2,
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
@@ -1146,7 +1156,8 @@ class TestPQCacheMaskerImplementation:
 
         # Scenario 2: Subsequent call with same sequence length - no new keys
         n_quantized_keys: int = seq_len_keys - config.init_offset  # 16
-        n_subvec: int = head_dim // config.pq_sub_dim  # 2
+        pq_sub_dim = head_dim // config.pq_group_factor
+        n_subvec: int = head_dim // pq_sub_dim  # 2
 
         existing_codebook: torch.Tensor = torch.randint(
             0, 16, (bsz, n_quantized_keys, kv_heads, n_subvec), dtype=torch.int64
@@ -1207,7 +1218,7 @@ class TestPQCacheMaskerImplementation:
 
         config: PQCacheConfig = PQCacheConfig(
             heavy_size=5,
-            pq_sub_dim=8,
+            pq_group_factor=2,
             pq_bits=4,
             kmeans_iter=10,
             init_offset=4,
