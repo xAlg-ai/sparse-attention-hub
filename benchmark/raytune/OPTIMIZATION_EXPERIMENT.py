@@ -62,12 +62,12 @@ MODELS : List[str] = [
 ]
 
 TASKS: List[str] = [
-    # "ruler32k/vt",
+    "ruler32k/vt",
     # "ruler32k/qa_1",
     # "ruler32k/qa_2",
     # "ruler32k/fwe",
     # "ruler32k/niah_multikey_2",
-    "ruler32k/niah_multikey_3",
+    # "ruler32k/niah_multikey_3",
 ]
 
 SPARSITY_OBJECTIVES: List[str] = [
@@ -87,12 +87,13 @@ BUILDER_NAMES: List[str] = [
     # "dense",
     # "double_sparsity", 
     # "hashattention_topk",
-    "magicpig",
+    # "magicpig",
     # "oracle_topk",
     # "oracle_topp", 
     # "quest_topk",
     # "vattention_hashattention",
     # "vattention_oracle",
+    "pqcache",
 ]  # Specify which builders to use (e.g., ["magicpig"], ["dense"], ["double_sparsity"])
 
 
@@ -101,7 +102,7 @@ NUM_SAMPLES: int = 1  # Number of samples per hyperparameter search
 SEARCH_MAX_NEW_TOKENS: int = 3  # Max new tokens for search trials
 SEARCH_MAX_CONTEXT_LENGTH: int = 40000  # Max context length for search trials
 SEARCH_MAX_REQUESTS: int = 3  # Max requests per search trial
-OPTIMAL_CONFIGS_DIR: str = "/data/apdesai/DO_NOT_DELETE/magicpig_optimization"  # Directory for storing optimal configurations
+OPTIMAL_CONFIGS_DIR: str = "/data/apdesai/code/sparse-attention-hub/debug/"  # Directory for storing optimal configurations
 RAY_RESULTS_DIR: str = "/tmp/ray_results"  # Directory for Ray Tune results
 SEARCH_TIMEOUT: int = 900  # Timeout per search trial in seconds
 ACTORS_PER_GPU: int = 1  # Number of actors per GPU for resource allocation
