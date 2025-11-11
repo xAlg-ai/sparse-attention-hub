@@ -114,7 +114,7 @@ class ResearchMasker(ABC):
         )
 
     def _create_full_mask(
-        self, dims: AttentionTensorDimensions, dtype: torch.dtype
+        self, dims: AttentionTensorDimensions, dtype: torch.dtype, device: torch.device
     ) -> Mask:
         """Create a full attention mask."""
         mask_shape: Tuple[int, int, int, int] = (
@@ -123,7 +123,7 @@ class ResearchMasker(ABC):
             dims.seq_len_queries,
             dims.seq_len_keys,
         )
-        return Mask.create_full_mask(mask_shape, dtype=dtype)
+        return Mask.create_full_mask(mask_shape, dtype=dtype, device=device)
 
     def _create_mask_from_rowise_indices(
         self,
@@ -142,7 +142,11 @@ class ResearchMasker(ABC):
         data: torch.Tensor = torch.ones_like(indices, dtype=dtype, device=device)
 
         return Mask.create_from_row_wise_idx(
-            shape=mask_shape, row_wise_idx=indices, data=data, type="index", dtype=dtype
+            shape=mask_shape,
+            row_wise_idx=indices,
+            data=data,
+            mask_type="index",
+            dtype=dtype,
         )
 
     def _calculate_effective_size(

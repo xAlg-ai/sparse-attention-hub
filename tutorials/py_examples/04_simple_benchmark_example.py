@@ -17,13 +17,11 @@ Usage:
 import os
 import time
 from pathlib import Path
-
+import sys
 import torch
 
-# Ensure we're in the correct directory and add to Python path
-import sys
-os.chdir('/data/apdesai/code/sparse-attention-hub')
-sys.path.insert(0, '/data/apdesai/code/sparse-attention-hub')
+# Add parent directory to Python path if running as a script
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
@@ -56,7 +54,7 @@ def main():
     # Common model arguments
     model_kwargs = {
         "model_kwargs": {"torch_dtype": torch.bfloat16},
-        "device": str(device)
+        "device": device
     }
     
     # Initialize adapters

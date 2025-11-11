@@ -52,6 +52,15 @@ class TopKMaskerConfig(FixedMaskerConfig):
 
     heavy_size: Union[float, int]
 
+    def __post_init__(self) -> None:
+        """Validate post-initialization constraints for TopKMaskerConfig.
+
+        Raises:
+            ValueError: If heavy_size is not greater than 0.
+        """
+        if not self.heavy_size > 0:
+            raise ValueError(f"heavy_size must be > 0, got {self.heavy_size}")
+
 
 class TopKMasker(FixedMasker):
     """Abstract base class for top-K maskers."""

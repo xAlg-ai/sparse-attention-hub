@@ -5,7 +5,7 @@
 import re
 import pandas as pd
 from typing import List, Union
-
+import ast
 
 def extract_boxed_answer(text: str) -> str:
     """
@@ -17,6 +17,8 @@ def extract_boxed_answer(text: str) -> str:
     Returns:
         The extracted answer as a string, or empty string if not found
     """
+    if type(text) is not str:
+        return ""
     # Look for \boxed{...} pattern
     boxed_pattern = r'\\boxed\{([^}]*)\}'
     matches = re.findall(boxed_pattern, text)
@@ -45,6 +47,8 @@ def extract_numerical_answer(text: str) -> str:
     Returns:
         The extracted numerical answer as a string
     """
+    if type(text) is not str:
+        return ""
     # First try to extract from boxed format
     boxed_answer = extract_boxed_answer(text)
     if boxed_answer:
@@ -129,9 +133,7 @@ def calculate_metrics(df: pd.DataFrame) -> dict:
     predictions = df["predicted_answer"].tolist()
     references = df["answer"].tolist()
     
-    # Ensure references are in the correct format (list of lists)
-    if references and not isinstance(references[0], list):
-        references = [[str(ref)] for ref in references]
+    references = [ast.literal_eval(ref) for ref in references]
     
     # Calculate exact match accuracy
     exact_match = calculate_exact_match_score(predictions, references)

@@ -1,4 +1,4 @@
-# longbench dataset
+# longbench dataset (Adapted from KVPress from NVIDIA)
 
 [longbench-v2](https://github.com/THUDM/LongBench). 
 

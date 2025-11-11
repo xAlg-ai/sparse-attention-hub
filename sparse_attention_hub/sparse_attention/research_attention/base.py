@@ -95,7 +95,7 @@ class ResearchAttention(SparseAttention):
             keys.shape[2],
         )
         sparse_attention_mask: Mask = Mask.create_empty_mask(
-            mask_shape, dtype=queries.dtype
+            mask_shape, dtype=queries.dtype, device=queries.device
         )
 
         # Apply all maskers sequentially, each one on the output of the previous one

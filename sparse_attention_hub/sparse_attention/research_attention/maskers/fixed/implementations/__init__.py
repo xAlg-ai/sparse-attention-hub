@@ -15,6 +15,7 @@ from .hashattention_top_k import HashAttentionTopKMasker, HashAttentionTopKMaske
 from .oracle_top_k import OracleTopK, OracleTopKConfig
 from .oracle_top_p import OracleTopPMasker, OracleTopPMaskerConfig
 from .pq_top_k import PQCache, PQCacheConfig
+from .quest_top_k import QuestTopKMasker, QuestTopKMaskerConfig
 from .xattention import XAttention, XAttentionConfig
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "CausalMasker",
     "SinkMasker",
     "OracleTopK",
+    "QuestTopKMasker",
     "OracleTopPMasker",
     "PQCache",
     "HashAttentionTopKMasker",
@@ -29,6 +31,7 @@ __all__ = [
     "LocalMaskerConfig",
     "SinkMaskerConfig",
     "OracleTopKConfig",
+    "QuestTopKMaskerConfig",
     "OracleTopPMaskerConfig",
     "PQCacheConfig",
     "HashAttentionTopKMaskerConfig",

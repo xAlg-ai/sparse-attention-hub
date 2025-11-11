@@ -1,9 +1,10 @@
 """Hash attention top-K masker implementation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
+from ray import tune
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     AttentionTensorDimensions,
@@ -32,6 +33,13 @@ class HashAttentionTopKMaskerConfig(TopKMaskerConfig):
     hat_mlp_activation: str
     hat_weights: Optional[Dict[int, Dict[str, List[torch.Tensor]]]] = None
     hat_weight_file: Optional[str] = None
+    search_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "heavy_size": tune.grid_search(
+                [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+            )
+        }
+    )
 
 
 @MaskerRegistry.register(HashAttentionTopKMaskerConfig)
@@ -98,7 +106,9 @@ class HashAttentionTopKMasker(TopKMasker):
         )
 
         if self._should_use_full_attention(tensor_dims, effective_heavy_size):
-            return self._create_full_mask(tensor_dims, previous_mask.dtype)
+            return self._create_full_mask(
+                tensor_dims, previous_mask.dtype, previous_mask.device
+            )
 
         remaining_kwargs: Dict[str, Any] = {
             k: v for k, v in kwargs.items() if k != "layer_idx"

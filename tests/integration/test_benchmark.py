@@ -50,7 +50,9 @@ def sparse_attention_config(masker_config):
 class TestBenchmarkAdapterIntegration:
     """Test benchmark integration with real adapter interfaces."""
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_benchmark_with_real_adapter_interface(
         self,
@@ -104,6 +106,7 @@ class TestBenchmarkAdapterIntegration:
                 "answers": [["Test answer"]],
                 "all_classes": [[]],
                 "answer_prefix": ["Answer: "],
+                "max_new_tokens": [10],
             }
         )
 
@@ -118,7 +121,9 @@ class TestBenchmarkAdapterIntegration:
         assert (result_path / "raw_results.csv").exists()
         assert (result_path / "metrics.json").exists()
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_dense_only_adapter_integration(
         self, mock_tokenizer_class, mock_model_class, temp_result_dir
@@ -163,6 +168,7 @@ class TestBenchmarkAdapterIntegration:
                 "answers": [["Answer 1"], ["Answer 2"]],
                 "all_classes": [[], []],
                 "answer_prefix": ["Answer: ", "Answer: "],
+                "max_new_tokens": [10, 10],
             }
         )
 
@@ -241,6 +247,7 @@ class TestEndToEndBenchmarkWorkflow:
                 "answers": [["A1a"], ["A1b"], ["A2"]],
                 "all_classes": [[], [], []],
                 "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
+                "max_new_tokens": [10, 10, 10],
             }
         )
 
@@ -308,6 +315,7 @@ class TestEndToEndBenchmarkWorkflow:
                 "answers": [["A1"], ["A2"], ["A3"], ["A4"], ["A5"], ["A6"]],
                 "all_classes": [[], [], [], [], [], []],
                 "answer_prefix": ["Answer: "] * 6,
+                "max_new_tokens": [10, 10, 10, 10, 10, 10],
             }
         )
 
@@ -348,6 +356,7 @@ class TestLongBenchIntegration:
                     3000,
                     5000,
                 ],  # Only extended datasets have length
+                "max_new_tokens": [10, 10, 10, 10],
             }
         )
 
@@ -380,6 +389,9 @@ class TestLongBenchIntegration:
 class TestErrorHandlingIntegration:
     """Test error handling in real integration scenarios."""
 
+    @pytest.mark.skip(
+        reason="Skipping since we removed error handling for better error dumps"
+    )
     def test_adapter_failure_recovery(self, temp_result_dir):
         """Test benchmark recovery when adapter fails intermittently."""
         # Create adapter that fails on certain contexts
@@ -407,6 +419,7 @@ class TestErrorHandlingIntegration:
                 "answers": [["A1"], ["A2"], ["A3"]],
                 "all_classes": [[], [], []],
                 "answer_prefix": ["Answer: ", "Answer: ", "Answer: "],
+                "max_new_tokens": [10, 10, 10],
             }
         )
 
@@ -449,6 +462,7 @@ class TestErrorHandlingIntegration:
                 "answers": [["A"]],
                 "all_classes": [[]],
                 "answer_prefix": ["Answer: "],
+                "max_new_tokens": [10],
             }
         )
 

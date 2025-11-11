@@ -27,24 +27,29 @@ import sys
 os.chdir('/root/prithvi/sparse-attention-hub')
 sys.path.insert(0, '/root/prithvi/sparse-attention-hub')
 
+from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig
 from sparse_attention_hub.sparse_attention.research_attention.maskers.fixed.implementations import (
-    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, PQCacheConfig, XAttentionConfig
+    LocalMaskerConfig, SinkMaskerConfig, OracleTopKConfig, PQCacheConfig, XAttentionConfig,
+    DoubleSparsityTopKMaskerConfig
 )
 from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.implementations import (
     AdaptiveSamplingMaskerConfig
 )
 
+#from benchmark.longbench import LongBench
 from benchmark.ruler32k import Ruler32K
 from benchmark.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
-from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 
 
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
     device = 0
 
+    # sorted_channel_file is available in the author's repository
+    # https://github.com/andy-yang-1/DoubleSparse/tree/main/config
+    # TODO: is there a better way to use the paths in scripts?
     sparse_attention_config = ResearchAttentionConfig(masker_configs=[
         SinkMaskerConfig(sink_size=128),
         LocalMaskerConfig(window_size=128),
@@ -57,11 +62,13 @@ def main():
 
     
     print("  ✓ Loading model...")
+     # use whichever is available
+     # flash_attention_3 is for Hopper GPU
+     # commonly flash_attention_2 is supported on other GPUs
     adapter = ModelAdapterHF(
         model_name=model_name,
         sparse_attention_config=sparse_attention_config,
-        model_kwargs= {"torch_dtype": torch.bfloat16},
-        generate_kwargs={"max_new_tokens": 32},
+        model_kwargs= {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_3"},
         device=device
     )
 
@@ -74,7 +81,7 @@ def main():
     
     benchmark = LongBench(['gov_report'])
 
-    result_dir = Path("./test_results")
+    result_dir = Path("./test_results.vt.4096.2.2.q_proj/")
     result_dir.mkdir(exist_ok=True)
 
     benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests":50, "max_context_length": 1000000})

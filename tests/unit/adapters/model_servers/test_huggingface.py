@@ -183,10 +183,10 @@ class TestModelCreation:
             "use_cache": True,
             "attn_implementation": "flash_attention_2",
         }
-        self.server._create_model("llama-7b", None, kwargs)
+        self.server._create_model("qwen3-1.7b", None, kwargs)
 
         # Verify all kwargs passed through
-        mock_auto_model.from_pretrained.assert_called_once_with("llama-7b", **kwargs)
+        mock_auto_model.from_pretrained.assert_called_once_with("qwen3-1.7b", **kwargs)
 
 
 @pytest.mark.unit
@@ -472,7 +472,6 @@ class TestHuggingFaceSpecificMethods:
         # Test getting model with device info
         kwargs = {"torch_dtype": torch.float16}
         model, device_info = self.server.get_model_with_device_info("gpt2", 0, kwargs)
-
         assert model == mock_model
         assert device_info == "cuda:0"  # Should infer from gpu_id
 

@@ -10,10 +10,11 @@ The AdaptiveSamplingMasker is useful for:
 - Maintaining error bounds while reducing computational complexity
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Union
 
 import torch
+from ray import tune
 from scipy.stats import norm
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
@@ -40,7 +41,8 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
 
     Attributes:
         base_rate_sampling: Union[int, float] representing the base sampling rate.
-            If float, must be in (0,1); if int, must be positive.
+            If float, must be in [0,1); if int, must be non-negative.
+            When set to 0, the masker returns the previous mask without modification.
         epsilon: Float in range (0,1) representing the error bound.
         delta: Float in range (0,1) representing the confidence bound.
         init_offset: Union[int, float] representing the start index for sampling.
@@ -56,18 +58,25 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
     delta: float  # Confidence bound (0,1)
     init_offset: Union[int, float]  # Start index
     local_offset: Union[int, float]  # End offset
+    search_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "base_rate_sampling": tune.grid_search([0.01, 0.02, 0.03]),
+            "epsilon": tune.grid_search([0.05, 0.1, 0.2, 0.3]),
+            "delta": tune.grid_search([0.05, 0.1, 0.2, 0.3]),
+        }
+    )
 
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
         if isinstance(self.base_rate_sampling, float):
-            if not (0.0 < self.base_rate_sampling < 1.0):
+            if not (0.0 <= self.base_rate_sampling < 1.0):
                 raise ValueError(
-                    f"base_rate_sampling must be in (0, 1) if float, got {self.base_rate_sampling}"
+                    f"base_rate_sampling must be in [0, 1) if float, got {self.base_rate_sampling}"
                 )
         elif isinstance(self.base_rate_sampling, int):
-            if self.base_rate_sampling <= 0:
+            if self.base_rate_sampling < 0:
                 raise ValueError(
-                    f"base_rate_sampling must be positive if int, got {self.base_rate_sampling}"
+                    f"base_rate_sampling must be non-negative if int, got {self.base_rate_sampling}"
                 )
         else:
             raise ValueError(
@@ -133,6 +142,8 @@ class AdaptiveSamplingMasker(SamplingMasker):
         delta_ppf: Pre-computed percentile point function for efficiency.
 
     Important Notes:
+        - If base_rate_sampling is set to 0, the masker returns the previous mask
+          without any modification.
         - The sampling is performed with replacement for efficiency.
         - The masker ignores the previous mask for base sampling to avoid complex
           index manipulation.
@@ -262,7 +273,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
             row_wise_idx=base_row_wise_idx,
             data=base_data,
-            type="index",
+            mask_type="dense",
             dtype=dtype,
         )
 
@@ -306,6 +317,8 @@ class AdaptiveSamplingMasker(SamplingMasker):
 
         This method implements the core adaptive sampling logic. It combines base
         sampling with adaptive budget allocation based on statistical error bounds.
+        If base_rate_sampling is set to 0, this method returns the previous mask
+        without modification.
 
         Args:
             keys: Key tensor with shape (batch_size, num_heads, seq_len_keys, head_dim).
@@ -326,6 +339,10 @@ class AdaptiveSamplingMasker(SamplingMasker):
         if previous_mask.is_full_mask():
             return previous_mask
 
+        # If base_rate_sampling is 0, return the previous mask without modification
+        if self.base_rate_sampling == 0:
+            return previous_mask
+
         # Extract dimensions and compute attention scores
         dims = self._extract_tensor_dimensions(keys, queries)
         batch_size, num_heads, seq_len_queries, seq_len_keys = (
@@ -343,6 +360,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             return Mask.create_full_mask(
                 shape=(batch_size, num_heads, seq_len_queries, seq_len_keys),
                 dtype=previous_mask.dtype,
+                device=previous_mask.device,
             )
 
         # Compute attention scores after removing attention_mask

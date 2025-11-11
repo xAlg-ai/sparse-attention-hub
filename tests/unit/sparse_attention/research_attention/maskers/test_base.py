@@ -210,6 +210,9 @@ class TestConcreteMaskerCreation:
 
     def test_masker_creation_from_config_for_double_sparsity_top_k_masker(self):
         """Test that DoubleSparsityTopKMasker can be created from a config."""
+        import os
+        import tempfile
+
         from sparse_attention_hub.sparse_attention.research_attention.maskers import (
             ResearchMasker,
         )
@@ -218,12 +221,27 @@ class TestConcreteMaskerCreation:
             DoubleSparsityTopKMaskerConfig,
         )
 
-        config = DoubleSparsityTopKMaskerConfig(
-            heavy_size=100, group_factor=4, label_bits=8, channel_config="auto"
-        )
-        masker = ResearchMasker.create_masker_from_config(config)
-        assert type(masker) is DoubleSparsityTopKMasker
-        assert masker.config == config
+        # Create a temporary file for sorted_channel_file
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as temp_file:
+            temp_file.write('{"test": "data"}')
+            temp_file_path = temp_file.name
+
+        try:
+            config = DoubleSparsityTopKMaskerConfig(
+                heavy_size=100,
+                group_factor=4,
+                label_bits=8,
+                sorted_channel_file=temp_file_path,
+            )
+            masker = ResearchMasker.create_masker_from_config(config)
+            assert type(masker) is DoubleSparsityTopKMasker
+            assert masker.config == config
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
 
     def test_masker_creation_from_config_for_random_sampling_masker(self):
         """Test that RandomSamplingMasker can be created from a config."""

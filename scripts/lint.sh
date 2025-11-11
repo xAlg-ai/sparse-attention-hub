@@ -41,7 +41,7 @@ run_flake8() {
     if check_tool "flake8"; then
         flake8 \
             --max-line-length=88 \
-            --extend-ignore=E203,W503,E501 \
+            --extend-ignore=E203,W503,E501,E231 \
             --exclude=build,dist,.git,__pycache__,.pytest_cache,.venv \
             sparse_attention_hub tests scripts
         echo -e "${GREEN}✅ flake8 passed${NC}"

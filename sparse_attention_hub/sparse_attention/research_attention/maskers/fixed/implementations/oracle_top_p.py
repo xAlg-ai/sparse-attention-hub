@@ -1,9 +1,10 @@
 """Oracle top-P masker implementation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 import torch
+from ray import tune
 
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     AttentionTensorDimensions,
@@ -23,7 +24,13 @@ from ..base import TopPMasker, TopPMaskerConfig
 class OracleTopPMaskerConfig(TopPMaskerConfig):
     """Configuration for OracleTopPMasker."""
 
-    pass  # Inherits top_p from parent with validation
+    search_space: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "top_p": tune.grid_search(
+                [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99]
+            )
+        }
+    )
 
 
 @MaskerRegistry.register(OracleTopPMaskerConfig)
@@ -60,7 +67,9 @@ class OracleTopPMasker(TopPMasker):
 
         # If sequence is small enough, use full attention
         if self._should_use_full_attention(tensor_dims):
-            return self._create_full_mask(tensor_dims, previous_mask.dtype)
+            return self._create_full_mask(
+                tensor_dims, previous_mask.dtype, previous_mask.device
+            )
 
         # Create oracle top-P attention mask
         oracle_mask: Mask = self._create_oracle_top_p_mask(

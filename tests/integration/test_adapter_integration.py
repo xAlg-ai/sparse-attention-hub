@@ -39,7 +39,7 @@ def sparse_attention_config_multi():
 @pytest.fixture
 def model_name():
     """Model name for testing."""
-    return "meta-llama/Llama-3.2-1B"
+    return "Qwen/Qwen3-1.7B"
 
 
 class TestAdapterIntegration:
@@ -48,14 +48,18 @@ class TestAdapterIntegration:
     def setup_method(self) -> None:
         """Set up test fixtures - reset ModelServer singleton."""
         from sparse_attention_hub.adapters.model_servers.base import ModelServer
+
         ModelServer._instance = None
 
     def teardown_method(self) -> None:
         """Clean up after each test - reset ModelServer singleton."""
         from sparse_attention_hub.adapters.model_servers.base import ModelServer
+
         ModelServer._instance = None
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_full_request_processing_flow(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -141,7 +145,9 @@ class TestAdapterIntegration:
         assert mock_tokenizer_instance.encode.call_count == 2
         mock_tokenizer_instance.decode.assert_called_once()
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_multiple_questions_processing(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -246,7 +252,9 @@ class TestAdapterIntegration:
         assert mock_tokenizer_instance.encode.call_count == 3
         assert mock_tokenizer_instance.decode.call_count == 2
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_mode_switching_integration(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -287,7 +295,9 @@ class TestAdapterIntegration:
             # Should not raise any errors
             pass
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_custom_attention_function_integration(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -350,7 +360,9 @@ class TestAdapterIntegration:
             mock_custom_attention.assert_called_once()
             assert result is not None
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_error_handling_integration(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -399,7 +411,9 @@ class TestAdapterIntegration:
                 # missing sparse_meta_data
             )
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_adapter_with_device_configuration(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -453,7 +467,9 @@ class TestAdapterIntegration:
             "test-model", device_map="cuda", torch_dtype=torch.float16
         )
 
-    @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM")
+    @patch(
+        "sparse_attention_hub.adapters.model_servers.huggingface.AutoModelForCausalLM"
+    )
     @patch("sparse_attention_hub.adapters.model_servers.huggingface.AutoTokenizer")
     def test_adapter_cleanup_on_exception(
         self, mock_tokenizer, mock_model, sparse_attention_config
@@ -560,7 +576,7 @@ class TestAdapterManual:
         """Test enable_sparse_mode with real model."""
         from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
         from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
-        from transformers.models.llama.modeling_llama import LlamaAttention
+        from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
 
         adapter = ModelAdapterHF(
             model_name=model_name,
@@ -569,7 +585,7 @@ class TestAdapterManual:
         )
 
         for name, module in adapter.model.named_modules():
-            if isinstance(module, LlamaAttention):
+            if isinstance(module, Qwen3Attention):
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
@@ -578,7 +594,7 @@ class TestAdapterManual:
         with adapter.enable_sparse_mode():
             # Should not raise any errors - sparse mode is working
             for name, module in adapter.model.named_modules():
-                if isinstance(module, LlamaAttention):
+                if isinstance(module, Qwen3Attention):
                     assert (
                         module.config._attn_implementation
                         == adapter._registered_attention_name
@@ -596,14 +612,14 @@ class TestAdapterManual:
         )
 
         for name, module in adapter.model.named_modules():
-            if isinstance(module, LlamaAttention):
+            if isinstance(module, Qwen3Attention):
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
 
         # Test dense mode (default mode after exiting sparse mode)
         for name, module in adapter.model.named_modules():
-            if isinstance(module, LlamaAttention):
+            if isinstance(module, Qwen3Attention):
                 assert not module.config._attn_implementation.startswith(
                     "sparse_attention"
                 )
@@ -618,6 +634,10 @@ class TestAdapterManual:
 
         registered_attention_name = adapter._registered_attention_name
         del adapter
+        # delete function is called by garbage collector . so force it
+        import gc
+
+        gc.collect()
         assert registered_attention_name not in ALL_ATTENTION_FUNCTIONS.valid_keys()
         assert (
             registered_attention_name not in ALL_MASK_ATTENTION_FUNCTIONS.valid_keys()

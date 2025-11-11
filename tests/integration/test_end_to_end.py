@@ -41,7 +41,7 @@ class TestEndToEndSparseAttention:
 #         # Create adapter with sparse attention configuration
 #         sparse_attention_config = ResearchAttentionConfig(masker_configs=[OracleTopKConfig(heavy_size=0.25)])
 #         adapter = ModelAdapterHF(
-#             model_name="meta-llama/Meta-Llama-3-8B-Instruct",
+#             model_name="Qwen/Qwen3-1.7B",
 #             sparse_attention_config=sparse_attention_config,
 #             model_kwargs={"torch_dtype": torch.bfloat16}
 #         )
