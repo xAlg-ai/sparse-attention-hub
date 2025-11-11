@@ -29,11 +29,6 @@ import traceback
 current_dir = Path(__file__).parent
 root_path = current_dir.parent.parent
 sys.path.extend([str(current_dir), str(root_path)])
-existing_pythonpath = os.environ.get("PYTHONPATH", "")
-if existing_pythonpath:
-    os.environ["PYTHONPATH"] = f"{existing_pythonpath}:{current_dir}:{root_path}"
-else:
-    os.environ["PYTHONPATH"] = f"{current_dir}:{root_path}"
 
 import ray
 from ray.util.queue import Queue as RayQueue
@@ -327,13 +322,10 @@ def main(
     print(f"\n{'='*80}")
     print(f"RAY BENCHMARK RUNNER")
     print(f"{'='*80}")
-    
-    # Initialize Ray with runtime environment so workers can import modules
+
+    # Initialize Ray
     if not ray.is_initialized():
-        ray.init(
-            ignore_reinit_error=True,
-            runtime_env={"working_dir": str(root_path)}
-        )
+        ray.init(ignore_reinit_error=True)
     
     # Get GPU info
     num_gpus = int(ray.available_resources().get("GPU", 0))
