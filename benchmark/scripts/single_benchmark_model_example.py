@@ -36,6 +36,7 @@ from sparse_attention_hub.sparse_attention.research_attention.maskers.sampling.i
 )
 
 from benchmark.ruler32k import Ruler32K
+from benchmark.longbench import LongBench
 from sparse_attention_hub.adapters import ModelAdapterHF
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 
@@ -51,7 +52,7 @@ def main():
         #OracleTopKConfig(heavy_size=5644),
         #AdaptiveSamplingMaskerConfig(base_rate_sampling=0.05, epsilon=0.25, delta=0.25, init_offset=128, local_offset=128),
         #PQCacheConfig(heavy_size=1024,pq_sub_dim=64, pq_bits=7, kmeans_iters=25, sink_size = 4)
-        XAttentionConfig(heavy_size=5644, importance_threshold=0.9, block_size=128, stride=8)
+        XAttentionConfig(heavy_size=5644, importance_threshold=0.8, block_size=128, stride=8)
     ])
 
     
@@ -71,12 +72,12 @@ def main():
     )
 
     
-    benchmark = Ruler32K(['vt'])
+    benchmark = LongBench(['gov_report'])
 
     result_dir = Path("./test_results")
     result_dir.mkdir(exist_ok=True)
 
-    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests":10, "max_context_length": 1000000})
+    benchmark.run_benchmark(adapter, result_dir, request_kwargs={"max_requests":50, "max_context_length": 1000000})
     
 if __name__ == "__main__":
     main() 
