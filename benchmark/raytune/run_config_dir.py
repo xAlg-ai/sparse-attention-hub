@@ -29,6 +29,11 @@ import traceback
 current_dir = Path(__file__).parent
 root_path = current_dir.parent.parent
 sys.path.extend([str(current_dir), str(root_path)])
+existing_pythonpath = os.environ.get("PYTHONPATH", "")
+if existing_pythonpath:
+    os.environ["PYTHONPATH"] = f"{existing_pythonpath}:{current_dir}:{root_path}"
+else:
+    os.environ["PYTHONPATH"] = f"{current_dir}:{root_path}"
 
 import ray
 from ray.util.queue import Queue as RayQueue
@@ -323,9 +328,12 @@ def main(
     print(f"RAY BENCHMARK RUNNER")
     print(f"{'='*80}")
     
-    # Initialize Ray
+    # Initialize Ray with runtime environment so workers can import modules
     if not ray.is_initialized():
-        ray.init(ignore_reinit_error=True)
+        ray.init(
+            ignore_reinit_error=True,
+            runtime_env={"working_dir": str(root_path)}
+        )
     
     # Get GPU info
     num_gpus = int(ray.available_resources().get("GPU", 0))
@@ -427,12 +435,16 @@ def main(
         pool.submit(lambda actor, task: actor.run_benchmark.remote(task), task)
     
     # Collect results
+    results: List[BenchmarkResult] = []
     while pool.has_next():
         result = pool.get_next()
         result_queue.put(result)
+        results.append(result)
     
     # Wait for progress reporter
     ray.get(progress_task)
+    
+    failed_results: List[BenchmarkResult] = [r for r in results if not r.success]
     
     # Get actor statistics
     print("\nActor statistics:")
@@ -454,6 +466,11 @@ def main(
     print(f"{'='*80}")
     
     ray.shutdown()
+
+    if failed_results:
+        for result in failed_results:
+            print(f"[ERROR] Task {result.task_id} failed: {result.error}")
+        raise RuntimeError("One or more benchmark tasks failed. See errors above.")
 
 
 if __name__ == "__main__":
