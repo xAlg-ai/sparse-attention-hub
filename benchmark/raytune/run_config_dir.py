@@ -383,7 +383,7 @@ def main(
     # Create adapter config
     adapter_config = {
         "adapter_name": "huggingface",
-        "model_kwargs": {"torch_dtype": torch.bfloat16},
+        "model_kwargs": {"torch_dtype": torch.bfloat16, "attn_implementation": "flash_attention_2"},
         "tokenizer_kwargs": {"padding_side": "left"}
     }
     

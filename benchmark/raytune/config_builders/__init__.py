@@ -8,6 +8,7 @@ from .dense import DenseConfigBuilder  # noqa: E402, F401
 from .double_sparsity import DoubleSparsityConfigBuilder  # noqa: E402, F401
 from .vattention_oracle import VAttentionOracleConfigBuilder  # noqa: E402, F401
 from .vattention_hashattention import VAttentionHashAttentionConfigBuilder  # noqa: E402, F401
+from .vattention_pqcache import VAttentionPQCacheConfigBuilder  # noqa: E402, F401
 from .oracle_topk import OracleTopKConfigBuilder  # noqa: E402, F401
 from .oracle_topp import OracleTopPConfigBuilder  # noqa: E402, F401
 from .hashattention_topk import HashAttentionTopKConfigBuilder  # noqa: E402, F401
@@ -22,6 +23,7 @@ __all__ = [
     "DoubleSparsityConfigBuilder",
     "VAttentionOracleConfigBuilder",
     "VAttentionHashAttentionConfigBuilder",
+    "VAttentionPQCacheConfigBuilder",
     "OracleTopKConfigBuilder",
     "OracleTopPConfigBuilder",
     "HashAttentionTopKConfigBuilder",
