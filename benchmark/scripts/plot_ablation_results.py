@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Change to directory and add to Python path
-os.chdir('/data/apdesai/code/sparse-attention-hub-rebuttal')
-sys.path.insert(0, '/data/apdesai/code/sparse-attention-hub-rebuttal')
+os.chdir('/workspace/sparse-attention-hub')
+sys.path.insert(0, '/workspace/sparse-attention-hub')
 
 
 def parse_directory_name(dir_name: str) -> Tuple[str, float, float]:

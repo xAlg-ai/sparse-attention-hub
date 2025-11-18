@@ -24,8 +24,8 @@ import torch
 import sys
 
 # Change to directory two levels below current location
-os.chdir('/data/apdesai/code/sparse-attention-hub-rebuttal')
-sys.path.insert(0, '/data/apdesai/code/sparse-attention-hub-rebuttal')
+os.chdir('/workspace/sparse-attention-hub')
+sys.path.insert(0, '/workspace/sparse-attention-hub')
 
 from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention import ResearchAttentionConfig

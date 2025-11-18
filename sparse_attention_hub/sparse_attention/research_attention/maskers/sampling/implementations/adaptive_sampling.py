@@ -399,6 +399,22 @@ class AdaptiveSamplingMasker(SamplingMasker):
                 estimated_denominator = static_denominator + sampled_denominator
                 estimated_value = estimated_denominator
                 estimated_std = std_estimate
+                if queries.shape[2] == 1:
+                    true_estimated_value = torch.sum(expwts, dim=-1, keepdim=True)
+                    true_estimated_std = torch.std(expwts[:,:,:,start_idx:end_idx], dim=-1, keepdim=True)
+                    print("layer_idx: ", kwargs.get("layer_idx"))
+                    for head_idx in range(true_estimated_value.shape[1]):
+                        print("head_idx: ", head_idx)
+                        print("true vs. estimated")
+                        v_true: float = true_estimated_value[:, head_idx, 0].item()
+                        v_est: float = estimated_value[:, head_idx, 0].item()
+                        std_true: float = true_estimated_std[:, head_idx, 0].item()
+                        std_est: float = estimated_std[:, head_idx, 0].item()
+                        rel_err_val: float = abs(v_true - v_est) / (abs(v_true) + 1e-8)
+                        rel_err_std: float = abs(std_true - std_est) / (abs(std_true) + 1e-8)
+                        print("layer_idx: ", kwargs.get("layer_idx"), "head_idx: ", head_idx, "value: ", "true:", v_true, "est:", v_est, "rel_err:", rel_err_val)
+                        print("layer_idx: ", kwargs.get("layer_idx"), "head_idx: ", head_idx, "std: ", "true:", std_true, "est:", std_est, "rel_err:", rel_err_std)
+                    
         elif self.mode == "numerator":
             if self.use_exact_estimation:
                 ngroups = _get_num_key_value_groups(queries, keys)
@@ -418,6 +434,15 @@ class AdaptiveSamplingMasker(SamplingMasker):
         budget = self._compute_adaptive_budget(
             estimated_std, estimated_value, sampling_range
         )
+        if queries.shape[2] == 1:
+            true_budget = self._compute_adaptive_budget(
+                true_estimated_std, true_estimated_value, sampling_range
+            )
+            for head_idx in range(true_budget.shape[1]):
+                tb: float = true_budget[:, head_idx, 0].item()
+                b: float = budget[:, head_idx, 0].item()
+                rel_err_budget: float = abs(tb - b) / (abs(tb) + 1e-8)
+                print(f"layer_idx: {kwargs.get('layer_idx')}, head_idx: {head_idx}, Budget (true): {tb:.6f}, Budget (est): {b:.6f}, Relative error: {rel_err_budget:.6e}")
         #budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
 
         # Create adaptive sampling mask

@@ -1,6 +1,10 @@
 """Base classes for research attention mechanisms."""
 
+import os
+import pickle
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
@@ -87,6 +91,25 @@ class ResearchAttention(SparseAttention):
         Returns:
             Tuple of attention output and optional attention weights.
         """
+        # Dump attention data if in decoding mode and environment variable is set
+        if queries.shape[2] == 1 and os.environ.get("DUMP_ATTENTION_DATA","0") == "1":
+            dump_dir: Path = Path("/workspace/attention_data")
+            dump_dir.mkdir(parents=True, exist_ok=True)
+            
+            layer_idx: int = kwargs.get("layer_idx", -1)
+            unique_str: str = str(uuid.uuid4())[:8]
+            dump_filename: str = f"{layer_idx}.{unique_str}.pkl"
+            dump_path: Path = dump_dir / dump_filename
+            
+            dump_data: Dict[str, torch.Tensor] = {
+                "queries": queries.detach().cpu(),
+                "keys": keys.detach().cpu(),
+                "values": values.detach().cpu(),
+            }
+            
+            with open(dump_path, "wb") as f:
+                pickle.dump(dump_data, f)
+        
         # Create an empty Mask object
         mask_shape: Tuple[int, int, int, int] = (
             queries.shape[0],
