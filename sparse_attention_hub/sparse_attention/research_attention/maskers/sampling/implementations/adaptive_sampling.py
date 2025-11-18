@@ -28,7 +28,6 @@ from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
     create_sampling_mask_with_per_head_budget,
     repeat_kv,
 )
-
 from ..base import SamplingMasker, SamplingMaskerConfig
 
 
@@ -58,6 +57,9 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
     delta: float  # Confidence bound (0,1)
     init_offset: Union[int, float]  # Start index
     local_offset: Union[int, float]  # End offset
+    mode: str  # Must be one of "denominator", "numerator", or "combined"
+    use_exact_estimation: bool
+
     search_space: Dict[str, Any] = field(
         default_factory=lambda: {
             "base_rate_sampling": tune.grid_search([0.01, 0.02, 0.03]),
@@ -119,6 +121,9 @@ class AdaptiveSamplingMaskerConfig(SamplingMaskerConfig):
                 f"local_offset must be int or float, got {type(self.local_offset)}"
             )
 
+        if self.mode not in ["denominator", "numerator", "combined"]:
+            raise ValueError(f"mode must be one of 'denominator', 'numerator', or 'combined', got {self.mode}")
+
 
 @MaskerRegistry.register(AdaptiveSamplingMaskerConfig)
 class AdaptiveSamplingMasker(SamplingMasker):
@@ -176,7 +181,8 @@ class AdaptiveSamplingMasker(SamplingMasker):
         self.delta = config.delta
         self.init_offset = config.init_offset
         self.local_offset = config.local_offset
-
+        self.mode = config.mode
+        self.use_exact_estimation = config.use_exact_estimation
         # Pre-compute delta_ppf for efficiency
         self.delta_ppf = float(norm.ppf(1 - self.delta))
 
@@ -282,11 +288,11 @@ class AdaptiveSamplingMasker(SamplingMasker):
     def _compute_adaptive_budget(
         self,
         std_estimate: torch.Tensor,
-        estimated_denominator: torch.Tensor,
+        estimated_val: torch.Tensor,
         sampling_range: int,
     ) -> torch.Tensor:
         """Compute adaptive budget based on statistical bounds."""
-        epsilon_allowable_error = self.epsilon * estimated_denominator
+        epsilon_allowable_error = self.epsilon * estimated_val
         epsilon_allowable_error = torch.clamp(epsilon_allowable_error, min=1e-8)
 
         budget_numerator = self.delta_ppf * std_estimate * sampling_range
@@ -366,32 +372,53 @@ class AdaptiveSamplingMasker(SamplingMasker):
         # Compute attention scores after removing attention_mask
         expwts = self._compute_exp_attention_scores(
             queries, keys, scaling, attention_mask
-        )
-        static_denominator = apply_inv_mask_sum(expwts, previous_mask)
-
-        # Get sampling parameters
-
+        ) # (b, h, sq, sk)
         num_base_samples = self._get_base_sample_count(sampling_range)
 
-        # Create base sampling mask and estimate std
-        base_sampling_mask, std_estimate = self._get_std_estimate_using_base_sample(
-            expwts,
-            batch_size,
-            num_heads,
-            seq_len_queries,
-            seq_len_keys,
-            start_idx,
-            end_idx,
-            num_base_samples,
-            previous_mask.dtype,
-        )
-        # Compute denominators and budget
-        sampled_denominator = apply_inv_mask_sum(expwts, base_sampling_mask)
-        estimated_denominator = static_denominator + sampled_denominator
+        if self.mode == "denominator":
+            if self.use_exact_estimation:
+                trimmed = expwts[:, :, :, start_idx:end_idx]
+                estimated_std = torch.std(trimmed, dim=-1, keepdim=True)
+                estimated_std = torch.clamp(estimated_std, min=1e-8)
+                estimated_value = torch.sum(expwts, dim=-1, keepdim=True)
+            else:
+                static_denominator = apply_inv_mask_sum(expwts, previous_mask)
+                base_sampling_mask, std_estimate = self._get_std_estimate_using_base_sample(
+                    expwts,
+                    batch_size,
+                    num_heads,
+                    seq_len_queries,
+                    seq_len_keys,
+                    start_idx,
+                    end_idx,
+                    num_base_samples,
+                    previous_mask.dtype,
+                )
+                # Compute denominators and budget
+                sampled_denominator = apply_inv_mask_sum(expwts, base_sampling_mask)
+                estimated_denominator = static_denominator + sampled_denominator
+                estimated_value = estimated_denominator
+                estimated_std = std_estimate
+        elif self.mode == "numerator":
+            if self.use_exact_estimation:
+                ngroups = _get_num_key_value_groups(queries, keys)
+                values = repeat_kv(values, ngroups)
+                v = values[:, :, start_idx:end_idx, :].unsqueeze(2)
+                e = expwts[:,:,:,start_idx:end_idx].unsqueeze(-1)
+                num_vals = v * e # element wise multiplication' # b, h, sq, sk, d
+                ## std estimation
+                std_estimate = torch.std(num_vals, dim=-2) # (b, h, sq, d)
+                std_estimate = torch.sqrt((std_estimate ** 2).sum(dim=-1, keepdim=True)) # (b, h, sq, 1)
+                estimated_std = std_estimate
+                estimated_value = torch.norm((values.unsqueeze(2) * expwts.unsqueeze(-1)).sum(dim=-2), dim=-1, keepdim=True)
+            else:
+                raise NotImplementedError(f"Approx for mode {self.mode} not implemented")
+        else:
+            raise NotImplementedError(f"Mode {self.mode} not implemented")
         budget = self._compute_adaptive_budget(
-            std_estimate, estimated_denominator, sampling_range
+            estimated_std, estimated_value, sampling_range
         )
-        budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
+        #budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
 
         # Create adaptive sampling mask
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
