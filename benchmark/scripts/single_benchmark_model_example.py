@@ -44,8 +44,9 @@ from sparse_attention_hub.adapters import ModelAdapterHF
 def main():
     model_name = "meta-llama/Llama-3.1-8B-Instruct"
     device = 0
-    delta_values = [0.01, 0.025, 0.05]
-    epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+    delta_values = [0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+    #epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+    epsilon_values = [0.01, 0.025, 0.05]
     modes = ["denominator", "numerator"]
     
     # Loop through all combinations

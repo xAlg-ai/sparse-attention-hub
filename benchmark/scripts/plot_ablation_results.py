@@ -81,6 +81,10 @@ def aggregate_ablation_results(ablations_dir: Path) -> Dict[str, Dict[float, Dic
     """
     Aggregate all ablation results by mode, delta, and epsilon.
     
+    Filters:
+        - Denominator mode: epsilon >= 0.025 and delta >= 0.025
+        - Numerator mode: epsilon >= 0.1 and delta >= 0.025
+    
     Args:
         ablations_dir: Path to the ablations directory
     
@@ -101,6 +105,16 @@ def aggregate_ablation_results(ablations_dir: Path) -> Dict[str, Dict[float, Dic
         except ValueError:
             print(f"Skipping directory: {dir_path.name}")
             continue
+        
+        # Apply filtering based on mode
+        if mode == 'denominator':
+            if epsilon < 0.025 or delta < 0.025:
+                print(f"Skipping {dir_path.name}: epsilon={epsilon} or delta={delta} below threshold for denominator")
+                continue
+        elif mode == 'numerator':
+            if epsilon < 0.1 or delta < 0.025:
+                print(f"Skipping {dir_path.name}: epsilon={epsilon} or delta={delta} below threshold for numerator")
+                continue
         
         metrics_file: Path = dir_path / 'micro_metrics.jsonl'
         if not metrics_file.exists():
