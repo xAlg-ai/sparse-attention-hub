@@ -17,6 +17,7 @@ import torch
 from ray import tune
 from scipy.stats import norm
 
+from sparse_attention_hub.metric_logging.logger import MicroMetricLogger
 from sparse_attention_hub.sparse_attention.research_attention.maskers.base import (
     MaskerConfig,
     MaskerRegistry,
@@ -30,6 +31,12 @@ from sparse_attention_hub.sparse_attention.utils.mask_attention_utils import (
 )
 
 from ..base import SamplingMasker, SamplingMaskerConfig
+
+# Register micro metrics for adaptive sampling
+MicroMetricLogger.register_metric("denominator_var_error", float)
+MicroMetricLogger.register_metric("numerator_trace_error", float)
+MicroMetricLogger.register_metric("denominator_budget_error", float)
+MicroMetricLogger.register_metric("numerator_budget_error", float)
 
 
 @dataclass
@@ -385,6 +392,7 @@ class AdaptiveSamplingMasker(SamplingMasker):
             num_base_samples,
             previous_mask.dtype,
         )
+        
         # Compute denominators and budget
         sampled_denominator = apply_inv_mask_sum(expwts, base_sampling_mask)
         estimated_denominator = static_denominator + sampled_denominator
@@ -392,6 +400,60 @@ class AdaptiveSamplingMasker(SamplingMasker):
             std_estimate, estimated_denominator, sampling_range
         )
         budget = torch.clamp(budget, min=num_base_samples, max=sampling_range)
+        if MicroMetricLogger().is_metric_enabled("denominator_var_error"):
+            estimated_var = std_estimate **2
+            true_var = torch.var(expwts[:,:,:,start_idx:end_idx], dim=-1,unbiased=True, keepdim=True)
+            
+            # Only log cases where true_var > 5e-5
+            mask: torch.Tensor = true_var > 0.001
+            if mask.any():
+                rel_err_var = (true_var - estimated_var).abs()
+                # Filter and compute mean only for valid cases
+                filtered_abs_err_var: torch.Tensor = rel_err_var[mask]
+                filtered_estimated_var: torch.Tensor = estimated_var[mask]
+                filtered_true_var: torch.Tensor = true_var[mask]
+                filtered_rel_err_var = filtered_abs_err_var / filtered_true_var
+                
+                MicroMetricLogger().log("denominator_var_error", 
+                                        filtered_abs_err_var.mean().item(), 
+                                        metadata={"layer_idx": kwargs.get("layer_idx"), 
+                                                  "estimated_var": filtered_estimated_var.mean().item(), 
+                                                  "true_var": filtered_true_var.mean().item(),
+                                                  "rel_err_var": filtered_rel_err_var.median().item()
+                                                  })
+        if MicroMetricLogger().is_metric_enabled("numerator_trace_error"):
+            ngroups = _get_num_key_value_groups(queries, keys)
+            values = repeat_kv(values, ngroups)
+            v = values[:, :, start_idx:end_idx, :].unsqueeze(2)
+            e = expwts[:,:,:,start_idx:end_idx].unsqueeze(-1)
+            num_vals = v * e # element wise multiplication' # b, h, sq, sk, d
+ 
+            ## true trace
+            true_var_estimate = torch.var(num_vals, dim=-2, unbiased=True) # (b, h, sq, d)
+            true_numerator_trace = true_var_estimate.sum(dim=-1, keepdim=True) # (b, h, sq, 1)
+
+            ## sampled trace estimation
+            sampled_indices = torch.randperm(num_vals.shape[-2], device=num_vals.device)[:num_base_samples]
+            sampled_num_vals = num_vals[:,:,:,sampled_indices,:]
+            sampled_var_estimate = torch.var(sampled_num_vals, dim=-2, unbiased=True) # (b, h, sq, d)
+            sampled_numerator_trace = sampled_var_estimate.sum(dim=-1, keepdim=True) # (b, h, sq, 1)
+            
+            # Only log cases where true_numerator_trace > 5e-5
+            mask_numerator: torch.Tensor = true_numerator_trace > 0.01
+            if mask_numerator.any():
+                rel_err_numerator_trace = (true_numerator_trace - sampled_numerator_trace).abs()
+                # Filter and compute mean only for valid cases
+                filtered_abs_err_numerator: torch.Tensor = rel_err_numerator_trace[mask_numerator]
+                filtered_sampled_numerator: torch.Tensor = sampled_numerator_trace[mask_numerator]
+                filtered_true_numerator: torch.Tensor = true_numerator_trace[mask_numerator]
+                filtered_rel_err_numerator = filtered_abs_err_numerator / filtered_true_numerator
+                MicroMetricLogger().log("numerator_trace_error", 
+                                        filtered_abs_err_numerator.mean().item(), 
+                                        metadata={"layer_idx": kwargs.get("layer_idx"), 
+                                                  "estimated_numerator_trace": filtered_sampled_numerator.mean().item(), 
+                                                  "true_numerator_trace": filtered_true_numerator.mean().item(),
+                                                  "rel_err_numerator_trace": filtered_rel_err_numerator.median().item()
+                                                  })
 
         # Create adaptive sampling mask
         sampling_probabilities = (budget / sampling_range).to(previous_mask.dtype)
